@@ -69,17 +69,17 @@ bool UWeaponAttackComponent::LoadTraceConfig(const FGameplayTagContainer& Attack
 	if (!WeaponData) return false;
 
 	//무기 데이터 가져오기
-	const FAttackActionData* AttackData = OwnerWeapon->GetWeaponAttackDataByTag(AttackTags);
-	if (!AttackData || AttackData->ComboAttackData.Num() == 0) return false;
+	const FTaggedAttackData* AttackData = OwnerWeapon->GetWeaponAttackDataByTag(AttackTags);
+	if (!AttackData || AttackData->ComboSequence.Num() == 0) return false;
 
 	//콤보 인덱스 유효성 검사
-	ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboAttackData.Num() - 1);
-	const FIndividualAttackData& AttackInfo = AttackData->ComboAttackData[ComboIndex];
+	ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboSequence.Num() - 1);
+	const FAttackStats& AttackInfo = AttackData->ComboSequence[ComboIndex].AttackData;
 
 	//트레이스 설정
 	CurrentTraceConfig.AttackMotionType = AttackInfo.DamageType;
-	CurrentTraceConfig.SocketCount = WeaponData->SweepTraceSocketCount;
-	CurrentTraceConfig.TraceRadius = WeaponData->SweepTraceRadius;
+	CurrentTraceConfig.SocketCount = WeaponData->HitSocketCount;
+	CurrentTraceConfig.TraceRadius = WeaponData->HitRadius;
 
 	//공격 데이터 설정
 	CurrentAttackData.FinalDamage = OwnerWeapon->GetCalculatedDamage() * AttackInfo.DamageMultiplier;

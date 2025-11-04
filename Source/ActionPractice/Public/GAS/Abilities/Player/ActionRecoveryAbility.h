@@ -77,7 +77,7 @@ protected:
 	virtual bool ConsumeStamina();
 	
 	UFUNCTION()
-	virtual void RotateCharacter();
+	virtual bool RotateCharacter();
 	
 	UFUNCTION()
 	virtual void PlayAction() override;

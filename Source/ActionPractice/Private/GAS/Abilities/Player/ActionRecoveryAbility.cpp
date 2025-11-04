@@ -7,7 +7,7 @@
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionRecoveryAbility, Log, All);
@@ -106,28 +106,33 @@ bool UActionRecoveryAbility::ConsumeStamina()
 	return true;
 }
 
-void UActionRecoveryAbility::RotateCharacter()
+bool UActionRecoveryAbility::RotateCharacter()
 {
 	if (!bRotateBeforeAction)
 	{
-		return;
+		return false;
 	}
 
 	if (AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo())
 	{
+		DEBUG_LOG(TEXT("Rotating Character"));
 		Character->RotateCharacterToInputDirection(RotateTime, bIgnoreLockOn);
+		return true;
 	}
+
+	return false;
 }
 
 void UActionRecoveryAbility::PlayAction()
 {
 	if (!ConsumeStamina()) return;
 	AddStateRecoveringTag();
-	RotateCharacter();
+
+	bool bShouldRotate = RotateCharacter();
 
 	//캐릭터가 회전을 마칠 때까지 기다린 후에 몽타주 태스크 실행
-	//bRotateBeforeAction이 false면 즉시 실행
-	float DelayTime = bRotateBeforeAction ? RotateTime : 0.0f;
+	//회전하지 않으면 즉시 실행
+	float DelayTime = bShouldRotate ? RotateTime : 0.0f;
 	WaitDelayTask = UAbilityTask_WaitDelay::WaitDelay(this, DelayTime);
 	if (WaitDelayTask)
 	{

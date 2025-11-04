@@ -52,7 +52,7 @@ protected:
 	virtual void ActivateInitSettings() override;
 	virtual void SetHitDetectionConfig() override;
 	virtual void SetStaminaCost(float InStaminaCost) override;
-	virtual void RotateCharacter() override;
+	virtual bool RotateCharacter() override;
 	virtual UAnimMontage* SetMontageToPlayTask() override;
 	virtual void ExecuteMontageTask() override;
 	virtual void BindEventsAndReadyMontageTask() override;

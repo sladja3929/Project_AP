@@ -111,8 +111,8 @@ void UBaseAttackAbility::ActivateInitSettings()
 
 bool UBaseAttackAbility::ConsumeStamina()
 {
-    SetStaminaCost(WeaponAttackData->ComboAttackData[ComboCounter].StaminaCost);
-    
+    SetStaminaCost(WeaponAttackData->ComboSequence[ComboCounter].AttackData.StaminaCost);
+
     return Super::ConsumeStamina();
 }
 
@@ -126,7 +126,7 @@ void UBaseAttackAbility::PlayAction()
 UAnimMontage* UBaseAttackAbility::SetMontageToPlayTask()
 {
     if (ComboCounter < 0) ComboCounter = 0;
-    return WeaponAttackData->AttackMontages[ComboCounter].Get();
+    return WeaponAttackData->ComboSequence[ComboCounter].AttackMontage.Get();
 }
 
 void UBaseAttackAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)

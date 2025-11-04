@@ -10,7 +10,7 @@ struct FFinalAttackData;
 class UAbilityTask_PlayMontageWithEvents;
 class UAbilityTask_WaitGameplayEvent;
 
-struct FAttackActionData;
+struct FTaggedAttackData;
 UCLASS()
 class ACTIONPRACTICE_API UBaseAttackAbility : public UActionRecoveryAbility, public IHitDetectionUser
 {
@@ -27,7 +27,7 @@ public:
 protected:
 #pragma region "Protected Vriables" //================================================
 
-	const FAttackActionData* WeaponAttackData = nullptr;
+	const FTaggedAttackData* WeaponAttackData = nullptr;
 	
 	int32 ComboCounter = 0;
 	int32 MaxComboCount = 0;

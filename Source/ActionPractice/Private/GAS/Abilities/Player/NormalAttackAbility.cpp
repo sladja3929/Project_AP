@@ -39,9 +39,9 @@ void UNormalAttackAbility::ActivateInitSettings()
     Super::ActivateInitSettings();
 
     ReadyInputByBufferTask();
-    
+
     //무기 데이터 적용
-    MaxComboCount = WeaponAttackData->ComboAttackData.Num();
+    MaxComboCount = WeaponAttackData->ComboSequence.Num();
     
     bCreateTask = true;
 }

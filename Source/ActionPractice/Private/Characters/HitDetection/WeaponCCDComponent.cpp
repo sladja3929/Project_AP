@@ -51,11 +51,11 @@ void UWeaponCCDComponent::BeginPlay()
         
         // 소켓 기반으로 캡슐 높이만 계산
         const UWeaponDataAsset* WeaponData = OwnerWeapon->GetWeaponData();
-        if (WeaponData && WeaponData->SweepTraceSocketCount >= 2)
+        if (WeaponData && WeaponData->HitSocketCount >= 2)
         {
             FName FirstSocket = FName(*FString::Printf(TEXT("trace_socket_0")));
             FName LastSocket = FName(*FString::Printf(TEXT("trace_socket_%d"), 
-                                                      WeaponData->SweepTraceSocketCount - 1));
+                                                      WeaponData->HitSocketCount - 1));
             
             if (WeaponMesh->DoesSocketExist(FirstSocket) && 
                 WeaponMesh->DoesSocketExist(LastSocket))
@@ -317,22 +317,22 @@ void UWeaponCCDComponent::ResetHitActors()
 bool UWeaponCCDComponent::LoadAttackConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex)
 {
     if (!OwnerWeapon) return false;
-    
+
     const UWeaponDataAsset* WeaponData = OwnerWeapon->GetWeaponData();
     if (!WeaponData) return false;
-    
-    const FAttackActionData* AttackData = OwnerWeapon->GetWeaponAttackDataByTag(AttackTags);
-    if (!AttackData || AttackData->ComboAttackData.Num() == 0) return false;
-    
-    ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboAttackData.Num() - 1);
-    const FIndividualAttackData& AttackInfo = AttackData->ComboAttackData[ComboIndex];
-    
+
+    const FTaggedAttackData* AttackData = OwnerWeapon->GetWeaponAttackDataByTag(AttackTags);
+    if (!AttackData || AttackData->ComboSequence.Num() == 0) return false;
+
+    ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboSequence.Num() - 1);
+    const FAttackStats& AttackInfo = AttackData->ComboSequence[ComboIndex].AttackData;
+
     CurrentAttackData.DamageType = AttackInfo.DamageType;
     CurrentAttackData.FinalDamage = OwnerWeapon->GetCalculatedDamage() * AttackInfo.DamageMultiplier;
     CurrentAttackData.PoiseDamage = AttackInfo.PoiseDamage;
-    
+
     // UpdateCapsuleSize 호출 제거 - 고정 크기 유지
-    
+
     return true;
 }
 
