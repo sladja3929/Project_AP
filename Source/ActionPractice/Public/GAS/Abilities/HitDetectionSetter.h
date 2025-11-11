@@ -48,7 +48,8 @@ public:
 
 	//PrepareHitDetection 호출
 	bool PrepareHitDetection(const FGameplayTagContainer& AssetTag, const int32 ComboCounter);
-	
+	bool PrepareHitDetection(const FName& AttackName, const int32 ComboCounter);
+
 	bool IsValid() const;
 
 private:

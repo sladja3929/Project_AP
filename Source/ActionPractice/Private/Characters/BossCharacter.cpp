@@ -10,6 +10,7 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Characters/HitDetection/EnemyAttackComponent.h"
+#include "Characters/Enemy/EnemyDataAsset.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -69,6 +70,13 @@ void ABossCharacter::CreateAttributeSet()
 void ABossCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	//EnemyData의 모든 몽타주 프리로드
+	if (EnemyData)
+	{
+		EnemyData->PreloadAllMontages();
+		DEBUG_LOG(TEXT("EnemyData montages preloaded"));
+	}
 
 	//AIController의 Perception 델리게이트 바인딩
 	AEnemyAIController* BossController = GetEnemyAIController();

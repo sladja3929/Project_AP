@@ -9,6 +9,10 @@
 class UAbilityTask_PlayMontageWithEvents;
 struct FFinalAttackData;
 
+/***
+ * EnemyAttack은 플레이어와 달리 공격 몽타주는 하나
+ * 단, 하나의 몽타주에서 현재 콤보 정보를 알 수 있도록 노티파이 부착
+ */
 UCLASS()
 class ACTIONPRACTICE_API UEnemyAttackAbility : public UEnemyAbility, public IHitDetectionUser, public IMontageAbilityInterface
 {
@@ -17,8 +21,8 @@ class ACTIONPRACTICE_API UEnemyAttackAbility : public UEnemyAbility, public IHit
 public:
 #pragma region "Public Variables"
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
-	TObjectPtr<UAnimMontage> Montage;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
+	FName AttackName = NAME_None;
 
 #pragma endregion
 
@@ -47,8 +51,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rotation")
 	float RotateTime = 0.1f;
 
+	//콤보 카운터
+	int32 ComboCounter = -1;
+
 	//사용되는 태그들
 	FGameplayTag EventNotifyRotateToTargetTag;
+	FGameplayTag EventNotifyAddComboTag;
 
 #pragma endregion
 
@@ -83,6 +91,10 @@ protected:
 	//RotateToTarget 노티파이 콜백 함수
 	UFUNCTION()
 	virtual void OnEventRotateToTarget(FGameplayEventData Payload);
+
+	//AddCombo 노티파이 콜백 함수
+	UFUNCTION()
+	virtual void OnEventAddCombo(FGameplayEventData Payload);
 
 #pragma endregion
 

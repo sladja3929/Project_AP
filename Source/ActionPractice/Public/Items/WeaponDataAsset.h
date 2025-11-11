@@ -80,12 +80,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Info")
     EWeaponEnums WeaponType = EWeaponEnums::None;
 
+    //공격 시작점 소켓 정보
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Info")
-    int32 HitSocketCount = 2;
+    TArray<FHitSocketInfo> HitSocketInfo;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Info")
-    float HitRadius = 10.0f;
-    
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Stats")
     float BaseDamage = 100.0f;
 
@@ -102,7 +100,22 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Block Definitions")
     FBlockActionData BlockData;
-    
+
+    //GetOptions용 함수 - HitSocketInfo에서 소켓 그룹 이름들을 반환
+    UFUNCTION()
+    TArray<FString> GetSocketGroupNames() const
+    {
+        TArray<FString> Names;
+        for (const FHitSocketInfo& Info : HitSocketInfo)
+        {
+            if (Info.HitSocketName != NAME_None)
+            {
+                Names.Add(Info.HitSocketName.ToString());
+            }
+        }
+        return Names;
+    }
+
     void PreloadAllMontages()
     {
         TArray<FSoftObjectPath> AssetsToLoad;

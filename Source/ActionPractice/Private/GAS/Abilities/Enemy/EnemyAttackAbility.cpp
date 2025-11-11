@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Characters/BossCharacter.h"
+#include "Characters/Enemy/EnemyDataAsset.h"
 #include "GAS/AbilitySystemComponent/BossAbilitySystemComponent.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "GAS/GameplayTagsSubsystem.h"
@@ -10,7 +11,7 @@
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAttackAbility, Log, All);
@@ -24,10 +25,16 @@ void UEnemyAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 	Super::OnGiveAbility(ActorInfo, Spec);
 
 	EventNotifyRotateToTargetTag = UGameplayTagsSubsystem::GetEventNotifyRotateToTargetTag();
+	EventNotifyAddComboTag = UGameplayTagsSubsystem::GetEventNotifyAddComboTag();
 
 	if (!EventNotifyRotateToTargetTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("EventNotifyRotateToTargetTag is not valid"));
+	}
+
+	if (!EventNotifyAddComboTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("EventNotifyAddComboTag is not valid"));
 	}
 }
 
@@ -35,24 +42,17 @@ void UEnemyAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
+	ComboCounter = -1;
 	PlayAction();
 }
 
 void UEnemyAttackAbility::SetHitDetectionConfig()
 {
-	//캐릭터에 공격 정보 제공
 	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
 	if (!BossCharacter)
 	{
 		DEBUG_LOG(TEXT("No Character"));
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-		return;
-	}
-
-	FGameplayTagContainer AssetTag = GetAssetTags();
-	if (AssetTag.IsEmpty())
-	{
-		DEBUG_LOG(TEXT("No AssetTags"));
 		return;
 	}
 
@@ -71,16 +71,6 @@ void UEnemyAttackAbility::SetHitDetectionConfig()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
-
-	//PrepareHitDetection 호출 (ComboCounter는 0으로 고정)
-	if (!HitDetectionSetter.PrepareHitDetection(AssetTag, 0))
-	{
-		DEBUG_LOG(TEXT("Failed to prepare HitDetection"));
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-		return;
-	}
-
-	DEBUG_LOG(TEXT("Enemy Attack Ability: Call Hit Detection Prepare"));
 }
 
 void UEnemyAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& HitResult, FFinalAttackData AttackData)
@@ -118,8 +108,29 @@ void UEnemyAttackAbility::PlayAction()
 
 UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 {
-	DEBUG_LOG(TEXT("SetMontageToPlayTask called"));
-	return Montage;
+	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
+	if (!BossCharacter)
+	{
+		DEBUG_LOG(TEXT("SetMontageToPlayTask: No BossCharacter"));
+		return nullptr;
+	}
+
+	const UEnemyDataAsset* EnemyData = BossCharacter->GetEnemyData();
+	if (!EnemyData)
+	{
+		DEBUG_LOG(TEXT("SetMontageToPlayTask: No EnemyData"));
+		return nullptr;
+	}
+
+	const FNamedAttackData* AttackData = EnemyData->NamedAttackData.Find(AttackName);
+	if (!AttackData)
+	{
+		DEBUG_LOG(TEXT("SetMontageToPlayTask: Attack data not found for name: %s"), *AttackName.ToString());
+		return nullptr;
+	}
+
+	DEBUG_LOG(TEXT("SetMontageToPlayTask: Found montage for attack: %s"), *AttackName.ToString());
+	return AttackData->AttackMontage.Get();
 }
 
 void UEnemyAttackAbility::ExecuteMontageTask()
@@ -161,6 +172,7 @@ void UEnemyAttackAbility::BindEventsAndReadyMontageTask()
 
 	//노티파이 이벤트 바인딩
 	PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(EventNotifyRotateToTargetTag);
+	PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(EventNotifyAddComboTag);
 
 	//태스크 활성화
 	PlayMontageWithEventsTask->ReadyForActivation();
@@ -183,6 +195,10 @@ void UEnemyAttackAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)
 	if (Payload.EventTag == EventNotifyRotateToTargetTag)
 	{
 		OnEventRotateToTarget(Payload);
+	}
+	else if (Payload.EventTag == EventNotifyAddComboTag)
+	{
+		OnEventAddCombo(Payload);
 	}
 }
 
@@ -214,6 +230,22 @@ void UEnemyAttackAbility::OnEventRotateToTarget(FGameplayEventData Payload)
 	//타겟을 향해 회전
 	BossCharacter->RotateToTarget(TargetPlayer, RotateTime);
 	DEBUG_LOG(TEXT("OnEventRotateToTarget: Rotating to %s"), *TargetPlayer->GetName());
+}
+
+void UEnemyAttackAbility::OnEventAddCombo(FGameplayEventData Payload)
+{
+	ComboCounter++;
+
+	DEBUG_LOG(TEXT("OnEventAddCombo: ComboCounter incremented to %d"), ComboCounter);
+
+	//PrepareHitDetection으로 공격 데이터 갱신
+	if (!HitDetectionSetter.PrepareHitDetection(AttackName, ComboCounter))
+	{
+		DEBUG_LOG(TEXT("OnEventAddCombo: Failed to prepare HitDetection for combo %d"), ComboCounter);
+		return;
+	}
+
+	DEBUG_LOG(TEXT("OnEventAddCombo: HitDetection prepared for combo %d"), ComboCounter);
 }
 
 void UEnemyAttackAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)

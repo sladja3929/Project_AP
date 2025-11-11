@@ -9,6 +9,7 @@
 class UBossHealthWidget;
 class AActionPracticeCharacter;
 class UEnemyAttackComponent;
+class UEnemyDataAsset;
 
 UCLASS()
 class ACTIONPRACTICE_API ABossCharacter : public ABaseCharacter
@@ -35,13 +36,18 @@ public:
 	FORCEINLINE UBossAttributeSet* GetAttributeSet() const { return Cast<UBossAttributeSet>(AttributeSet); }
 	FORCEINLINE UBossHealthWidget* GetBossHealthWidget() const { return BossHealthWidget; }
 	FORCEINLINE class AEnemyAIController* GetEnemyAIController() const { return Cast<AEnemyAIController>(GetController()); }
-	
+
+	const UEnemyDataAsset* GetEnemyData() const { return EnemyData.Get(); }
+
 	void RotateToTarget(const AActor* TargetActor, float RotateTime);
 
 #pragma endregion
 
 protected:
 #pragma region "Protected Variables"
+
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
+	TObjectPtr<UEnemyDataAsset> EnemyData;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UBossHealthWidget> BossHealthWidgetClass;

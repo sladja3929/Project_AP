@@ -34,6 +34,13 @@ void UWeaponAttackComponent::BeginPlay()
 
 	Super::BeginPlay();
 
+	//WeaponData의 모든 소켓 정보를 미리 빌드
+	const UWeaponDataAsset* WeaponData = OwnerWeapon->GetWeaponData();
+	if (WeaponData)
+	{
+		BuildSocketConfigs(WeaponData->HitSocketInfo);
+	}
+
 	//디버그용 1번 키 바인딩
 	if (GetWorld())
 	{
@@ -63,28 +70,62 @@ UAbilitySystemComponent* UWeaponAttackComponent::GetOwnerASC() const
 #pragma region "Trace Config Functions"
 bool UWeaponAttackComponent::LoadTraceConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex)
 {
-	if (!OwnerWeapon) return false;
+	DEBUG_LOG(TEXT("LoadTraceConfig - START, ComboIndex: %d"), ComboIndex);
+
+	if (!OwnerWeapon)
+	{
+		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No OwnerWeapon"));
+		return false;
+	}
 
 	const UWeaponDataAsset* WeaponData = OwnerWeapon->GetWeaponData();
-	if (!WeaponData) return false;
+	if (!WeaponData)
+	{
+		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No WeaponData"));
+		return false;
+	}
 
 	//무기 데이터 가져오기
 	const FTaggedAttackData* AttackData = OwnerWeapon->GetWeaponAttackDataByTag(AttackTags);
-	if (!AttackData || AttackData->ComboSequence.Num() == 0) return false;
+	if (!AttackData || AttackData->ComboSequence.Num() == 0)
+	{
+		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No AttackData or empty ComboSequence"));
+		return false;
+	}
 
 	//콤보 인덱스 유효성 검사
 	ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboSequence.Num() - 1);
 	const FAttackStats& AttackInfo = AttackData->ComboSequence[ComboIndex].AttackData;
 
-	//트레이스 설정
-	CurrentTraceConfig.AttackMotionType = AttackInfo.DamageType;
-	CurrentTraceConfig.SocketCount = WeaponData->HitSocketCount;
-	CurrentTraceConfig.TraceRadius = WeaponData->HitRadius;
+	UsingHitSocketGroups.Empty();
+
+	//AttackStats의 UsingSocketConfigs에서 사용할 소켓들을 가져옴
+	for (const FAttackSocketConfig& SocketConfig : AttackInfo.UsingSocketConfigs)
+	{
+		if (FHitSocketGroupConfig* PrebuiltSocketGroup = PrebuiltSocketGroups.Find(SocketConfig.SocketName))
+		{
+			//미리 빌드된 설정을 복사하고 DamageType과 TraceRadius 설정
+			FHitSocketGroupConfig SocketGroupConfig = *PrebuiltSocketGroup;
+			SocketGroupConfig.AttackMotionType = AttackInfo.DamageType;
+			SocketGroupConfig.TraceRadius = SocketConfig.TraceRadius;
+
+			UsingHitSocketGroups.Add(SocketConfig.SocketName, SocketGroupConfig);
+			DEBUG_LOG(TEXT("LoadTraceConfig - Added socket group: %s, SocketCount: %d, Radius: %.2f"),
+				*SocketConfig.SocketName.ToString(), SocketGroupConfig.SocketCount, SocketGroupConfig.TraceRadius);
+		}
+		else
+		{
+			DEBUG_LOG(TEXT("LoadTraceConfig - Socket not found in PrebuiltSocketGroups: %s"), *SocketConfig.SocketName.ToString());
+		}
+	}
 
 	//공격 데이터 설정
 	CurrentAttackData.FinalDamage = OwnerWeapon->GetCalculatedDamage() * AttackInfo.DamageMultiplier;
 	CurrentAttackData.PoiseDamage = AttackInfo.PoiseDamage;
 	CurrentAttackData.DamageType = AttackInfo.DamageType;
+
+	DEBUG_LOG(TEXT("LoadTraceConfig - SUCCESS: Added %d socket groups, FinalDamage: %.2f"),
+		UsingHitSocketGroups.Num(), CurrentAttackData.FinalDamage);
 
 	return true;
 }
@@ -92,15 +133,12 @@ bool UWeaponAttackComponent::LoadTraceConfig(const FGameplayTagContainer& Attack
 void UWeaponAttackComponent::SetOwnerMesh()
 {
 	OwnerMesh = OwnerWeapon->FindComponentByClass<UStaticMeshComponent>();
-	//무기 끝 소켓까지 확인
-	if (!OwnerMesh || !OwnerMesh->DoesSocketExist(FName(*FString::Printf(TEXT("trace_socket_0")))))
+
+	if (!OwnerMesh)
 	{
-		OwnerMesh = nullptr;
-		DEBUG_LOG(TEXT("WeaponCollisionComponent: No Weapon StaticMesh or trace_socket_0"));
+		DEBUG_LOG(TEXT("WeaponCollisionComponent: No Weapon StaticMesh"));
 		return;
 	}
-
-	TipSocketName = FName(*FString::Printf(TEXT("%s0"), *SocketNamePrefix.ToString()));
 }
 #pragma endregion
 

@@ -43,39 +43,45 @@ void UWeaponCCDComponent::BeginPlay()
         DEBUG_LOG(TEXT("WeaponCCDComponent: Owner is not a weapon!"));
         return;
     }
-    
+
+    const UWeaponDataAsset* WeaponData = OwnerWeapon->GetWeaponData();
     UStaticMeshComponent* WeaponMesh = OwnerWeapon->FindComponentByClass<UStaticMeshComponent>();
     if (WeaponMesh)
     {
         AttachToComponent(WeaponMesh, FAttachmentTransformRules::KeepRelativeTransform);
         
-        // 소켓 기반으로 캡슐 높이만 계산
-        const UWeaponDataAsset* WeaponData = OwnerWeapon->GetWeaponData();
-        if (WeaponData && WeaponData->HitSocketCount >= 2)
+        // 소켓 기반으로 캡슐 높이만 계산 (첫 번째 소켓 정보 사용)
+        if (WeaponData && WeaponData->HitSocketInfo.Num() > 0)
         {
-            FName FirstSocket = FName(*FString::Printf(TEXT("trace_socket_0")));
-            FName LastSocket = FName(*FString::Printf(TEXT("trace_socket_%d"), 
-                                                      WeaponData->HitSocketCount - 1));
-            
-            if (WeaponMesh->DoesSocketExist(FirstSocket) && 
-                WeaponMesh->DoesSocketExist(LastSocket))
+            const FHitSocketInfo& FirstSocketInfo = WeaponData->HitSocketInfo[0];
+            if (FirstSocketInfo.HitSocketCount >= 2)
             {
-                FVector FirstPos = WeaponMesh->GetSocketLocation(FirstSocket);
-                FVector LastPos = WeaponMesh->GetSocketLocation(LastSocket);
-                
-                // 무기 길이를 캡슐 높이로 설정
-                float WeaponLength = (FirstPos - LastPos).Size();
-                DefaultCapsuleHalfHeight = WeaponLength * 0.5f;
-                
-                // 캡슐을 무기 중심에 배치
-                FVector CenterPos = (FirstPos + LastPos) * 0.5f;
-                FVector LocalCenter = WeaponMesh->GetComponentTransform().InverseTransformPosition(CenterPos);
-                SetRelativeLocation(LocalCenter);
-                
-                // 무기 방향에 맞춰 회전
-                FVector WeaponDirection = (FirstPos - LastPos).GetSafeNormal();
-                FRotator CapsuleRotation = FRotationMatrix::MakeFromZ(WeaponDirection).Rotator();
-                SetRelativeRotation(CapsuleRotation);
+                FName FirstSocket = FName(*FString::Printf(TEXT("%s_0"),
+                                                           *FirstSocketInfo.HitSocketName.ToString()));
+                FName LastSocket = FName(*FString::Printf(TEXT("%s_%d"),
+                                                          *FirstSocketInfo.HitSocketName.ToString(),
+                                                          FirstSocketInfo.HitSocketCount - 1));
+
+                if (WeaponMesh->DoesSocketExist(FirstSocket) &&
+                    WeaponMesh->DoesSocketExist(LastSocket))
+                {
+                    FVector FirstPos = WeaponMesh->GetSocketLocation(FirstSocket);
+                    FVector LastPos = WeaponMesh->GetSocketLocation(LastSocket);
+
+                    // 무기 길이를 캡슐 높이로 설정
+                    float WeaponLength = (FirstPos - LastPos).Size();
+                    DefaultCapsuleHalfHeight = WeaponLength * 0.5f;
+
+                    // 캡슐을 무기 중심에 배치
+                    FVector CenterPos = (FirstPos + LastPos) * 0.5f;
+                    FVector LocalCenter = WeaponMesh->GetComponentTransform().InverseTransformPosition(CenterPos);
+                    SetRelativeLocation(LocalCenter);
+
+                    // 무기 방향에 맞춰 회전
+                    FVector WeaponDirection = (FirstPos - LastPos).GetSafeNormal();
+                    FRotator CapsuleRotation = FRotationMatrix::MakeFromZ(WeaponDirection).Rotator();
+                    SetRelativeRotation(CapsuleRotation);
+                }
             }
         }
         else
