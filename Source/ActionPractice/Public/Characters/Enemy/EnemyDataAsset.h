@@ -10,22 +10,15 @@
 
 class UAnimMontage;
 
+//FName으로 식별되는 공격 데이터
 USTRUCT(BlueprintType)
 struct FNamedAttackData
 {
     GENERATED_BODY()
 
-    //메인 공격 몽타주
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
-    TSoftObjectPtr<UAnimMontage> AttackMontage;
-
-    //보조 몽타주 (차지 액션 등, 필요한 경우만 사용)
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
-    TSoftObjectPtr<UAnimMontage> SubAttackMontage;
-
-    //공격 정보들, 하나의 몽타주에 여러개의 콤보 정보를 넣을 수 있음
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
-    TArray<FAttackStats> AttackStats;
+    //콤보 시퀀스 (1번 공격, 2번 공격, 3번 공격...)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combo")
+    TArray<FComboAttackUnit> ComboSequence;
 };
 
 UCLASS(BlueprintType)
@@ -68,14 +61,17 @@ public:
         {
             const FNamedAttackData& AttackData = Pair.Value;
 
-            if (!AttackData.AttackMontage.IsNull())
+            for (const FComboAttackUnit& ComboUnit : AttackData.ComboSequence)
             {
-                AssetsToLoad.Add(AttackData.AttackMontage.ToSoftObjectPath());
-            }
+                if (!ComboUnit.AttackMontage.IsNull())
+                {
+                    AssetsToLoad.Add(ComboUnit.AttackMontage.ToSoftObjectPath());
+                }
 
-            if (!AttackData.SubAttackMontage.IsNull())
-            {
-                AssetsToLoad.Add(AttackData.SubAttackMontage.ToSoftObjectPath());
+                if (!ComboUnit.SubAttackMontage.IsNull())
+                {
+                    AssetsToLoad.Add(ComboUnit.SubAttackMontage.ToSoftObjectPath());
+                }
             }
         }
 

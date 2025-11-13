@@ -23,9 +23,8 @@ UBaseAttackAbility::UBaseAttackAbility()
     StaminaCost = 15.0f;
 }
 
-void UBaseAttackAbility::SetHitDetectionConfig()
+void UBaseAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-    //캐릭터에 공격 정보 제공
     AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
     if (!Character)
     {
@@ -33,14 +32,7 @@ void UBaseAttackAbility::SetHitDetectionConfig()
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
         return;
     }
-
-    FGameplayTagContainer AssetTag = GetAssetTags();
-    if (AssetTag.IsEmpty())
-    {
-        DEBUG_LOG(TEXT("No AssetTags"));
-        return;
-    }
-
+    
     //HitDetectionSetter 초기화
     if (!HitDetectionSetter.Init(Character->GetHitDetectionInterface()))
     {
@@ -56,7 +48,19 @@ void UBaseAttackAbility::SetHitDetectionConfig()
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
         return;
     }
+    
+    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+}
 
+void UBaseAttackAbility::SetHitDetectionConfig()
+{
+    FGameplayTagContainer AssetTag = GetAssetTags();
+    if (AssetTag.IsEmpty())
+    {
+        DEBUG_LOG(TEXT("No AssetTags"));
+        return;
+    }
+    
     //PrepareHitDetection 호출
     if (!HitDetectionSetter.PrepareHitDetection(AssetTag, ComboCounter))
     {

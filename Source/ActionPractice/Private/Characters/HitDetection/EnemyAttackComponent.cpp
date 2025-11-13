@@ -84,15 +84,15 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 Combo
 	}
 
 	const FNamedAttackData* AttackData = EnemyData->NamedAttackData.Find(AttackName);
-	if (!AttackData || AttackData->AttackStats.Num() == 0)
+	if (!AttackData || AttackData->ComboSequence.Num() == 0)
 	{
-		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No AttackData or empty AttackStats"));
+		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No AttackData or empty ComboSequence"));
 		return false;
 	}
 
 	//콤보 인덱스 유효성 검사
-	ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->AttackStats.Num() - 1);
-	const FAttackStats& AttackInfo = AttackData->AttackStats[ComboIndex];
+	ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboSequence.Num() - 1);
+	const FAttackStats& AttackInfo = AttackData->ComboSequence[ComboIndex].AttackData;
 
 	UsingHitSocketGroups.Empty();
 

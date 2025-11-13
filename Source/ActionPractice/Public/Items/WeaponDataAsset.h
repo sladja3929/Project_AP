@@ -11,25 +11,6 @@
 
 class UAnimMontage;
 
-//하나의 콤보 단위 (몽타주 - 데이터 - 보조몽타주를 하나로 묶음)
-USTRUCT(BlueprintType)
-struct FComboAttackUnit
-{
-    GENERATED_BODY()
-
-    //메인 공격 몽타주
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
-    TSoftObjectPtr<UAnimMontage> AttackMontage;
-
-    //이 콤보의 공격 데이터
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
-    FAttackStats AttackData;
-
-    //보조 몽타주 (차지 액션 등, 필요한 경우만 사용)
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
-    TSoftObjectPtr<UAnimMontage> SubAttackMontage;
-};
-
 //TMap 대신 사용할 구조체
 USTRUCT(BlueprintType)
 struct FTaggedAttackData

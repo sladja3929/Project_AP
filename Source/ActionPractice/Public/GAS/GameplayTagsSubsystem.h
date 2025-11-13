@@ -52,6 +52,7 @@ public:
 	static const FGameplayTag& GetEventNotifyHitDetectionStartTag();
 	static const FGameplayTag& GetEventNotifyHitDetectionEndTag();
 	static const FGameplayTag& GetEventNotifyRotateToTargetTag();
+	static const FGameplayTag& GetEventNotifyCheckConditionTag();
 	static const FGameplayTag& GetEventNotifyAddComboTag();
 	static const FGameplayTag& GetEventActionInputByBufferTag();
 	static const FGameplayTag& GetEventActionPlayBufferTag();
@@ -107,6 +108,7 @@ private:
 	const FGameplayTag& GetEventNotifyHitDetectionStartTagInternal() const;
 	const FGameplayTag& GetEventNotifyHitDetectionEndTagInternal() const;
 	const FGameplayTag& GetEventNotifyRotateToTargetTagInternal() const;
+	const FGameplayTag& GetEventNotifyCheckConditionTagInternal() const;
 	const FGameplayTag& GetEventNotifyAddComboTagInternal() const;
 	const FGameplayTag& GetEventActionInputByBufferTagInternal() const;
 	const FGameplayTag& GetEventActionPlayBufferTagInternal() const;

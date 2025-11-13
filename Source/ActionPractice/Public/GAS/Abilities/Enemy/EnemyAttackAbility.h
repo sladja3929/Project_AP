@@ -4,14 +4,15 @@
 #include "GAS/Abilities/Enemy/EnemyAbility.h"
 #include "GAS/Abilities/HitDetectionSetter.h"
 #include "GAS/Abilities/MontageAbilityInterface.h"
+#include "AI/EnemyAIController.h"
 #include "EnemyAttackAbility.generated.h"
 
 class UAbilityTask_PlayMontageWithEvents;
 struct FFinalAttackData;
+struct FNamedAttackData;
 
 /***
- * EnemyAttack은 플레이어와 달리 공격 몽타주는 하나
- * 단, 하나의 몽타주에서 현재 콤보 정보를 알 수 있도록 노티파이 부착
+ *
  */
 UCLASS()
 class ACTIONPRACTICE_API UEnemyAttackAbility : public UEnemyAbility, public IHitDetectionUser, public IMontageAbilityInterface
@@ -48,15 +49,35 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
 	TSubclassOf<UGameplayEffect> DamageInstantEffect;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rotation")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config")
 	float RotateTime = 0.1f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config")
+	float MaxTargetDistance = 150.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config")
+	float MaxTargetAngle = 60.0f;
+
+	//공격 데이터
+	const FNamedAttackData* EnemyAttackData = nullptr;
+
 	//콤보 카운터
-	int32 ComboCounter = -1;
+	int32 ComboCounter = 0;
+	int32 MaxComboCount = 0;
+
+	//다음 콤보를 이어갈지 여부 체크
+	bool bPerformNextCombo = true;
+
+	//ExecuteMontageTask 파라미터
+	bool bCreateTask = false;
+
+	//Ability 시작 시 캐싱된 Target 정보
+	FCurrentTarget CachedTargetInfo;
 
 	//사용되는 태그들
 	FGameplayTag EventNotifyRotateToTargetTag;
-	FGameplayTag EventNotifyAddComboTag;
+	FGameplayTag EventNotifyCheckConditionTag;
+	FGameplayTag EventNotifyActionRecoveryEndTag;
 
 #pragma endregion
 
@@ -92,9 +113,17 @@ protected:
 	UFUNCTION()
 	virtual void OnEventRotateToTarget(FGameplayEventData Payload);
 
-	//AddCombo 노티파이 콜백 함수
+	//CheckCondition 노티파이 콜백 함수
 	UFUNCTION()
-	virtual void OnEventAddCombo(FGameplayEventData Payload);
+	virtual void OnEventCheckCondition(FGameplayEventData Payload);
+
+	//ActionRecoveryEnd 노티파이 콜백 함수
+	UFUNCTION()
+	virtual void OnEventActionRecoveryEnd(FGameplayEventData Payload);
+
+	//다음 콤보 실행 함수
+	UFUNCTION()
+	void PlayNextCombo();
 
 #pragma endregion
 
