@@ -44,18 +44,11 @@ void UChargeAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorI
 void UChargeAttackAbility::ActivateInitSettings()
 {
     Super::ActivateInitSettings();
-
-    //SubAttack: 차지 몽타주, Attack: 공격 실행 몽타주
-    if (WeaponAttackData->SubAttackMontages.Num() != WeaponAttackData->AttackMontages.Num())
-    {
-        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-        return;
-    }
-
-    ReadyInputByBufferTask();
     
-    //무기 데이터 적용
-    MaxComboCount = WeaponAttackData->ComboAttackData.Num();
+    ReadyInputByBufferTask();
+
+    //무기 데이터 적용, SubAttack: 차지 몽타주, Attack: 공격 실행 몽타주
+    MaxComboCount = WeaponAttackData->ComboSequence.Num();
     
     bMaxCharged = false;
     bIsCharging = false;
@@ -93,18 +86,21 @@ void UChargeAttackAbility::SetStaminaCost(float InStaminaCost)
     Super::SetStaminaCost(InStaminaCost);
 }
 
-void UChargeAttackAbility::RotateCharacter()
+bool UChargeAttackAbility::RotateCharacter()
 {
-    if (!bIsAttackMontage) return;
+    if (!bIsAttackMontage)
+    {
+        return false;
+    }
 
-    Super::RotateCharacter();
+    return Super::RotateCharacter();
 }
 
 UAnimMontage* UChargeAttackAbility::SetMontageToPlayTask()
 {
     if (ComboCounter < 0) ComboCounter = 0;
-    if (!bIsAttackMontage) return WeaponAttackData->SubAttackMontages[ComboCounter].Get();
-    
+    if (!bIsAttackMontage) return WeaponAttackData->ComboSequence[ComboCounter].SubAttackMontage.Get();
+
     return Super::SetMontageToPlayTask();
 }
 

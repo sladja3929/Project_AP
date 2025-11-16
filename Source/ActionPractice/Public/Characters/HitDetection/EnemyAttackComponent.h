@@ -34,9 +34,8 @@ protected:
 #pragma endregion
 
 #pragma region "Protected Functions"
-
-	// EnemyData에서 트레이스 설정 로드 (TODO: 나중에 EnemyDataAsset 생성 후 구현)
-	virtual bool LoadTraceConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex) override;
+	
+	virtual bool LoadTraceConfig(const FName& AttackName, int32 ComboIndex) override;
 
 	virtual void SetOwnerMesh() override;
 

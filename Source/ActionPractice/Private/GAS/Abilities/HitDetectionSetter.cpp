@@ -1,6 +1,6 @@
 #include "GAS/Abilities/HitDetectionSetter.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogHitDetectionSetter, Log, All);
@@ -67,6 +67,20 @@ bool FHitDetectionSetter::PrepareHitDetection(const FGameplayTagContainer& Asset
 	HitDetection->PrepareHitDetection(AssetTag, ComboCounter);
 
 	DEBUG_LOG(TEXT("PrepareHitDetection: Called with ComboCounter=%d"), ComboCounter);
+	return true;
+}
+
+bool FHitDetectionSetter::PrepareHitDetection(const FName& AttackName, const int32 ComboCounter)
+{
+	if(!HitDetection)
+	{
+		DEBUG_LOG(TEXT("PrepareHitDetection: HitDetection is nullptr"));
+		return false;
+	}
+
+	HitDetection->PrepareHitDetection(AttackName, ComboCounter);
+
+	DEBUG_LOG(TEXT("PrepareHitDetection: Called with AttackName=%s, ComboCounter=%d"), *AttackName.ToString(), ComboCounter);
 	return true;
 }
 

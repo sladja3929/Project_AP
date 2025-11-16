@@ -19,7 +19,7 @@ AWeapon* FWeaponAbilityStatics::GetWeaponFromAbility(const UGameplayAbility* Abi
 	return bIsLeft ? Character->GetLeftWeapon() : Character->GetRightWeapon();
 }
 
-const FAttackActionData* FWeaponAbilityStatics::GetAttackDataFromAbility(const UGameplayAbility* Ability)
+const FTaggedAttackData* FWeaponAbilityStatics::GetAttackDataFromAbility(const UGameplayAbility* Ability)
 {
 	AWeapon* Weapon = GetWeaponFromAbility(Ability, false);
 	if (!Weapon)
@@ -35,23 +35,17 @@ const FAttackActionData* FWeaponAbilityStatics::GetAttackDataFromAbility(const U
 		return nullptr;
 	}
 
-	//몽타주 검증, 데이터 배열 크기 일치 검증
-	const FAttackActionData* WeaponAttackData = Weapon->GetWeaponAttackDataByTag(AssetTag);
+	//몽타주 검증
+	const FTaggedAttackData* WeaponAttackData = Weapon->GetWeaponAttackDataByTag(AssetTag);
 	if (!WeaponAttackData)
 	{
 		DEBUG_LOG(TEXT("WeaponAbilityStatics: No AttackData"))
 		return nullptr;
 	}
-	
-	if (WeaponAttackData->AttackMontages.IsEmpty() || !WeaponAttackData->AttackMontages[0])
+
+	if (WeaponAttackData->ComboSequence.IsEmpty() || !WeaponAttackData->ComboSequence[0].AttackMontage)
 	{
 		DEBUG_LOG(TEXT("WeaponAbilityStatics: No Attack Montage"))
-		return nullptr;
-	}
-	
-	if (WeaponAttackData->AttackMontages.Num() != WeaponAttackData->ComboAttackData.Num())
-	{
-		DEBUG_LOG(TEXT("WeaponAbilityStatics: Not Same Attack List Size"))
 		return nullptr;
 	}
 
@@ -74,12 +68,13 @@ const FBlockActionData* FWeaponAbilityStatics::GetBlockDataFromAbility(const UGa
 		DEBUG_LOG(TEXT("WeaponAbilityStatics: No BlockData"))
 		return nullptr;
 	}
-	
-	if (!WeaponBlockData->BlockIdleMontage || !WeaponBlockData->BlockReactionMontage)
+
+	if (!WeaponBlockData->BlockIdleMontage || !WeaponBlockData->BlockReactionLightMontage ||
+		!WeaponBlockData->BlockReactionMiddleMontage || !WeaponBlockData->BlockReactionHeavyMontage)
 	{
 		DEBUG_LOG(TEXT("WeaponAbilityStatics: No Block Montages"))
 		return nullptr;
 	}
-	
+
 	return WeaponBlockData;
 }

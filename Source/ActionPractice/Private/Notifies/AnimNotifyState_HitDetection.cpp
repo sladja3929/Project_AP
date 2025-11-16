@@ -36,6 +36,16 @@ void UAnimNotifyState_HitDetection::NotifyBegin(USkeletalMeshComponent* MeshComp
     if (!ASC || !IsValid(ASC))
         return;
 
+    // AddCombo 이벤트 송신 (HitDetectionStart 이벤트 전에)
+    FGameplayEventData AddComboEventData;
+    AddComboEventData.Instigator = Owner;
+    AddComboEventData.Target = Owner;
+    AddComboEventData.EventTag = UGameplayTagsSubsystem::GetEventNotifyAddComboTag();
+
+    ASC->HandleGameplayEvent(UGameplayTagsSubsystem::GetEventNotifyAddComboTag(), &AddComboEventData);
+    DEBUG_LOG(TEXT("HitDetection ANS: AddCombo"));
+
+    // HitDetectionStart 이벤트 송신
     FGameplayEventData EventData;
     EventData.Instigator = Owner;
     EventData.Target = Owner;

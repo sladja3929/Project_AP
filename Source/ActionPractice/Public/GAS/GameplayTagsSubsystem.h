@@ -26,6 +26,7 @@ public:
 	static const FGameplayTag& GetAbilitySprintTag();
 	static const FGameplayTag& GetAbilityJumpTag();
 	static const FGameplayTag& GetAbilityBlockTag();
+	static const FGameplayTag& GetAbilityHitReactionTag();
 #pragma endregion
 
 #pragma region "Static State Tags"
@@ -51,6 +52,8 @@ public:
 	static const FGameplayTag& GetEventNotifyHitDetectionStartTag();
 	static const FGameplayTag& GetEventNotifyHitDetectionEndTag();
 	static const FGameplayTag& GetEventNotifyRotateToTargetTag();
+	static const FGameplayTag& GetEventNotifyCheckConditionTag();
+	static const FGameplayTag& GetEventNotifyAddComboTag();
 	static const FGameplayTag& GetEventActionInputByBufferTag();
 	static const FGameplayTag& GetEventActionPlayBufferTag();
 #pragma endregion
@@ -79,6 +82,7 @@ private:
 	const FGameplayTag& GetAbilitySprintTagInternal() const;
 	const FGameplayTag& GetAbilityJumpTagInternal() const;
 	const FGameplayTag& GetAbilityBlockTagInternal() const;
+	const FGameplayTag& GetAbilityHitReactionTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal State Tags"
@@ -104,6 +108,8 @@ private:
 	const FGameplayTag& GetEventNotifyHitDetectionStartTagInternal() const;
 	const FGameplayTag& GetEventNotifyHitDetectionEndTagInternal() const;
 	const FGameplayTag& GetEventNotifyRotateToTargetTagInternal() const;
+	const FGameplayTag& GetEventNotifyCheckConditionTagInternal() const;
+	const FGameplayTag& GetEventNotifyAddComboTagInternal() const;
 	const FGameplayTag& GetEventActionInputByBufferTagInternal() const;
 	const FGameplayTag& GetEventActionPlayBufferTagInternal() const;
 #pragma endregion

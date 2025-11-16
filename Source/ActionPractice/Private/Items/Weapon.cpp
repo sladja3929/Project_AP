@@ -77,16 +77,16 @@ const FBlockActionData* AWeapon::GetWeaponBlockData() const
 }
 
 
-const FAttackActionData* AWeapon::GetWeaponAttackDataByTag(const FGameplayTagContainer& AttackTags) const
+const FTaggedAttackData* AWeapon::GetWeaponAttackDataByTag(const FGameplayTagContainer& AttackTags) const
 {
     if (!WeaponData) return nullptr;
 
     // 첫 번째 몽타주를 체크해서, 로드가 안되었으면 로드
-    for (const FTaggedAttackData& TaggedData : WeaponData->AttackDataArray)
+    for (const FTaggedAttackData& TaggedData : WeaponData->TaggedAttackData)
     {
-        if (TaggedData.AttackData.AttackMontages.Num() > 0)
+        if (TaggedData.ComboSequence.Num() > 0)
         {
-            const TSoftObjectPtr<UAnimMontage>& FirstMontage = TaggedData.AttackData.AttackMontages[0];
+            const TSoftObjectPtr<UAnimMontage>& FirstMontage = TaggedData.ComboSequence[0].AttackMontage;
             if (!FirstMontage.IsNull() && !FirstMontage.IsValid())
             {
                 WeaponData->PreloadAllMontages();
@@ -94,16 +94,16 @@ const FAttackActionData* AWeapon::GetWeaponAttackDataByTag(const FGameplayTagCon
             }
         }
     }
-    
+
     // 정확한 매칭: 전달받은 태그 컨테이너와 정확히 일치하는 키를 찾음
-    for (const FTaggedAttackData& TaggedData : WeaponData->AttackDataArray)
+    for (const FTaggedAttackData& TaggedData : WeaponData->TaggedAttackData)
     {
         if (TaggedData.AttackTags == AttackTags)
         {
-            return &TaggedData.AttackData;
+            return &TaggedData;
         }
     }
-    
+
     return nullptr;
 }
 

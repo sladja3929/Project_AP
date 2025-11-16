@@ -56,7 +56,8 @@ public:
     
     //HitDetection Interface
     virtual void PrepareHitDetection(const FGameplayTagContainer& AttackTags, const int32 ComboIndex) override;
-    
+    virtual void PrepareHitDetection(const FName& AttackName, const int32 ComboIndex) override { } // Weapon은 사용 안함
+
     UFUNCTION()
     virtual void HandleHitDetectionStart(const FGameplayEventData& Payload) override;
     

@@ -89,12 +89,12 @@ void AEnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus St
 	if (Stimulus.Type == UAISense::GetSenseID<UAISense_Sight>())
 	{
 		AActionPracticeCharacter* Player = Cast<AActionPracticeCharacter>(Actor);
-		
+
 		if (Stimulus.WasSuccessfullySensed())
 		{
 			if (Player)
 			{
-				DetectedPlayer = Player;
+				CurrentTarget.Actor = Player;
 				DEBUG_LOG(TEXT("Target Detected: %s"), *Actor->GetName());
 			}
 		}
@@ -102,7 +102,7 @@ void AEnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus St
 		{
 			if (Player)
 			{
-				DetectedPlayer = nullptr;
+				CurrentTarget.Reset();
 				DEBUG_LOG(TEXT("Target Lost: %s"), *Actor->GetName());
 			}
 		}

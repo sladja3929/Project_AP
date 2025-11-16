@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "StateTreeEvaluatorBase.h"
-#include "DistanceToTargetEvaluator.generated.h"
+#include "UpdateTargetInfoEvaluator.generated.h"
 
 class AActor;
 class AEnemyAIController;
@@ -14,7 +14,7 @@ class AEnemyAIController;
  * Output: 노드의 결과 값
  */
 USTRUCT()
-struct ACTIONPRACTICE_API FDistanceToTargetEvaluatorInstanceData
+struct ACTIONPRACTICE_API FUpdateTargetInfoEvaluatorInstanceData
 {
 	GENERATED_BODY()
 
@@ -32,30 +32,34 @@ struct ACTIONPRACTICE_API FDistanceToTargetEvaluatorInstanceData
 	UPROPERTY(EditAnywhere, Category = "Output")
 	float DistanceToTarget = -1.0f;
 
+	//Output: Enemy의 정면 기준 Target과의 각도 (Yaw)
+	UPROPERTY(EditAnywhere, Category = "Output")
+	float AngleToTarget = 0.0f;
+
 	//Output: 인지 여부
 	UPROPERTY(EditAnywhere, Category = "Output")
 	bool bTargetDetected  = false;
 };
 
 /**
- * AIPerception에서 감지된 플레이어와의 거리를 계산하는 Evaluator
+ * AIPerception에서 감지된 타겟의 정보(거리, 각도)를 계산하고 갱신하는 Evaluator
  */
 USTRUCT()
-struct ACTIONPRACTICE_API FDistanceToTargetEvaluator : public FStateTreeEvaluatorBase
+struct ACTIONPRACTICE_API FUpdateTargetInfoEvaluator : public FStateTreeEvaluatorBase
 {
 	GENERATED_BODY()
 
-	using FInstanceDataType = FDistanceToTargetEvaluatorInstanceData;
+	using FInstanceDataType = FUpdateTargetInfoEvaluatorInstanceData;
 
-	FDistanceToTargetEvaluator() = default;
+	FUpdateTargetInfoEvaluator() = default;
 
 	virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
-	
+
 	virtual void TreeStart(FStateTreeExecutionContext& Context) const override;
 	virtual void TreeStop(FStateTreeExecutionContext& Context) const override;
 	virtual void Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
-	
+
 protected:
-	
-	void UpdateDistanceToTarget(FStateTreeExecutionContext& Context) const;
+
+	void UpdateTargetInfo(FStateTreeExecutionContext& Context) const;
 };

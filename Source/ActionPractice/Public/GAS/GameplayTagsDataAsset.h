@@ -44,6 +44,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
 	FGameplayTag Ability_Block;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
+	FGameplayTag Ability_HitReaction;
 #pragma endregion
 
 #pragma region "State Tags"
@@ -109,6 +112,12 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
 	FGameplayTag Event_Notify_RotateToTarget;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
+	FGameplayTag Event_Notify_CheckCondition;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
+	FGameplayTag Event_Notify_AddCombo;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
 	FGameplayTag Event_Action_InputByBuffer;

@@ -16,7 +16,7 @@ class UPrimitiveComponent;
 class UWeaponAttackComponent;  
 struct FGameplayTag;
 struct FBlockActionData;
-struct FAttackActionData;
+struct FTaggedAttackData;
 
 UCLASS()
 class AWeapon : public AActor
@@ -48,7 +48,7 @@ public:
 	const UWeaponDataAsset* GetWeaponData() const { return WeaponData.Get(); }
 	
 	const FBlockActionData* GetWeaponBlockData() const;
-	const FAttackActionData* GetWeaponAttackDataByTag(const FGameplayTagContainer& AttackTags) const;
+	const FTaggedAttackData* GetWeaponAttackDataByTag(const FGameplayTagContainer& AttackTags) const;
 	
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Weapon")
 	TScriptInterface<IHitDetectionInterface> GetHitDetectionComponent() const;

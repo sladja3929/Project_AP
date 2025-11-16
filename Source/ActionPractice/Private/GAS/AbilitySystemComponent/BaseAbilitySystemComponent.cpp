@@ -30,6 +30,9 @@ void UBaseAbilitySystemComponent::BeginPlay()
 	{
 		CachedCharacter = Cast<ABaseCharacter>(Owner);
 	}
+
+	//HitReaction 태그 초기화
+	AbilityHitReactionTag = UGameplayTagsSubsystem::GetAbilityHitReactionTag();
 }
 
 void UBaseAbilitySystemComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -214,12 +217,56 @@ void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, c
 	{
 		DEBUG_LOG(TEXT("HandleOnDamagedResolved: Character died"));
 		//TODO: 죽음 처리
+		return;
 	}
 
 	//포이즈 브레이크 체크
 	if (BaseAttributeSet->GetPoise() <= 0.0f)
 	{
-		DEBUG_LOG(TEXT("HandleOnDamagedResolved: Poise broken"));
-		//TODO: 포이즈 브레이크 처리 (stun, stagger)
+		DEBUG_LOG(TEXT("HandleOnDamagedResolved: Poise broken, Poise=%.1f"), BaseAttributeSet->GetPoise());
+
+		//HitReaction Ability 활성화
+		if (AbilityHitReactionTag.IsValid())
+		{
+			TArray<FGameplayAbilitySpec*> HitReactionSpecs;
+			GetActivatableGameplayAbilitySpecsByAllMatchingTags(FGameplayTagContainer(AbilityHitReactionTag), HitReactionSpecs);
+
+			if (HitReactionSpecs.Num() > 0)
+			{
+				FGameplayAbilitySpec* HitReactionSpec = HitReactionSpecs[0];
+
+				//EventData 준비
+				FGameplayEventData EventData;
+				PrepareHitReactionEventData(EventData, FinalAttackData);
+
+				FGameplayAbilityActorInfo* ActorInfo = const_cast<FGameplayAbilityActorInfo*>(AbilityActorInfo.Get());
+				if (ActorInfo && HitReactionSpec)
+				{
+					TriggerAbilityFromGameplayEvent(
+						HitReactionSpec->Handle,
+						ActorInfo,
+						AbilityHitReactionTag,
+						&EventData,
+						*this
+					);
+					DEBUG_LOG(TEXT("HitReaction Ability activated with Poise=%.1f"), EventData.EventMagnitude);
+				}
+			}
+			else
+			{
+				DEBUG_LOG(TEXT("HitReaction Ability not found"));
+			}
+		}
+	}
+}
+
+void UBaseAbilitySystemComponent::PrepareHitReactionEventData(FGameplayEventData& OutEventData, const FFinalAttackData& FinalAttackData)
+{
+	UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(GetAttributeSet(UBaseAttributeSet::StaticClass()));
+	UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
+	if (BaseAttributeSet)
+	{
+		OutEventData.EventMagnitude = BaseAttributeSet->GetPoise(); // 음수값
+		OutEventData.EventTag = AbilityHitReactionTag;
 	}
 }

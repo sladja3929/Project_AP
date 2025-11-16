@@ -7,9 +7,8 @@
 #include "GAS/GameplayTagsSubsystem.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
-#include "Components/InputComponent.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackTraceComponent, Log, All);
@@ -38,19 +37,26 @@ void UAttackTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 	if (!bIsTracing) return;
 
-	double TickStart = FPlatformTime::Seconds();
-
-	UpdateAdaptiveTraceSettings();
-
-	//무기 끝 위치 업데이트 (속도 계산용)
-	PrevTipSocketLocation = GetTipSocketLocation();
-
-	TraceAccumulator += DeltaTime;
-
-	if (TraceAccumulator >= CurrentSecondsPerTrace)
+	//각 소켓 그룹별로 독립적으로 적응형 트레이스 처리
+	for (TPair<FName, FHitSocketGroupConfig>& Pair : UsingHitSocketGroups)
 	{
-		PerformTrace(TraceAccumulator);
-		TraceAccumulator = 0.0f;
+		FHitSocketGroupConfig& SocketGroup = Pair.Value;
+
+		//적응형 트레이스 설정 업데이트
+		UpdateAdaptiveTraceSettings(SocketGroup);
+
+		//무기 끝 위치 업데이트 (속도 계산용)
+		SocketGroup.PrevTipSocketLocation = GetTipSocketLocation(SocketGroup);
+
+		//각 그룹의 TraceAccumulator 업데이트
+		SocketGroup.TraceAccumulator += DeltaTime;
+
+		//각 그룹의 TraceAccumulator가 임계값 넘으면 해당 그룹만 트레이스
+		if (SocketGroup.TraceAccumulator >= SocketGroup.CurrentSecondsPerTrace)
+		{
+			PerformTrace(SocketGroup.TraceAccumulator);
+			SocketGroup.TraceAccumulator = 0.0f;
+		}
 	}
 }
 
@@ -153,7 +159,6 @@ void UAttackTraceComponent::PrepareHitDetection(const FGameplayTagContainer& Att
 		return;
 	}
 
-	GenerateSocketNames();
 	ResetHitActors();
 	BindEventCallbacks();
 
@@ -162,20 +167,50 @@ void UAttackTraceComponent::PrepareHitDetection(const FGameplayTagContainer& Att
 	DEBUG_LOG(TEXT("PrepareHitDetection - Attack Tags Count: %d, Combo: %d"), AttackTags.Num(), ComboIndex);
 }
 
-void UAttackTraceComponent::GenerateSocketNames()
+void UAttackTraceComponent::PrepareHitDetection(const FName& AttackName, const int32 ComboIndex)
 {
-	TraceSocketNames.Empty();
-	const FString NamePrefix = SocketNamePrefix.ToString();
-
-	//trace_socket_0부터 시작, 0이 칼 끝
-	for (int32 i = 0; i < CurrentTraceConfig.SocketCount; ++i)
+	//자식 클래스에서 설정 로드
+	if (!LoadTraceConfig(AttackName, ComboIndex))
 	{
-		const FString FullName = FString::Printf(TEXT("%s%d"), *NamePrefix, i);
-
-		TraceSocketNames.Add(FName(*FullName));
+		DEBUG_LOG(TEXT("Failed to load trace config for attack name"));
+		return;
 	}
 
-	DEBUG_LOG(TEXT("Generated %d socket names"), TraceSocketNames.Num());
+	ResetHitActors();
+	BindEventCallbacks();
+
+	bIsPrepared = true;
+
+	DEBUG_LOG(TEXT("PrepareHitDetection - Attack Name: %s, Combo: %d"), *AttackName.ToString(), ComboIndex);
+}
+
+void UAttackTraceComponent::BuildSocketConfigs(const TArray<FHitSocketInfo>& SocketInfoArray)
+{
+	PrebuiltSocketGroups.Empty();
+
+	for (const FHitSocketInfo& SocketInfo : SocketInfoArray)
+	{
+		FHitSocketGroupConfig SocketConfig;
+		SocketConfig.SocketGroupName = SocketInfo.HitSocketName;
+		SocketConfig.SocketCount = SocketInfo.HitSocketCount;
+		SocketConfig.TraceRadius = 10.0f; //기본값, 개별 공격에서 설정됨
+		SocketConfig.AttackMotionType = EAttackDamageType::None; //공격마다 설정됨
+
+		//소켓 이름들 미리 생성: prefix_0, prefix_1, prefix_2 ...
+		SocketConfig.TraceSocketNames.Empty();
+		for (int32 i = 0; i < SocketInfo.HitSocketCount; ++i)
+		{
+			const FString FullName = FString::Printf(TEXT("%s_%d"), *SocketInfo.HitSocketName.ToString(), i);
+			SocketConfig.TraceSocketNames.Add(FName(*FullName));
+		}
+
+		//위치 배열 초기화
+		SocketConfig.PreviousSocketPositions.SetNum(SocketInfo.HitSocketCount);
+		SocketConfig.CurrentSocketPositions.SetNum(SocketInfo.HitSocketCount);
+
+		PrebuiltSocketGroups.Add(SocketInfo.HitSocketName, SocketConfig);
+		DEBUG_LOG(TEXT("Prebuilt socket config: %s (Count: %d)"), *SocketInfo.HitSocketName.ToString(), SocketInfo.HitSocketCount);
+	}
 }
 #pragma endregion
 	
@@ -195,10 +230,14 @@ void UAttackTraceComponent::StartTrace()
 		return;
 	}
 
-	PrevTipSocketLocation = GetTipSocketLocation();
-	PreviousSocketPositions = CurrentSocketPositions;
+	//각 그룹의 Previous 위치를 Current로 초기화 및 적응형 트레이스 변수 초기화
+	for (TPair<FName, FHitSocketGroupConfig>& Pair : UsingHitSocketGroups)
+	{
+		Pair.Value.PreviousSocketPositions = Pair.Value.CurrentSocketPositions;
+		Pair.Value.PrevTipSocketLocation = GetTipSocketLocation(Pair.Value);
+		Pair.Value.TraceAccumulator = 0.0f;
+	}
 
-	TraceAccumulator = 0.0f;
 	bIsTracing = true;
 	SetComponentTickEnabled(true);
 
@@ -210,7 +249,6 @@ void UAttackTraceComponent::StopTrace()
 {
 	bIsTracing = false;
 	SetComponentTickEnabled(false);
-	TraceAccumulator = 0.0f;
 	UnbindEventCallbacks();
 
 	DEBUG_LOG(TEXT("Stopped trace, counter: %d"), DebugSweepTraceCounter);
@@ -218,37 +256,47 @@ void UAttackTraceComponent::StopTrace()
 
 void UAttackTraceComponent::PerformTrace(float DeltaTime)
 {
-	if (TraceSocketNames.Num() == 0)
+	if (UsingHitSocketGroups.Num() == 0)
+	{
+		DEBUG_LOG(TEXT("PerformTrace - FAILED: No socket groups"));
 		return;
+	}
 
 	if (!UpdateSocketPositions())
 	{
-		DEBUG_LOG(TEXT("cannot update socket positions during trace"));
+		DEBUG_LOG(TEXT("PerformTrace - FAILED: cannot update socket positions during trace"));
 		StopTrace();
 		return;
 	}
 
-	switch (CurrentTraceConfig.AttackMotionType)
+	//모든 소켓 그룹에 대해 트레이스 수행
+	for (TPair<FName, FHitSocketGroupConfig>& Pair : UsingHitSocketGroups)
 	{
-	case EAttackDamageType::Slash:
-		PerformSlashTrace();
-		break;
+		switch (Pair.Value.AttackMotionType)
+		{
+		case EAttackDamageType::Slash:
+			PerformSlashTrace(Pair.Value);
+			break;
 
-	case EAttackDamageType::Pierce:
-		PerformPierceTrace();
-		break;
+		case EAttackDamageType::Pierce:
+			PerformPierceTrace(Pair.Value);
+			break;
 
-	case EAttackDamageType::Strike:
-		PerformStrikeTrace();
-		break;
+		case EAttackDamageType::Strike:
+			PerformStrikeTrace(Pair.Value);
+			break;
 
-	default:
-		DEBUG_LOG(TEXT("Unknown damage type: %d"), (int32)CurrentTraceConfig.AttackMotionType);
-		break;
+		default:
+			DEBUG_LOG(TEXT("Unknown damage type: %d"), (int32)Pair.Value.AttackMotionType);
+			break;
+		}
 	}
 
-	//이전 소켓위치를 현재 소켓위치로 변경
-	PreviousSocketPositions = CurrentSocketPositions;
+	//각 그룹의 이전 소켓위치를 현재 소켓위치로 변경
+	for (TPair<FName, FHitSocketGroupConfig>& Pair : UsingHitSocketGroups)
+	{
+		Pair.Value.PreviousSocketPositions = Pair.Value.CurrentSocketPositions;
+	}
 }
 
 bool UAttackTraceComponent::UpdateSocketPositions()
@@ -258,53 +306,60 @@ bool UAttackTraceComponent::UpdateSocketPositions()
 		return false;
 	}
 
-	//소켓을 이름순으로 CurrentSocketPisitions에 저장 (1부터)
-	CurrentSocketPositions.Empty();
-	for (const FName& SocketName : TraceSocketNames)
+	//모든 소켓 그룹의 위치 업데이트
+	for (TPair<FName, FHitSocketGroupConfig>& Pair : UsingHitSocketGroups)
 	{
-		if (OwnerMesh->DoesSocketExist(SocketName))
+		Pair.Value.CurrentSocketPositions.Empty();
+		for (const FName& SocketName : Pair.Value.TraceSocketNames)
 		{
-			FVector SocketLocation = OwnerMesh->GetSocketLocation(SocketName);
-			CurrentSocketPositions.Add(SocketLocation);
-		}
-		else
-		{
-			DEBUG_LOG(TEXT("Socket %s not found on mesh"), *SocketName.ToString());
-			CurrentSocketPositions.Empty();
-			return false;
+			if (OwnerMesh->DoesSocketExist(SocketName))
+			{
+				FVector SocketLocation = OwnerMesh->GetSocketLocation(SocketName);
+				Pair.Value.CurrentSocketPositions.Add(SocketLocation);
+			}
+			else
+			{
+				DEBUG_LOG(TEXT("Socket %s not found on mesh"), *SocketName.ToString());
+				Pair.Value.CurrentSocketPositions.Empty();
+				return false;
+			}
 		}
 	}
 	return true;
 }
 
-void UAttackTraceComponent::PerformPierceTrace()
+void UAttackTraceComponent::PerformPierceTrace(FHitSocketGroupConfig& SocketGroup)
 {
 
 }
 
-void UAttackTraceComponent::PerformStrikeTrace()
+void UAttackTraceComponent::PerformStrikeTrace(FHitSocketGroupConfig& SocketGroup)
 {
 
 }
 
-void UAttackTraceComponent::PerformSlashTrace()
+void UAttackTraceComponent::PerformSlashTrace(FHitSocketGroupConfig& SocketGroup)
 {
-	if (CurrentSocketPositions.Num() < 2) return;
+	if (SocketGroup.CurrentSocketPositions.Num() < 2)
+	{
+		DEBUG_LOG(TEXT("PerformSlashTrace - FAILED: Not enough socket positions (need >= 2)"));
+		return;
+	}
 
 	TArray<FHitResult> AllHits;
 
 	//소켓 이름 순서대로 트레이스 시작과 끝 설정 (0 ~ 1, 1 ~ 2, ...)
-	for (int32 i = 0; i < CurrentSocketPositions.Num() - 1; i++)
+	for (int32 i = 0; i < SocketGroup.CurrentSocketPositions.Num() - 1; i++)
 	{
-		FVector StartPrev = PreviousSocketPositions[i];
-		FVector StartCurr = CurrentSocketPositions[i];
+		FVector StartPrev = SocketGroup.PreviousSocketPositions[i];
+		FVector StartCurr = SocketGroup.CurrentSocketPositions[i];
 
-		FVector EndPrev = PreviousSocketPositions[i + 1];
-		FVector EndCurr = CurrentSocketPositions[i + 1];
+		FVector EndPrev = SocketGroup.PreviousSocketPositions[i + 1];
+		FVector EndCurr = SocketGroup.CurrentSocketPositions[i + 1];
 
 		TArray<FHitResult> SubHits;
 
-		PerformInterpolationTrace(StartPrev, StartCurr, EndPrev, EndCurr, CurrentTraceConfig.TraceRadius, SubHits);
+		PerformInterpolationTrace(StartPrev, StartCurr, EndPrev, EndCurr, SocketGroup.TraceRadius, SocketGroup.CurrentInterpolationPerTrace, SubHits);
 		AllHits.Append(SubHits);
 	}
 
@@ -340,7 +395,6 @@ bool UAttackTraceComponent::ValidateHit(AActor* HitActor, const FHitResult& HitR
 
 		if (CurrentTime - ValidationData->LastHitTime < HitCooldownTime)
 		{
-			DEBUG_LOG(TEXT("Hit rejected: Cooldown (%.2f < %.2f)"), CurrentTime - ValidationData->LastHitTime, HitCooldownTime);
 			return false;
 		}
 
@@ -404,12 +458,17 @@ void UAttackTraceComponent::AddIgnoredActors(FCollisionQueryParams& Params) cons
 #pragma endregion
 
 #pragma region "Adaptive Trace Functions"
-FVector UAttackTraceComponent::GetTipSocketLocation() const
+FVector UAttackTraceComponent::GetTipSocketLocation(const FHitSocketGroupConfig& SocketGroup) const
 {
-	return OwnerMesh ? OwnerMesh->GetSocketLocation(TipSocketName) : FVector::ZeroVector;
+	if (!OwnerMesh) return FVector::ZeroVector;
+
+	//파라미터로 받은 SocketGroup의 첫 번째 소켓을 TipSocket으로 사용
+	if (SocketGroup.TraceSocketNames.Num() == 0) return FVector::ZeroVector;
+
+	return OwnerMesh->GetSocketLocation(SocketGroup.TraceSocketNames[0]);
 }
 
-float UAttackTraceComponent::CalculateSwingSpeed() const
+float UAttackTraceComponent::CalculateSwingSpeed(const FHitSocketGroupConfig& SocketGroup) const
 {
 	if (!GetWorld()) return 0.0f;
 
@@ -420,18 +479,18 @@ float UAttackTraceComponent::CalculateSwingSpeed() const
 		return 0.0f;
 	}
 
-	FVector CurTipSocketLocation = GetTipSocketLocation();
+	FVector CurTipSocketLocation = GetTipSocketLocation(SocketGroup);
 
 	//속도 (cm/s) 계산
-	const float DistanceTraveled = FVector::Dist(CurTipSocketLocation, PrevTipSocketLocation);
+	const float DistanceTraveled = FVector::Dist(CurTipSocketLocation, SocketGroup.PrevTipSocketLocation);
 	const float SpeedInCmPerSecond = DistanceTraveled / DeltaTime;
 
 	return SpeedInCmPerSecond;
 }
 
-void UAttackTraceComponent::UpdateAdaptiveTraceSettings()
+void UAttackTraceComponent::UpdateAdaptiveTraceSettings(FHitSocketGroupConfig& SocketGroup)
 {
-	float SwingSpeed = CalculateSwingSpeed();
+	float SwingSpeed = CalculateSwingSpeed(SocketGroup);
 
 	//속도에 따른 설정 선택
 	FAdaptiveTraceConfig SelectedConfig = AdaptiveConfigs[0];
@@ -448,26 +507,23 @@ void UAttackTraceComponent::UpdateAdaptiveTraceSettings()
 		}
 	}
 
-	CurrentSecondsPerTrace = SelectedConfig.SecondsPerTrace;
-	CurrentInterpolationPerTrace = SelectedConfig.InterpolationPerTrace;
-
-	//DEBUG_LOG(TEXT("Adaptive Trace - Speed: %.1f, Interval: %.3f, Subdivisions: %d, level: %d"), SwingSpeed, CurrentSecondsPerTrace, CurrentInterpolationPerTrace, i - 1);
+	SocketGroup.CurrentSecondsPerTrace = SelectedConfig.SecondsPerTrace;
+	SocketGroup.CurrentInterpolationPerTrace = SelectedConfig.InterpolationPerTrace;
 }
 
 void UAttackTraceComponent::PerformInterpolationTrace(
 	const FVector& StartPrev, const FVector& StartCurr,
 	const FVector& EndPrev, const FVector& EndCurr,
-	float Radius, TArray<FHitResult>& OutHits)
+	float Radius, int32 InterpolationPerTrace, TArray<FHitResult>& OutHits)
 {
 	//이전 프레임 소켓 위치와 현재 프레임 소켓 위치 사이의 간극이 큰 것을 방지하기 위해
 	//보간으로 프레임 간 중간 지점을 찾아 스윕 포인트 추가
 
-	const int32 InterpolationPerTrace = CurrentInterpolationPerTrace;  //보간 세분화 수
 	FCollisionQueryParams Params = GetCollisionQueryParams();
 
 	for (int32 i = 0; i <= InterpolationPerTrace; ++i)
 	{
-		float Alpha = (float)i / (float)InterpolationPerTrace;
+		float Alpha = static_cast<float>(i) / static_cast<float>(InterpolationPerTrace);
 
 		FVector InterpStart = FMath::Lerp(StartPrev, StartCurr, Alpha);
 		FVector InterpEnd = FMath::Lerp(EndPrev, EndCurr, Alpha);
@@ -506,8 +562,8 @@ void UAttackTraceComponent::PerformInterpolationTrace(
 ECollisionChannel UAttackTraceComponent::GetTraceChannel() const
 {
 	//프로젝트 설정에서 커스텀 채널 사용
-	// DefaultEngine.ini에서 설정 필요
-	return ECC_GameTraceChannel1;  // WeaponTrace 채널
+	//DefaultEngine.ini에서 설정 필요
+	return ECC_GameTraceChannel1;  //WeaponTrace 채널
 }
 
 FCollisionQueryParams UAttackTraceComponent::GetCollisionQueryParams() const

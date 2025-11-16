@@ -11,6 +11,33 @@ class ABossCharacter;
 class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 
+/**
+ * Enemy AI가 추적하는 Target 정보
+ */
+USTRUCT()
+struct ACTIONPRACTICE_API FCurrentTarget
+{
+	GENERATED_BODY()
+
+	//Target Actor
+	TWeakObjectPtr<AActor> Actor = nullptr;
+
+	//Target까지의 거리
+	float Distance = -1.0f;
+
+	//Enemy의 정면 기준 Target과의 각도
+	float AngleToTarget = 0.0f;
+
+	void Reset()
+	{
+		Actor.Reset();
+		Distance = -1.0f;
+		AngleToTarget = 0.0f;
+	}
+
+	bool IsValid() const { return Actor.IsValid(); }
+};
+
 UCLASS()
 class ACTIONPRACTICE_API AEnemyAIController : public AAIController
 {
@@ -19,8 +46,8 @@ class ACTIONPRACTICE_API AEnemyAIController : public AAIController
 public:
 #pragma region "Public Variables"
 
-	TWeakObjectPtr<AActionPracticeCharacter> DetectedPlayer = nullptr;
-	
+	FCurrentTarget CurrentTarget;
+
 #pragma endregion
 
 #pragma region "Public Functions"
@@ -29,7 +56,8 @@ public:
 
 	FORCEINLINE UGASStateTreeAIComponent* GetStateTreeComponent() const { return GASStateTreeAIComponent; }
 	FORCEINLINE ABossCharacter* GetBossCharacter() const { return BossCharacter.Get(); }
-	FORCEINLINE AActionPracticeCharacter* GetDetectedPlayer() const { return DetectedPlayer.Get(); }
+	FORCEINLINE AActor* GetCurrentTargetActor() const { return CurrentTarget.Actor.Get(); }
+	FORCEINLINE const FCurrentTarget& GetCurrentTarget() const { return CurrentTarget; }
 
 #pragma endregion
 

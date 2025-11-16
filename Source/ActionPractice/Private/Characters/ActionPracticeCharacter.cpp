@@ -142,11 +142,6 @@ void AActionPracticeCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateLockOnCamera();
-	
-	if (bIsRotatingForAction)
-	{
-		UpdateActionRotation(DeltaSeconds);
-	}
 }
 
 void AActionPracticeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -228,7 +223,7 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 {
 	const FVector2D MovementVector = Value.Get<FVector2D>();
 
-	//공격 어빌리티 중단
+	//리커버리가 끝나면 어빌리티 중단
 	if (MovementVector.Size() > 0.1f)
 	{
 		CancelActionForMove();
@@ -239,29 +234,30 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 	if (Controller != nullptr && !bIsRecovering)
 	{
 		bool bIsSprinting = AbilitySystemComponent->HasMatchingGameplayTag(StateAbilitySprintingTag);
-		
+
+		//락온일 경우
 		if(!bIsSprinting && bIsLockOn && LockedOnTarget)
 		{
 			const FVector TargetLocation = LockedOnTarget->GetActorLocation();
 			const FVector CharacterLocation = GetActorLocation();
             
-			// 타겟을 향한 방향 계산
+			//타겟 방향 계산
 			FVector DirectionToTarget = TargetLocation - CharacterLocation;
-			DirectionToTarget.Z = 0.0f; // 수평 방향만 고려
+			DirectionToTarget.Z = 0.0f; //수평 방향만 고려
 			DirectionToTarget.Normalize();
             
-			// 타겟을 기준으로 한 이동 방향 계산
+			//타겟을 기준으로 한 이동 방향 계산
 			const FRotator TargetRotation = DirectionToTarget.Rotation();
 			const FVector RightDirection = FRotationMatrix(TargetRotation).GetUnitAxis(EAxis::Y);
 			const FVector BackwardDirection = -DirectionToTarget; // 타겟 반대 방향
             
-			// Strafe 이동 (좌우 이동)
+			//Strafe 이동
 			AddMovementInput(RightDirection, MovementVector.X);
             
-			// 전후 이동 (타겟을 기준으로)
+			//전후 이동
 			AddMovementInput(BackwardDirection, -MovementVector.Y);
             
-			// 캐릭터가 타겟을 바라보도록 회전
+			//캐릭터가 타겟을 바라보도록 회전
 			SetActorRotation(TargetRotation);
 		}
 
@@ -281,14 +277,13 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 
 FVector2D AActionPracticeCharacter::GetCurrentMovementInput() const
 {
-	// PlayerController를 통해 어디서든 접근 가능
 	APlayerController* PC = GetController<APlayerController>();
 	if (PC && IA_Move)
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = 
 			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
 		{
-			// 특정 액션의 현재 값 조회
+			//특정 액션의 현재 값 조회
 			FInputActionValue ActionValue = Subsystem->GetPlayerInput()->GetActionValue(IA_Move);
 			return ActionValue.Get<FVector2D>();
 		}
@@ -296,82 +291,40 @@ FVector2D AActionPracticeCharacter::GetCurrentMovementInput() const
 	return FVector2D::ZeroVector;
 }
 
-void AActionPracticeCharacter::RotateCharacterToInputDirection(float RotateTime)
+void AActionPracticeCharacter::RotateCharacterToInputDirection(float RotateTime, bool bIgnoreLockOn)
 {
-	//현재 입력 값 가져오기
-	FVector2D MovementInput = GetCurrentMovementInput();
-	
-	if (MovementInput.IsZero())
+	//락온 상태면 락온 대상 방향으로
+	if (!bIgnoreLockOn && bIsLockOn)
 	{
-		return;
-	}
-    
-	//카메라의 Yaw 회전만 가져오기
-	FRotator CameraRotation = FollowCamera->GetComponentRotation();
-	FRotator CameraYaw = FRotator(0.0f, CameraRotation.Yaw, 0.0f);
-    
-	//입력 벡터를 3D로 변환
-	FVector InputDirection = FVector(MovementInput.Y, MovementInput.X, 0.0f);
-    
-	//카메라 기준으로 입력 방향 변환
-	FVector WorldDirection = CameraYaw.RotateVector(InputDirection);
-	WorldDirection.Normalize();
-    
-	//목표 회전 설정
-	TargetActionRotation = FRotator(0.0f, WorldDirection.Rotation().Yaw, 0.0f);
-    
-	//회전 시간이 0 이하면 즉시 회전
-	if (RotateTime <= 0.0f)
-	{
-		SetActorRotation(TargetActionRotation);
-		bIsRotatingForAction = false;
-		return;
-	}
-    
-	//회전 각도 차이 계산
-	float YawDifference = FMath::Abs(FMath::FindDeltaAngleDegrees(
-		GetActorRotation().Yaw, 
-		TargetActionRotation.Yaw
-	));
-    
-	//회전 차이가 매우 작으면 즉시 완료
-	if (YawDifference < 1.0f)
-	{
-		SetActorRotation(TargetActionRotation);
-		bIsRotatingForAction = false;
-		return;
-	}
-	
-	StartActionRotation = GetActorRotation();
-	CurrentRotationTime = 0.0f;
-	TotalRotationTime = RotateTime;
-	bIsRotatingForAction = true;
-}
+		if (!LockedOnTarget) return;
 
-void AActionPracticeCharacter::UpdateActionRotation(float DeltaTime)
-{
-	if (!bIsRotatingForAction)
-	{
-		return;
+		//BaseCharacter의 RotateToPosition 호출
+		RotateToPosition(LockedOnTarget->GetActorLocation(), RotateTime);
 	}
-	
-	CurrentRotationTime += DeltaTime;
-	
-	float Alpha = FMath::Clamp(CurrentRotationTime / TotalRotationTime, 0.0f, 1.0f);
-    
-	//부드러운 커브 적용
-	Alpha = FMath::InterpEaseInOut(0.0f, 1.0f, Alpha, 2.0f);
-    
-	//회전 보간
-	FRotator NewRotation = FMath::Lerp(StartActionRotation, TargetActionRotation, Alpha);
-	SetActorRotation(NewRotation);
-	
-	if (CurrentRotationTime >= TotalRotationTime)
+
+	//아니면 입력 방향으로
+	else
 	{
-		//정확한 목표 회전으로 설정
-		SetActorRotation(TargetActionRotation);
-		bIsRotatingForAction = false;
-		CurrentRotationTime = 0.0f;
+		//현재 입력 값 가져오기
+		FVector2D MovementInput = GetCurrentMovementInput();
+		if (MovementInput.IsZero()) return;
+		
+		//카메라의 Yaw 회전만 가져오기
+		FRotator CameraRotation = FollowCamera->GetComponentRotation();
+		FRotator CameraYaw = FRotator(0.0f, CameraRotation.Yaw, 0.0f);
+
+		//입력 벡터를 3D로 변환
+		FVector InputDirection = FVector(MovementInput.Y, MovementInput.X, 0.0f);
+
+		//카메라 기준으로 입력 방향 변환
+		FVector WorldDirection = CameraYaw.RotateVector(InputDirection);
+		WorldDirection.Normalize();
+
+		//목표 회전 계산
+		FRotator TargetRotation = FRotator(0.0f, WorldDirection.Rotation().Yaw, 0.0f);
+
+		//BaseCharacter의 RotateToRotation 호출
+		RotateToRotation(TargetRotation, RotateTime);
 	}
 }
 

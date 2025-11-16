@@ -27,13 +27,29 @@ struct FHitValidationData
 };
 
 USTRUCT()
-struct FTraceConfig
+struct FHitSocketGroupConfig
 {
 	GENERATED_BODY()
 
 	EAttackDamageType AttackMotionType = EAttackDamageType::None;
+	FName SocketGroupName = NAME_None;
 	int32 SocketCount = 2;
 	float TraceRadius = 10.0f;
+
+	UPROPERTY()
+	TArray<FName> TraceSocketNames;
+
+	UPROPERTY()
+	TArray<FVector> PreviousSocketPositions;
+
+	UPROPERTY()
+	TArray<FVector> CurrentSocketPositions;
+
+	// ===== Adaptive Trace Settings (소켓 그룹 별로 적용) =====
+	FVector PrevTipSocketLocation = FVector::ZeroVector;
+	float CurrentSecondsPerTrace = 1.0f;
+	int32 CurrentInterpolationPerTrace = 1;
+	float TraceAccumulator = 0.0f;
 };
 
 USTRUCT(BlueprintType)
@@ -63,14 +79,6 @@ public:
 
 	FOnHitDetected OnHit;
 
-	//공격판정 소켓 접두사
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trace Settings")
-	FName SocketNamePrefix = FName(TEXT("trace_socket_"));
-
-	//속도 측정용 소켓 이름
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trace Settings")
-	FName TipSocketName = FName(TEXT("trace_socket_0"));
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Trace Settings")
 	float HitCooldownTime = 0.1f;
 
@@ -89,6 +97,7 @@ public:
 	
 	// ===== HitDetection Interface =====
 	virtual void PrepareHitDetection(const FGameplayTagContainer& AttackTags, const int32 ComboIndex) override;
+	virtual void PrepareHitDetection(const FName& AttackName, const int32 ComboIndex) override;
 
 	UFUNCTION()
 	virtual void HandleHitDetectionStart(const FGameplayEventData& Payload) override;
@@ -116,25 +125,17 @@ protected:
 	FFinalAttackData CurrentAttackData;
 
 	// ===== Trace Config Variables =====
-	FTraceConfig CurrentTraceConfig;
-	TArray<FName> TraceSocketNames;
+	
+	//미리 로드된 모든 소켓 정보, Name은 Prefix
+	TMap<FName, FHitSocketGroupConfig> PrebuiltSocketGroups;
 
-	UPROPERTY()
-	TArray<FVector> PreviousSocketPositions;
-
-	UPROPERTY()
-	TArray<FVector> CurrentSocketPositions;
-
+	//공격 한 번에 사용될 소켓들, Name은 Prefix
+	TMap<FName, FHitSocketGroupConfig> UsingHitSocketGroups;
+	
 	bool bIsTracing = false;
-	bool bIsPrepared = false;	
+	bool bIsPrepared = false;
 
 	// ===== Adaptive Trace Sweep Variables =====
-	float TraceAccumulator = 0.0f;
-	float CurrentSecondsPerTrace = 1.0f;
-	int32 CurrentInterpolationPerTrace = 1;
-	
-	FVector PrevTipSocketLocation;
-	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Adaptive Trace")
 	TArray<FAdaptiveTraceConfig> AdaptiveConfigs = {
 		{0.05f, 1, 0.0f},
@@ -160,31 +161,34 @@ protected:
 #pragma region "Protected Functions"
 
 	// ===== Trace Config Functions =====
-	void GenerateSocketNames();
 	bool UpdateSocketPositions();
 	void StartTrace();
 	void StopTrace();
 	
 	//트레이스 설정 로드 (각 클래스마다 데이터 소스가 다름)
-	virtual bool LoadTraceConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex) PURE_VIRTUAL(UAttackTraceComponent::LoadTraceConfig, return false;);
+	virtual bool LoadTraceConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex) { return false; }
+	virtual bool LoadTraceConfig(const FName& AttackName, int32 ComboIndex) { return false; }
 
 	//Owner의 메시 컴포넌트를 OwnerMesh에 설정 (Weapon은 StaticMesh, Enemy는 SkeletalMesh)
 	virtual void SetOwnerMesh() PURE_VIRTUAL(UAttackTraceComponent::SetOwnerMesh, );
-	
+
+	//DataAsset의 HitSocketInfo 배열로부터 PrebuiltSocketConfigs 생성
+	void BuildSocketConfigs(const TArray<FHitSocketInfo>& SocketInfoArray);
+
 	// ===== Execute Trace Functions =====
 	void PerformTrace(float DeltaTime);
-	void PerformSlashTrace();
-	void PerformPierceTrace();
-	void PerformStrikeTrace();
+	void PerformSlashTrace(FHitSocketGroupConfig& SocketGroup);
+	void PerformPierceTrace(FHitSocketGroupConfig& SocketGroup);
+	void PerformStrikeTrace(FHitSocketGroupConfig& SocketGroup);
 	
 	// ===== Adaptive Trace Sweep Functions =====
-	FVector GetTipSocketLocation() const;
-	float CalculateSwingSpeed() const;
-	void UpdateAdaptiveTraceSettings();
+	FVector GetTipSocketLocation(const FHitSocketGroupConfig& SocketGroup) const;
+	float CalculateSwingSpeed(const FHitSocketGroupConfig& SocketGroup) const;
+	void UpdateAdaptiveTraceSettings(FHitSocketGroupConfig& SocketGroup);
 	void PerformInterpolationTrace(
 			const FVector& StartPrev, const FVector& StartCurr,
 			const FVector& EndPrev, const FVector& EndCurr,
-			float Radius, TArray<FHitResult>& OutHits);
+			float Radius, int32 InterpolationPerTrace, TArray<FHitResult>& OutHits);
 
 	// ===== Hit Functions =====
 	bool ValidateHit(AActor* HitActor, const FHitResult& HitResult, bool bIsMultiHit);

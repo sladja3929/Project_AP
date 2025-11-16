@@ -10,7 +10,7 @@ struct FFinalAttackData;
 class UAbilityTask_PlayMontageWithEvents;
 class UAbilityTask_WaitGameplayEvent;
 
-struct FAttackActionData;
+struct FTaggedAttackData;
 UCLASS()
 class ACTIONPRACTICE_API UBaseAttackAbility : public UActionRecoveryAbility, public IHitDetectionUser
 {
@@ -20,6 +20,7 @@ public:
 #pragma region "Public Functions" //==================================================
 
 	UBaseAttackAbility();
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 #pragma endregion
@@ -27,7 +28,7 @@ public:
 protected:
 #pragma region "Protected Vriables" //================================================
 
-	const FAttackActionData* WeaponAttackData = nullptr;
+	const FTaggedAttackData* WeaponAttackData = nullptr;
 	
 	int32 ComboCounter = 0;
 	int32 MaxComboCount = 0;

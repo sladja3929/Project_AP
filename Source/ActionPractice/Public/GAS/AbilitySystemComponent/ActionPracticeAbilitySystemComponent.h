@@ -28,7 +28,7 @@ public:
 
 	//===== Defense Policy Override =====
 	virtual void CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
-	virtual void HandleOnDamagedResolved(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
+	virtual void PrepareHitReactionEventData(FGameplayEventData& OutEventData, const FFinalAttackData& FinalAttackData) override;
 
 #pragma endregion
 
@@ -37,6 +37,7 @@ protected:
 
 	TWeakObjectPtr<AActionPracticeCharacter> CachedAPCharacter;
 	FGameplayTag EffectStaminaRegenBlockDurationTag;
+	FGameplayTag StateAbilityBlockingTag;
 
 #pragma endregion
 
@@ -57,6 +58,8 @@ private:
 #pragma endregion
 
 #pragma region "Private Functions"
-	
+
+	void CheckBlockSuccess(AActor* SourceActor);
+
 #pragma endregion
 };

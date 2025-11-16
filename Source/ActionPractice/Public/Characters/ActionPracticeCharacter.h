@@ -79,7 +79,7 @@ public:
 	FVector2D GetCurrentMovementInput() const;
 	
 	UFUNCTION(BlueprintCallable, Category = "Character")
-	void RotateCharacterToInputDirection(float RotationTime);
+	void RotateCharacterToInputDirection(float RotationTime, bool bIgnoreLockOn);
 
 	TArray<FGameplayAbilitySpec*> FindAbilitySpecsWithInputAction(const UInputAction* InputAction);
 
@@ -221,18 +221,11 @@ protected:
 private:
 #pragma region "Private Variables"
 
-	//회전 관련 변수
-	FRotator TargetActionRotation;
-	FRotator StartActionRotation;
-	float CurrentRotationTime = 0;
-	float TotalRotationTime = 0;
-	bool bIsRotatingForAction = false;
 
 #pragma endregion
-	
+
 #pragma region "Private Functions"
 
-	void UpdateActionRotation(float DeltaTime);
-	
+
 #pragma endregion
 };

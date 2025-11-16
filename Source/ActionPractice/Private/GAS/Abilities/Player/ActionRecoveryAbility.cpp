@@ -106,23 +106,34 @@ bool UActionRecoveryAbility::ConsumeStamina()
 	return true;
 }
 
-void UActionRecoveryAbility::RotateCharacter()
+bool UActionRecoveryAbility::RotateCharacter()
 {
-	// 캐릭터 회전
+	if (!bRotateBeforeAction)
+	{
+		return false;
+	}
+
 	if (AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo())
 	{
-		Character->RotateCharacterToInputDirection(RotateTime);
+		DEBUG_LOG(TEXT("Rotating Character"));
+		Character->RotateCharacterToInputDirection(RotateTime, bIgnoreLockOn);
+		return true;
 	}
+
+	return false;
 }
 
 void UActionRecoveryAbility::PlayAction()
 {
 	if (!ConsumeStamina()) return;
 	AddStateRecoveringTag();
-	RotateCharacter();
+
+	bool bShouldRotate = RotateCharacter();
 
 	//캐릭터가 회전을 마칠 때까지 기다린 후에 몽타주 태스크 실행
-	WaitDelayTask = UAbilityTask_WaitDelay::WaitDelay(this, RotateTime);
+	//회전하지 않으면 즉시 실행
+	float DelayTime = bShouldRotate ? RotateTime : 0.0f;
+	WaitDelayTask = UAbilityTask_WaitDelay::WaitDelay(this, DelayTime);
 	if (WaitDelayTask)
 	{
 		WaitDelayTask->OnFinish.AddDynamic(this, &UActionRecoveryAbility::ExecuteMontageTask);

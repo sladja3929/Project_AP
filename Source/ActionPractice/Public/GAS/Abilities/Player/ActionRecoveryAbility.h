@@ -29,8 +29,17 @@ public:
 
 protected:
 #pragma region "Protected Variables"
+
+    //액션 수행 전 회전을 할지 여부
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rotate")
+	bool bRotateBeforeAction = true;
+	
+	//회전이 락온을 무시할지 여부
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rotate")
+	bool bIgnoreLockOn = false;
+
 	//캐릭터 회전 시간
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Montage")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rotate")
 	float RotateTime = 0.1f;
 
 	//PlayMontageWithEvents 태스크
@@ -68,7 +77,7 @@ protected:
 	virtual bool ConsumeStamina();
 	
 	UFUNCTION()
-	virtual void RotateCharacter();
+	virtual bool RotateCharacter();
 	
 	UFUNCTION()
 	virtual void PlayAction() override;

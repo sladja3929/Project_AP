@@ -127,6 +127,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityBlockTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityHitReactionTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetAbilityHitReactionTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Static State Tags"
@@ -303,6 +312,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyRotateToTargetTag()
 	return FGameplayTag::EmptyTag;
 }
 
+const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyCheckConditionTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEventNotifyCheckConditionTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyAddComboTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEventNotifyAddComboTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
 const FGameplayTag& UGameplayTagsSubsystem::GetEventActionInputByBufferTag()
 {
 	if (UGameplayTagsSubsystem* Subsystem = Get())
@@ -465,6 +492,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityBlockTagInternal() const
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Ability_Block;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityHitReactionTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Ability_HitReaction;
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -640,6 +676,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyRotateToTargetTagInter
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Event_Notify_RotateToTarget;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyCheckConditionTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Event_Notify_CheckCondition;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyAddComboTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Event_Notify_AddCombo;
 	}
 	return FGameplayTag::EmptyTag;
 }

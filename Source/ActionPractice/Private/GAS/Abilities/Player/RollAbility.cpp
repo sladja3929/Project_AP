@@ -22,6 +22,7 @@ URollAbility::URollAbility()
 	bRetriggerInstancedAbility = true;
 	StaminaCost = 20.0f;
 	RotateTime = 0.05f;
+	bIgnoreLockOn = true;
 }
 
 void URollAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)

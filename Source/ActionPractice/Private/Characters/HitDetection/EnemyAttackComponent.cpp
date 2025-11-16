@@ -2,12 +2,13 @@
 
 #include "Characters/HitDetection/EnemyAttackComponent.h"
 #include "Characters/BossCharacter.h"
+#include "Characters/Enemy/EnemyDataAsset.h"
 #include "Items/AttackData.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "AbilitySystemComponent.h"
 #include "Components/InputComponent.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAttackComponent, Log, All);
@@ -30,6 +31,13 @@ void UEnemyAttackComponent::BeginPlay()
 	}
 
 	Super::BeginPlay();
+
+	//EnemyData의 모든 소켓 정보를 미리 빌드
+	const UEnemyDataAsset* EnemyData = OwnerEnemy->GetEnemyData();
+	if (EnemyData)
+	{
+		BuildSocketConfigs(EnemyData->HitSocketInfo);
+	}
 
 	//디버그용 2번 키 바인딩 (1번은 Weapon이 사용)
 	if (GetWorld())
@@ -57,28 +65,64 @@ UAbilitySystemComponent* UEnemyAttackComponent::GetOwnerASC() const
 }
 
 #pragma region "Trace Config Functions"
-bool UEnemyAttackComponent::LoadTraceConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex)
+bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 ComboIndex)
 {
-	if (!OwnerEnemy) return false;
+	DEBUG_LOG(TEXT("LoadTraceConfig - START, AttackName: %s, ComboIndex: %d"), *AttackName.ToString(), ComboIndex);
 
-	// TODO: EnemyDataAsset 생성 후 아래 하드코딩 부분을 데이터 에셋에서 로드하도록 변경
-	// const UEnemyDataAsset* EnemyData = OwnerEnemy->GetEnemyData();
-	// if (!EnemyData) return false;
-	// const FAttackActionData* AttackData = OwnerEnemy->GetEnemyAttackDataByTag(AttackTags);
-	// if (!AttackData || AttackData->ComboAttackData.Num() == 0) return false;
-	// ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboAttackData.Num() - 1);
-	// const FIndividualAttackData& AttackInfo = AttackData->ComboAttackData[ComboIndex];
+	if (!OwnerEnemy)
+	{
+		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No OwnerEnemy"));
+		return false;
+	}
 
-	// 임시 하드코딩 - EnemyDataAsset 구현 후 삭제
-	CurrentTraceConfig.AttackMotionType = EAttackDamageType::Slash;
-	CurrentTraceConfig.SocketCount = 2;
-	CurrentTraceConfig.TraceRadius = 80.0f;
+	//Enemy 정보 가져오기
+	const UEnemyDataAsset* EnemyData = OwnerEnemy->GetEnemyData();
+	if (!EnemyData)
+	{
+		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No EnemyData"));
+		return false;
+	}
 
-	CurrentAttackData.FinalDamage = 100.0f;
-	CurrentAttackData.PoiseDamage = 30.0f;
-	CurrentAttackData.DamageType = EAttackDamageType::Slash;
+	const FNamedAttackData* AttackData = EnemyData->NamedAttackData.Find(AttackName);
+	if (!AttackData || AttackData->ComboSequence.Num() == 0)
+	{
+		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No AttackData or empty ComboSequence"));
+		return false;
+	}
 
-	DEBUG_LOG(TEXT("LoadTraceConfig - HARDCODED DATA (TODO: Implement EnemyDataAsset)"));
+	//콤보 인덱스 유효성 검사
+	ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboSequence.Num() - 1);
+	const FAttackStats& AttackInfo = AttackData->ComboSequence[ComboIndex].AttackData;
+
+	UsingHitSocketGroups.Empty();
+
+	//AttackStats의 UsingSocketConfigs에서 사용할 소켓들을 가져옴
+	for (const FAttackSocketConfig& SocketConfig : AttackInfo.UsingSocketConfigs)
+	{
+		if (FHitSocketGroupConfig* PrebuiltSocketGroup = PrebuiltSocketGroups.Find(SocketConfig.SocketName))
+		{
+			//미리 빌드된 설정을 복사하고 DamageType과 TraceRadius 설정
+			FHitSocketGroupConfig SocketGroupConfig = *PrebuiltSocketGroup;
+			SocketGroupConfig.AttackMotionType = AttackInfo.DamageType;
+			SocketGroupConfig.TraceRadius = SocketConfig.TraceRadius;
+
+			UsingHitSocketGroups.Add(SocketConfig.SocketName, SocketGroupConfig);
+			DEBUG_LOG(TEXT("LoadTraceConfig - Added socket group: %s, SocketCount: %d, Radius: %.2f"),
+				*SocketConfig.SocketName.ToString(), SocketGroupConfig.SocketCount, SocketGroupConfig.TraceRadius);
+		}
+		else
+		{
+			DEBUG_LOG(TEXT("LoadTraceConfig - Socket not found in PrebuiltSocketGroups: %s"), *SocketConfig.SocketName.ToString());
+		}
+	}
+
+	//공격 데이터 설정
+	CurrentAttackData.FinalDamage = EnemyData->BaseDamage * AttackInfo.DamageMultiplier;
+	CurrentAttackData.PoiseDamage = AttackInfo.PoiseDamage;
+	CurrentAttackData.DamageType = AttackInfo.DamageType;
+
+	DEBUG_LOG(TEXT("LoadTraceConfig - SUCCESS: Added %d socket groups, FinalDamage: %.2f"),
+		UsingHitSocketGroups.Num(), CurrentAttackData.FinalDamage);
 
 	return true;
 }
@@ -90,14 +134,11 @@ void UEnemyAttackComponent::SetOwnerMesh()
 	//SkeletalMeshComponent 가져오기
 	OwnerMesh = OwnerEnemy->GetMesh();
 
-	if (!OwnerMesh || !OwnerMesh->DoesSocketExist(FName(*FString::Printf(TEXT("trace_socket_0")))))
+	if (!OwnerMesh)
 	{
-		OwnerMesh = nullptr;
-		DEBUG_LOG(TEXT("EnemyAttackComponent: No Enemy SkeletalMesh or trace_socket_0"));
+		DEBUG_LOG(TEXT("EnemyAttackComponent: No Enemy SkeletalMesh"));
 		return;
 	}
-
-	TipSocketName = FName(*FString::Printf(TEXT("%s0"), *SocketNamePrefix.ToString()));
 }
 #pragma endregion
 
