@@ -20,7 +20,7 @@ USTRUCT()
 struct FActivateAbilityTaskInstanceData
 {
     GENERATED_BODY()
-
+    
     //Context에 바인딩된 ASC
     UPROPERTY(EditAnywhere, Category = "Context")
     TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent = nullptr;
@@ -28,7 +28,7 @@ struct FActivateAbilityTaskInstanceData
     //실행할 어빌리티 클래스를 에셋에서 지정
     UPROPERTY(EditAnywhere, Category = "Parameter")
     TSubclassOf<UGameplayAbility> AbilityToActivate = nullptr;
-
+    
     //spec 핸들
     FGameplayAbilitySpecHandle AbilityHandle;
 
@@ -52,18 +52,11 @@ struct ACTIONPRACTICE_API FActivateAbilityTask : public FStateTreeTaskBase
 
     using FInstanceDataType = FActivateAbilityTaskInstanceData;
 
-    virtual const UStruct* GetInstanceDataType() const override
-    {
-        return FInstanceDataType::StaticStruct();
-    }
+    FActivateAbilityTask() = default;
+    
+    virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
 
     virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
-
     virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
-
     virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
-
-#if WITH_EDITOR
-    virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
-#endif
 };

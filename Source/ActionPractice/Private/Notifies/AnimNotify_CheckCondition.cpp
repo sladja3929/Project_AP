@@ -15,7 +15,7 @@
 
 void UAnimNotify_CheckCondition::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
 {
-	if (!MeshComp || !MeshComp->GetOwner())
+	if (!MeshComp || !MeshComp->GetOwner()) 
 		return;
 
 	AActor* Owner = MeshComp->GetOwner();

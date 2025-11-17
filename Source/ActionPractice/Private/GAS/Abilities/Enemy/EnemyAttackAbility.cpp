@@ -11,7 +11,7 @@
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAttackAbility, Log, All);

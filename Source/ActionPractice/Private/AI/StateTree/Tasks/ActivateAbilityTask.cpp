@@ -1,5 +1,6 @@
 #include "AI/StateTree/Tasks/ActivateAbilityTask.h"
 #include "AbilitySystemComponent.h"
+#include "StateTreeAsyncExecutionContext.h"
 #include "StateTreeExecutionContext.h"
 
 #define ENABLE_DEBUG_LOG 0
@@ -12,18 +13,11 @@
 #endif
 
 EStateTreeRunStatus FActivateAbilityTask::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
-{
-    if (Transition.ChangeType != EStateTreeStateChangeType::Changed)
-    {
-        return EStateTreeRunStatus::Failed;
-    }
-    
+{    
     FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
-
-    //초기화
     InstanceData.bAbilityEnded = false;
     InstanceData.bAbilityCancelled = false;
-
+    
     if (!InstanceData.AbilitySystemComponent)
     {
         DEBUG_LOG(TEXT("AbilitySystemComponent is nullptr"));
@@ -41,38 +35,44 @@ EStateTreeRunStatus FActivateAbilityTask::EnterState(FStateTreeExecutionContext&
     if (!Spec)
     {
         DEBUG_LOG(TEXT("No AbilitySpec: %s"), *GetNameSafe(InstanceData.AbilityToActivate));
+        return EStateTreeRunStatus::Failed;
     }
     
     InstanceData.AbilityHandle = Spec->Handle;
     DEBUG_LOG(TEXT("Using Ability: %s"), *InstanceData.AbilityToActivate->GetName());
 
-    //Task는 UStruct라서 어빌리티 종료 바인딩을 함수로 사용하지 못함, 람다 함수를 통해 플래그만 받고 Tick에서 확인
-    InstanceData.AbilityEndedHandle = InstanceData.AbilitySystemComponent->OnAbilityEnded.AddLambda([&InstanceData](const FAbilityEndedData& EndData) {
-        InstanceData.bAbilityEnded = true;
-        InstanceData.bAbilityCancelled = EndData.bWasCancelled;
-        if (EndData.bWasCancelled)
+    //Task는 UStruct라서 ASC의 어빌리티 종료 델리게이트(인자 1개)에 콜백 함수를 바인딩하지 못함, 람다 함수를 통해 플래그만 받고 Tick에서 확인
+    //AddDynamic: UFUNCTION 사용 불가, AddUObject: UObject가 아님, AddRaw: GC 등록이 되지 않아 안전하지 않음, 구조체 객체 자체도 위험
+    InstanceData.AbilityEndedHandle = InstanceData.AbilitySystemComponent->OnAbilityEnded.AddLambda(
+        [&InstanceData, AbilityHandle = InstanceData.AbilityHandle](const FAbilityEndedData& EndData)
         {
-            DEBUG_LOG(TEXT("Ability cancelled In STTask"));
-        }
-        else
-        {
-            DEBUG_LOG(TEXT("Ability completed normally In STTask"));
-        }
-    });
+            //종료된 어빌리티 핸들이 태스크가 생성한 것인지 확인
+            if (EndData.AbilitySpecHandle == AbilityHandle)
+            {
+                InstanceData.bAbilityEnded = true;
+                InstanceData.bAbilityCancelled = EndData.bWasCancelled;
+                if (EndData.bWasCancelled)
+                {
+                    DEBUG_LOG(TEXT("Ability cancelled In STTask"));
+                }
+                
+                else
+                {
+                    DEBUG_LOG(TEXT("Ability completed normally In STTask"));
+                }
+            }
+        });
 
     //어빌리티 활성화
     const bool bSuccess = InstanceData.AbilitySystemComponent->TryActivateAbility(InstanceData.AbilityHandle, true);
-
-    if (bSuccess)
-    {
-        DEBUG_LOG(TEXT("Successfully activated ability: %s"), *InstanceData.AbilityToActivate->GetName());
-        return EStateTreeRunStatus::Running;
-    }
-    else
+    if (!bSuccess)
     {
         DEBUG_LOG(TEXT("Failed to activate ability: %s"), *InstanceData.AbilityToActivate->GetName());
         return EStateTreeRunStatus::Failed;
     }
+
+    DEBUG_LOG(TEXT("Successfully activated ability: %s"), *InstanceData.AbilityToActivate->GetName());
+    return EStateTreeRunStatus::Running;
 }
 
 EStateTreeRunStatus FActivateAbilityTask::Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const
@@ -99,11 +99,6 @@ EStateTreeRunStatus FActivateAbilityTask::Tick(FStateTreeExecutionContext& Conte
 
 void FActivateAbilityTask::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
-    if (Transition.ChangeType != EStateTreeStateChangeType::Changed)
-    {
-        return;
-    }
-
     FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
     //델리게이트 언바인딩
@@ -119,11 +114,6 @@ void FActivateAbilityTask::ExitState(FStateTreeExecutionContext& Context, const 
         InstanceData.AbilitySystemComponent->CancelAbilityHandle(InstanceData.AbilityHandle);
         DEBUG_LOG(TEXT("Cancelled ability on exit"));
     }
-}
 
-#if WITH_EDITOR
-FText FActivateAbilityTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting) const
-{
-    return FText::FromString(TEXT("<b>Activate GAS Ability</b>"));
+    DEBUG_LOG(TEXT("Exit Task"));
 }
-#endif
