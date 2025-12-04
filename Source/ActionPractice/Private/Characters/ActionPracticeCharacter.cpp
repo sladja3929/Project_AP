@@ -235,43 +235,51 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 	{
 		bool bIsSprinting = AbilitySystemComponent->HasMatchingGameplayTag(StateAbilitySprintingTag);
 
-		//락온일 경우
+		//락온 상태에서 걸을 때: Strafe 이동
 		if(!bIsSprinting && bIsLockOn && LockedOnTarget)
 		{
+			//Strafe 이동 설정
+			GetCharacterMovement()->bOrientRotationToMovement = false;
+			GetCharacterMovement()->bUseControllerDesiredRotation = false;
+
 			const FVector TargetLocation = LockedOnTarget->GetActorLocation();
 			const FVector CharacterLocation = GetActorLocation();
-            
+
 			//타겟 방향 계산
 			FVector DirectionToTarget = TargetLocation - CharacterLocation;
 			DirectionToTarget.Z = 0.0f; //수평 방향만 고려
 			DirectionToTarget.Normalize();
-            
+
 			//타겟을 기준으로 한 이동 방향 계산
 			const FRotator TargetRotation = DirectionToTarget.Rotation();
 			const FVector RightDirection = FRotationMatrix(TargetRotation).GetUnitAxis(EAxis::Y);
 			const FVector BackwardDirection = -DirectionToTarget; // 타겟 반대 방향
-            
+
 			//Strafe 이동
 			AddMovementInput(RightDirection, MovementVector.X);
-            
+
 			//전후 이동
 			AddMovementInput(BackwardDirection, -MovementVector.Y);
-            
+
 			//캐릭터가 타겟을 바라보도록 회전
 			SetActorRotation(TargetRotation);
 		}
 
-		else //일반적인 회전 이동
+		else //일반적인 회전 이동 (락온 없음 or 락온+달리기)
 		{
+			//일반 회전 이동 설정
+			GetCharacterMovement()->bOrientRotationToMovement = true;
+			GetCharacterMovement()->bUseControllerDesiredRotation = false;
+
 			const FRotator Rotation = Controller->GetControlRotation();
 			const FRotator YawRotation(0, Rotation.Yaw, 0);
-        
+
 			const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 			const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-        
+
 			AddMovementInput(ForwardDirection, MovementVector.Y);
 			AddMovementInput(RightDirection, MovementVector.X);
-		}		
+		}
 	}
 }
 
@@ -410,10 +418,6 @@ void AActionPracticeCharacter::ToggleLockOn()
 		{
 			bIsLockOn = true;
 			LockedOnTarget = NearestTarget;
-
-			//Strafe 이동을 위해 회전 모드 변경
-			GetCharacterMovement()->bOrientRotationToMovement = false;
-			GetCharacterMovement()->bUseControllerDesiredRotation = false;
 
 			DEBUG_LOG(TEXT("Lock-On Target: %s"), *NearestTarget->GetName());
 		}
