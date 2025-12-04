@@ -28,7 +28,11 @@ struct FActivateAbilityTaskInstanceData
     //실행할 어빌리티 클래스를 에셋에서 지정
     UPROPERTY(EditAnywhere, Category = "Parameter")
     TSubclassOf<UGameplayAbility> AbilityToActivate = nullptr;
-    
+
+    //어빌리티 종료 후 대기 시간 (초)
+    UPROPERTY(EditAnywhere, Category = "Parameter")
+    float EndDelay = 0.0f;
+
     //spec 핸들
     FGameplayAbilitySpecHandle AbilityHandle;
 
@@ -40,6 +44,9 @@ struct FActivateAbilityTaskInstanceData
 
     //어빌리티가 취소되었는지 여부
     bool bAbilityCancelled = false;
+
+    //EndDelay 경과 시간
+    float ElapsedEndDelay = 0.0f;
 };
 
 /**

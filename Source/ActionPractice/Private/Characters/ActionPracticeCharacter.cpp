@@ -291,6 +291,22 @@ FVector2D AActionPracticeCharacter::GetCurrentMovementInput() const
 	return FVector2D::ZeroVector;
 }
 
+bool AActionPracticeCharacter::IsBlockInputPressed() const
+{
+	APlayerController* PC = GetController<APlayerController>();
+	if (PC && IA_Block)
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		{
+			// IA_Block 액션의 현재 값 조회
+			FInputActionValue ActionValue = Subsystem->GetPlayerInput()->GetActionValue(IA_Block);
+			return ActionValue.Get<bool>();
+		}
+	}
+	return false;
+}
+
 void AActionPracticeCharacter::RotateCharacterToInputDirection(float RotateTime, bool bIgnoreLockOn)
 {
 	//락온 상태면 락온 대상 방향으로
@@ -375,21 +391,30 @@ void AActionPracticeCharacter::ToggleLockOn()
 	{
 		bIsLockOn = false;
 		LockedOnTarget = nullptr;
-		
+
+		//일반 이동 회전으로 복원
+		GetCharacterMovement()->bOrientRotationToMovement = true;
+		GetCharacterMovement()->bUseControllerDesiredRotation = false;
+
 		if (CameraBoom)
 		{
 			//필요하면 카메라 설정 복원
 		}
-        
+
 		DEBUG_LOG(TEXT("Lock-On Released"));
 	}
 	else
-	{		
+	{
 		AActor* NearestTarget = FindNearestTarget();
 		if (NearestTarget)
 		{
 			bIsLockOn = true;
 			LockedOnTarget = NearestTarget;
+
+			//Strafe 이동을 위해 회전 모드 변경
+			GetCharacterMovement()->bOrientRotationToMovement = false;
+			GetCharacterMovement()->bUseControllerDesiredRotation = false;
+
 			DEBUG_LOG(TEXT("Lock-On Target: %s"), *NearestTarget->GetName());
 		}
 		else
@@ -536,10 +561,6 @@ TSubclassOf<AWeapon> AActionPracticeCharacter::LoadWeaponClassByName(const FStri
 	DEBUG_LOG(TEXT("Failed to load weapon class from path: %s"), *BlueprintPath);
 	return nullptr;
 }
-#pragma endregion
-
-#pragma region "Attack Combo Functions"
-
 #pragma endregion
 
 #pragma region "GAS Input Functions"

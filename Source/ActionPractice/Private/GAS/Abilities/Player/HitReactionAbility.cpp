@@ -5,8 +5,9 @@
 #include "GAS/Abilities/Player/BlockAbility.h"
 #include "Items/WeaponDataAsset.h"
 #include "AbilitySystemComponent.h"
+#include "Characters/ActionPracticeCharacter.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogHitReactionAbility, Log, All);
@@ -129,9 +130,15 @@ void UHitReactionAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 
 		if (BlockAbilitySpec)
 		{
-			//InputPressed로 입력이 눌려있는지 확인
-			const bool bIsBlockInputPressed = BlockAbilitySpec->InputPressed > 0;
-			DEBUG_LOG(TEXT("bIsBlockInputPressed=%d"), bIsBlockInputPressed);
+			//실시간 입력 상태 확인
+			bool bIsBlockInputPressed = false;
+
+			if (AActionPracticeCharacter* Character = Cast<AActionPracticeCharacter>(ActorInfo->AvatarActor.Get()))
+			{
+				bIsBlockInputPressed = Character->IsBlockInputPressed();
+			}
+
+			DEBUG_LOG(TEXT("bIsBlockInputPressed=%d (real-time check)"), bIsBlockInputPressed);
 
 			if (bIsBlockInputPressed)
 			{

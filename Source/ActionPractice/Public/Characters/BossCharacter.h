@@ -19,8 +19,10 @@ class ACTIONPRACTICE_API ABossCharacter : public ABaseCharacter
 public:
 #pragma region "Public Variables"
 
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
+	FName EnemyName = NAME_None;
 
-#pragma endregion
+#pragma endregion 
 
 #pragma region "Public Functions"
 
@@ -38,7 +40,7 @@ public:
 	FORCEINLINE class AEnemyAIController* GetEnemyAIController() const { return Cast<AEnemyAIController>(GetController()); }
 
 	const UEnemyDataAsset* GetEnemyData() const { return EnemyData.Get(); }
-
+ 
 	void RotateToTarget(const AActor* TargetActor, float RotateTime);
 
 #pragma endregion

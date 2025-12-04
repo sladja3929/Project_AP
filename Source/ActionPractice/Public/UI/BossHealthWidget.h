@@ -6,6 +6,7 @@
 
 class UBossAttributeSet;
 class UProgressBar;
+class UTextBlock;
 
 UCLASS()
 class ACTIONPRACTICE_API UBossHealthWidget : public UUserWidget
@@ -21,6 +22,9 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> BossHealthDamageBar;
 
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> BossNameText;
+
 #pragma endregion
 
 #pragma region "Public Functions"
@@ -31,6 +35,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void SetBossAttributeSet(UBossAttributeSet* InAttributeSet);
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void SetBossName(const FName& InBossName);
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void UpdateBossHealth(float CurrentHealth, float MaxHealth);

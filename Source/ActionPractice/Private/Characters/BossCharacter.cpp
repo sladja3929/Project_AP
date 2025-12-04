@@ -157,7 +157,10 @@ void ABossCharacter::CreateAndAttachHealthWidget()
 	{
 		BossHealthWidget->SetBossAttributeSet(BossAttributeSet);
 	}
-	
+
+	//보스 이름 설정
+	BossHealthWidget->SetBossName(EnemyName);
+
 	BossHealthWidget->AddToViewport();
 
 	bHealthWidgetActive = true;

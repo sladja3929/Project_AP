@@ -13,10 +13,11 @@
 #endif
 
 EStateTreeRunStatus FActivateAbilityTask::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
-{    
+{
     FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
     InstanceData.bAbilityEnded = false;
     InstanceData.bAbilityCancelled = false;
+    InstanceData.ElapsedEndDelay = 0.0f;
     
     if (!InstanceData.AbilitySystemComponent)
     {
@@ -86,6 +87,21 @@ EStateTreeRunStatus FActivateAbilityTask::Tick(FStateTreeExecutionContext& Conte
         {
             DEBUG_LOG(TEXT("Task failed - Ability was cancelled"));
             return EStateTreeRunStatus::Failed;
+        }
+
+        //EndDelay 적용
+        if (InstanceData.EndDelay > 0.0f)
+        {
+            InstanceData.ElapsedEndDelay += DeltaTime;
+
+            if (InstanceData.ElapsedEndDelay >= InstanceData.EndDelay)
+            {
+                DEBUG_LOG(TEXT("Task succeeded - Ability completed after EndDelay (%.2fs)"), InstanceData.EndDelay);
+                return EStateTreeRunStatus::Succeeded;
+            }
+
+            DEBUG_LOG(TEXT("Waiting for EndDelay - Elapsed: %.2f / %.2f"), InstanceData.ElapsedEndDelay, InstanceData.EndDelay);
+            return EStateTreeRunStatus::Running;
         }
         else
         {

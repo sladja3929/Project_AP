@@ -8,7 +8,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackTraceComponent, Log, All);
@@ -145,7 +145,8 @@ void UAttackTraceComponent::HandleHitDetectionEnd(const FGameplayEventData& Payl
 	DEBUG_LOG(TEXT("HitDetectionEnd Event Received"));
 
 	StopTrace();
-	bIsPrepared = false;
+	//프레임 드랍으로 HitDetectionEnd가 HitDetectionStart보다 먼저 도착할 수 있기 때문에
+	//bIsPrepared를 다음 PrepareHitDetection에서 초기화되도록 여기서 false로 설정하지 않음
 }
 #pragma endregion
 
@@ -427,14 +428,14 @@ void UAttackTraceComponent::ProcessHit(AActor* HitActor, const FHitResult& HitRe
 		FString DamageTypeName = TEXT("Unknown");
 
 		//히트 메시지 출력
-		GEngine->AddOnScreenDebugMessage(
+		/*GEngine->AddOnScreenDebugMessage(
 			-1,  //키 (-1은 중복 허용)
 			2.0f,  //표시 시간 (초)
 			MessageColor,  //색상
 			FString::Printf(TEXT("HIT %s, Damage x%.2f"),
 				*HitActor->GetName(),
 				IncomingDamage)
-		);
+		);*/
 	}
 
 	OnHit.Broadcast(HitActor, HitResult, CurrentAttackData);

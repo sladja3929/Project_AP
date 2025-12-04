@@ -24,9 +24,13 @@ AWeapon::AWeapon()
 {
     PrimaryActorTick.bCanEverTick = true;
 
+	// Scene Component를 Root로 설정
+	USceneComponent* SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
+	RootComponent = SceneRoot;
+	
     // 메시 컴포넌트 생성
     WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMesh"));
-    RootComponent = WeaponMesh;
+	WeaponMesh->SetupAttachment(RootComponent);
     
     // 콜리전 컴포넌트 추가
     AttackTraceComponent = CreateDefaultSubobject<UWeaponAttackComponent>(TEXT("TraceComponent"));

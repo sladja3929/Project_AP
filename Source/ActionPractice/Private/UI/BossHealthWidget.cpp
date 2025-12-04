@@ -1,5 +1,6 @@
 ﻿#include "UI/BossHealthWidget.h"
 #include "Components/ProgressBar.h"
+#include "Components/TextBlock.h"
 #include "GAS/AttributeSet/BossAttributeSet.h"
 
 #define ENABLE_DEBUG_LOG 0
@@ -50,6 +51,20 @@ void UBossHealthWidget::SetBossAttributeSet(UBossAttributeSet* InAttributeSet)
 
 	BossAttributeSet = InAttributeSet;
 	DEBUG_LOG(TEXT("BossAttributeSet set to BossHealthWidget"));
+}
+
+void UBossHealthWidget::SetBossName(const FName& InBossName)
+{
+	if (!BossNameText)
+	{
+		DEBUG_LOG(TEXT("BossNameText is nullptr"));
+		return;
+	}
+
+	FText BossNameAsText = FText::FromName(InBossName);
+	BossNameText->SetText(BossNameAsText);
+
+	DEBUG_LOG(TEXT("Boss name set to: %s"), *InBossName.ToString());
 }
 
 void UBossHealthWidget::UpdateBossHealth(float CurrentHealth, float MaxHealth)
