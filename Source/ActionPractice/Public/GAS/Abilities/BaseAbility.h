@@ -61,10 +61,16 @@ protected:
 	TSubclassOf<class UGameplayEffect> StaminaCostEffect;
 
 	FGameplayTag EffectStaminaCostTag;
+	FGameplayTag EffectCooldownDurationTag;
 
 #pragma endregion
 
 #pragma region "Protected Functions"
+
+	virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
+
+	//쿨다운 태그를 AbilityTags로 사용
+	virtual const FGameplayTagContainer* GetCooldownTags() const override;
 
 	UFUNCTION(BlueprintPure, Category = "Ability")
 	UBaseAbilitySystemComponent* GetBaseAbilitySystemComponentFromActorInfo() const;

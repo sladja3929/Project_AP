@@ -403,6 +403,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEffectDamageIncomingDamageTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEffectCooldownDurationTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEffectCooldownDurationTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Internal Ability Tags"
@@ -768,6 +777,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEffectDamageIncomingDamageTagInte
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Effect_Damage_IncomingDamage;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEffectCooldownDurationTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Effect_Cooldown_Duration;
 	}
 	return FGameplayTag::EmptyTag;
 }
