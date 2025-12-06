@@ -4,7 +4,7 @@
 #include "Characters/BossCharacter.h"
 #include "GAS/AttributeSet/BossAttributeSet.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogBossAbilitySystemComponent, Log, All);

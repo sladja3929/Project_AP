@@ -56,7 +56,21 @@ void UBlockAbility::PlayAction()
 
 UAnimMontage* UBlockAbility::SetMontageToPlayTask()
 {
-	return WeaponBlockData->BlockIdleMontage.Get();
+	if (!WeaponBlockData)
+	{
+		DEBUG_LOG(TEXT("SetMontageToPlayTask: No WeaponBlockData"));
+		return nullptr;
+	}
+
+	// 소프트 레퍼런스를 실제 오브젝트로 로드
+	UAnimMontage* Montage = WeaponBlockData->BlockIdleMontage.LoadSynchronous();
+	if (!Montage)
+	{
+		DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load BlockIdleMontage"));
+		return nullptr;
+	}
+
+	return Montage;
 }
 
 void UBlockAbility::BindEventsAndReadyMontageTask()

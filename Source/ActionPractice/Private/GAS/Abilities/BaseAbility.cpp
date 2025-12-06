@@ -42,16 +42,18 @@ void UBaseAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, con
 
 bool UBaseAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, OUT FGameplayTagContainer* OptionalRelevantTags) const
 {
-	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
+	const bool bSuperCanActivate = Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+
+	if (!bSuperCanActivate)
 	{
-		DEBUG_LOG(TEXT("Cannot Activate Ability"));
+		DEBUG_LOG(TEXT("BaseAbility::CanActivateAbility FAILED at Super. Ability=%s"), *GetName());
 		return false;
 	}
 
-	//초기 스테미나 소모값 확인
-	if (!CheckStaminaCost(*ActorInfo))
+	const bool bHasStamina = CheckStaminaCost(*ActorInfo);
+	if (!bHasStamina)
 	{
-		DEBUG_LOG(TEXT("Cannot Activate Ability"));
+		DEBUG_LOG(TEXT("BaseAbility::CanActivateAbility FAILED by Stamina. Ability=%s"), *GetName());
 		return false;
 	}
 

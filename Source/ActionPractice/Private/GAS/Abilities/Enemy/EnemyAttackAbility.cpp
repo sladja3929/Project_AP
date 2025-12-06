@@ -11,7 +11,7 @@
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAttackAbility, Log, All);
@@ -47,36 +47,33 @@ void UEnemyAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 void UEnemyAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	
+
 	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
 	if (!BossCharacter)
 	{
-		DEBUG_LOG(TEXT("No Character"));
+		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - BossCharacter is nullptr. Ability=%s"), *GetName());
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 
-	//HitDetectionSetter 초기화
 	if (!HitDetectionSetter.Init(BossCharacter->GetHitDetectionInterface()))
 	{
-		DEBUG_LOG(TEXT("Failed to init HitDetectionSetter"));
+		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - HitDetectionSetter.Init failed. Ability=%s"), *GetName());
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 
-	//HitDetectionSetter 바인딩
 	if (!HitDetectionSetter.Bind(this))
 	{
-		DEBUG_LOG(TEXT("Failed to bind HitDetectionSetter"));
+		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - HitDetectionSetter.Bind failed. Ability=%s"), *GetName());
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 
-	//공격 데이터 가져오기
 	const UEnemyDataAsset* EnemyData = BossCharacter->GetEnemyData();
 	if (!EnemyData)
 	{
-		DEBUG_LOG(TEXT("ActivateAbility: No EnemyData"));
+		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - EnemyData is nullptr. Ability=%s"), *GetName());
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
@@ -90,14 +87,12 @@ void UEnemyAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	}
 
 	MaxComboCount = EnemyAttackData->ComboSequence.Num();
-	DEBUG_LOG(TEXT("ActivateAbility: Loaded Attack Data - MaxComboCount: %d"), MaxComboCount);
 
 	//Ability 시작 시 AIController로부터 CurrentTarget 정보 캐싱
 	AEnemyAIController* AIController = GetEnemyAIControllerFromActorInfo();
 	if (AIController)
 	{
 		CachedTargetInfo = AIController->GetCurrentTarget();
-		DEBUG_LOG(TEXT("ActivateAbility: Cached Target Info - Distance: %.2f, Angle: %.2f"), CachedTargetInfo.Distance, CachedTargetInfo.AngleToTarget);
 	}
 
 	ComboCounter = 0;
@@ -160,10 +155,22 @@ UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 		return nullptr;
 	}
 
-	if (ComboCounter < 0) ComboCounter = 0;
+	if (ComboCounter < 0)
+	{
+		ComboCounter = 0;
+	}
 
-	DEBUG_LOG(TEXT("SetMontageToPlayTask: ComboIndex: %d"), ComboCounter);
-	return EnemyAttackData->ComboSequence[ComboCounter].AttackMontage.Get();
+	// 소프트 레퍼런스를 실제 오브젝트로 로드
+	const auto& ComboData = EnemyAttackData->ComboSequence[ComboCounter];
+	UAnimMontage* Montage = ComboData.AttackMontage.LoadSynchronous();
+	if (!Montage)
+	{
+		DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load montage. AttackName=%s, ComboIndex=%d"),
+			*AttackName.ToString(), ComboCounter);
+		return nullptr;
+	}
+
+	return Montage;
 }
 
 void UEnemyAttackAbility::ExecuteMontageTask()
@@ -171,7 +178,7 @@ void UEnemyAttackAbility::ExecuteMontageTask()
 	UAnimMontage* MontageToPlay = SetMontageToPlayTask();
 	if (!MontageToPlay)
 	{
-		DEBUG_LOG(TEXT("No Montage to Play"));
+		DEBUG_LOG(TEXT("EnemyAttackAbility::ExecuteMontageTask FAIL - MontageToPlay is nullptr. Ability=%s"), *GetName());
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}

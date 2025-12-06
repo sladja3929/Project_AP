@@ -4,7 +4,7 @@
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogWeaponAbilityStatics, Log, All);

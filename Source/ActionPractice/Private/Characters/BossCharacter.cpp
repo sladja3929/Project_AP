@@ -71,11 +71,30 @@ void ABossCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	DEBUG_LOG(TEXT("BossCharacter::BeginPlay: This=%p, ASC=%p, AttributeSet=%p"),
+		this,
+		AbilitySystemComponent.Get(),
+		AttributeSet.Get());
+
+	if (EnemyData)
+	{
+		DEBUG_LOG(TEXT("BossCharacter::BeginPlay: EnemyData=%s"), *GetNameSafe(EnemyData));
+	}
+	else
+	{
+		DEBUG_LOG(TEXT("BossCharacter::BeginPlay: EnemyData is nullptr"));
+	}
+
+	DEBUG_LOG(TEXT("BossCharacter::BeginPlay: StartAbilities count=%d"), StartAbilities.Num());
+	for (const TSubclassOf<UGameplayAbility>& AbilityClass : StartAbilities)
+	{
+		DEBUG_LOG(TEXT("  StartAbility: %s"), *GetNameSafe(AbilityClass));
+	}
+
 	//EnemyData의 모든 몽타주 프리로드
 	if (EnemyData)
 	{
 		EnemyData->PreloadAllMontages();
-		DEBUG_LOG(TEXT("EnemyData montages preloaded"));
 	}
 
 	//AIController의 Perception 델리게이트 바인딩
@@ -89,7 +108,6 @@ void ABossCharacter::BeginPlay()
 			DEBUG_LOG(TEXT("Perception delegate bound to BossCharacter"));
 		}
 	}
-	DEBUG_LOG(TEXT("BossChar Begin"));
 }
 
 void ABossCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
