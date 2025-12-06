@@ -68,6 +68,13 @@ EStateTreeRunStatus FActivateAbilityTask::EnterState(FStateTreeExecutionContext&
     const bool bSuccess = InstanceData.AbilitySystemComponent->TryActivateAbility(InstanceData.AbilityHandle, true);
     if (!bSuccess)
     {
+        //발동 실패 시 델리게이트를 반드시 해제해야 함
+        if (InstanceData.AbilityEndedHandle.IsValid())
+        {
+            InstanceData.AbilitySystemComponent->OnAbilityEnded.Remove(InstanceData.AbilityEndedHandle);
+            InstanceData.AbilityEndedHandle.Reset();
+        }
+        
         DEBUG_LOG(TEXT("Failed to activate ability: %s"), *InstanceData.AbilityToActivate->GetName());
         return EStateTreeRunStatus::Failed;
     }
