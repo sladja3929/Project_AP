@@ -7,7 +7,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GAS/GameplayTagsSubsystem.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAnimNotifyState_HitDetection, Log, All);
@@ -25,6 +25,11 @@ UAnimNotifyState_HitDetection::UAnimNotifyState_HitDetection()
 
 void UAnimNotifyState_HitDetection::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float TotalDuration, const FAnimNotifyEventReference& EventReference)
 {
+    Super::NotifyBegin(MeshComp, Animation, TotalDuration, EventReference);
+
+    DEBUG_LOG(TEXT("HitDetection NotifyBegin: Anim=%s, Duration=%.3f"),
+        *GetNameSafe(Animation), TotalDuration);
+
     if (!MeshComp || !MeshComp->GetOwner())
         return;
 
@@ -43,7 +48,6 @@ void UAnimNotifyState_HitDetection::NotifyBegin(USkeletalMeshComponent* MeshComp
     AddComboEventData.EventTag = UGameplayTagsSubsystem::GetEventNotifyAddComboTag();
 
     ASC->HandleGameplayEvent(UGameplayTagsSubsystem::GetEventNotifyAddComboTag(), &AddComboEventData);
-    DEBUG_LOG(TEXT("HitDetection ANS: AddCombo"));
 
     // HitDetectionStart 이벤트 송신
     FGameplayEventData EventData;
@@ -55,11 +59,15 @@ void UAnimNotifyState_HitDetection::NotifyBegin(USkeletalMeshComponent* MeshComp
     EventData.EventMagnitude = TotalDuration;
 
     ASC->HandleGameplayEvent(UGameplayTagsSubsystem::GetEventNotifyHitDetectionStartTag(), &EventData);
-    DEBUG_LOG(TEXT("HitDetection ANS: Start"));
 }
 
 void UAnimNotifyState_HitDetection::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
 {
+    Super::NotifyEnd(MeshComp, Animation, EventReference);
+
+    DEBUG_LOG(TEXT("HitDetection NotifyEnd: Anim=%s"),
+        *GetNameSafe(Animation));
+
     if (!MeshComp || !MeshComp->GetOwner())
         return;
 
@@ -77,5 +85,4 @@ void UAnimNotifyState_HitDetection::NotifyEnd(USkeletalMeshComponent* MeshComp, 
     EventData.EventTag = UGameplayTagsSubsystem::GetEventNotifyHitDetectionEndTag();
 
     ASC->HandleGameplayEvent(UGameplayTagsSubsystem::GetEventNotifyHitDetectionEndTag(), &EventData);
-    DEBUG_LOG(TEXT("HitDetection ANS: End"));
 }

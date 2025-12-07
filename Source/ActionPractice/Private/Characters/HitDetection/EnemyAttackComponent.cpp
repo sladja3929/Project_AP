@@ -8,7 +8,7 @@
 #include "AbilitySystemComponent.h"
 #include "Components/InputComponent.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAttackComponent, Log, All);
@@ -67,11 +67,12 @@ UAbilitySystemComponent* UEnemyAttackComponent::GetOwnerASC() const
 #pragma region "Trace Config Functions"
 bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 ComboIndex)
 {
-	DEBUG_LOG(TEXT("LoadTraceConfig - START, AttackName: %s, ComboIndex: %d"), *AttackName.ToString(), ComboIndex);
+	DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig: AttackName=%s, ComboIndex=%d"),
+		*AttackName.ToString(), ComboIndex);
 
 	if (!OwnerEnemy)
 	{
-		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No OwnerEnemy"));
+		DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig FAILED"));
 		return false;
 	}
 
@@ -79,14 +80,14 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 Combo
 	const UEnemyDataAsset* EnemyData = OwnerEnemy->GetEnemyData();
 	if (!EnemyData)
 	{
-		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No EnemyData"));
+		DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig FAILED"));
 		return false;
 	}
 
 	const FNamedAttackData* AttackData = EnemyData->NamedAttackData.Find(AttackName);
 	if (!AttackData || AttackData->ComboSequence.Num() == 0)
 	{
-		DEBUG_LOG(TEXT("LoadTraceConfig - FAILED: No AttackData or empty ComboSequence"));
+		DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig FAILED"));
 		return false;
 	}
 
@@ -107,12 +108,10 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 Combo
 			SocketGroupConfig.TraceRadius = SocketConfig.TraceRadius;
 
 			UsingHitSocketGroups.Add(SocketConfig.SocketName, SocketGroupConfig);
-			DEBUG_LOG(TEXT("LoadTraceConfig - Added socket group: %s, SocketCount: %d, Radius: %.2f"),
-				*SocketConfig.SocketName.ToString(), SocketGroupConfig.SocketCount, SocketGroupConfig.TraceRadius);
 		}
 		else
 		{
-			DEBUG_LOG(TEXT("LoadTraceConfig - Socket not found in PrebuiltSocketGroups: %s"), *SocketConfig.SocketName.ToString());
+			DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig FAILED"));
 		}
 	}
 
@@ -121,8 +120,8 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 Combo
 	CurrentAttackData.PoiseDamage = AttackInfo.PoiseDamage;
 	CurrentAttackData.DamageType = AttackInfo.DamageType;
 
-	DEBUG_LOG(TEXT("LoadTraceConfig - SUCCESS: Added %d socket groups, FinalDamage: %.2f"),
-		UsingHitSocketGroups.Num(), CurrentAttackData.FinalDamage);
+	DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig SUCCESS (UsingSocketGroups=%d)"),
+		UsingHitSocketGroups.Num());
 
 	return true;
 }

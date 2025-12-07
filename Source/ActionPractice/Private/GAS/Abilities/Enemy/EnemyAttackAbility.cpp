@@ -110,8 +110,6 @@ void UEnemyAttackAbility::SetHitDetectionConfig()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
-
-	DEBUG_LOG(TEXT("Attack Ability: Call Hit Detection Prepare"));
 }
 
 void UEnemyAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& HitResult, FFinalAttackData AttackData)
@@ -160,7 +158,7 @@ UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 		ComboCounter = 0;
 	}
 
-	// 소프트 레퍼런스를 실제 오브젝트로 로드
+	//소프트 레퍼런스를 실제 오브젝트로 로드
 	const auto& ComboData = EnemyAttackData->ComboSequence[ComboCounter];
 	UAnimMontage* Montage = ComboData.AttackMontage.LoadSynchronous();
 	if (!Montage)
@@ -320,6 +318,9 @@ void UEnemyAttackAbility::OnEventCheckCondition(FGameplayEventData Payload)
 
 void UEnemyAttackAbility::OnEventActionRecoveryEnd(FGameplayEventData Payload)
 {
+	DEBUG_LOG(TEXT("OnEventActionRecoveryEnd: bPerformNextCombo=%s"),
+		bPerformNextCombo ? TEXT("true") : TEXT("false"));
+
 	if (bPerformNextCombo)
 	{
 		DEBUG_LOG(TEXT("OnEventActionRecoveryEnd: Performing Next Combo"));
@@ -334,6 +335,8 @@ void UEnemyAttackAbility::OnEventActionRecoveryEnd(FGameplayEventData Payload)
 void UEnemyAttackAbility::PlayNextCombo()
 {
 	++ComboCounter;
+	DEBUG_LOG(TEXT("PlayNextCombo: ComboCounter=%d / MaxComboCount=%d"),
+		ComboCounter, MaxComboCount);
 
 	//콤보 카운터가 콤보 시퀀스를 벗어나면 종료
 	if (ComboCounter >= MaxComboCount)
@@ -342,8 +345,6 @@ void UEnemyAttackAbility::PlayNextCombo()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}
-
-	DEBUG_LOG(TEXT("PlayNextCombo: ComboCounter: %d"), ComboCounter);
 
 	bPerformNextCombo = true;
 	bCreateTask = false;
