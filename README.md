@@ -1,15 +1,17 @@
-# Unreal ActionPractice
+# Project AP
 
-언리얼 공부를 위한 1인 개발 토이 프로젝트입니다.
+언리얼로 제작한 1인 개발 토이 프로젝트입니다.
 
-엘든 링과 몬스터 헌터를 레퍼런스로 한 3D 액션 게임입니다. 
+## 개발 목적
++ 엘든 링, 몬스터 헌터 같은 하드코어 3D 액션 게임의 시스템과 기능들을 모방하여 설계 역량을 키우고  장르의 특성을 이해
++ 언리얼의 다양한 기술들을 사용해보며 엔진에 숙달
 
 ## 시연 영상
-[![Video Label](http://img.youtube.com/vi/ldf_MIIXqkk/0.jpg)](https://www.youtube.com/watch?v=ldf_MIIXqkk)
+[![Video Label](http://img.youtube.com/vi/FYvSqzST_Zk/0.jpg)](https://www.youtube.com/watch?v=FYvSqzST_Zk)
 
 ## 환경
 + 플랫폼: Windows PC
-+ 엔진: Unreal 5.6
++ 엔진: Unreal 5.7 preview
 + 언어: C++
 
 ## 구현 기능
@@ -22,7 +24,7 @@
   + Roll Attack
   + Sprint Attack
   + Block
-+ Input Buffer System
-+ Trace Sweep Hit Detection
++ 입력 저장 시스템: Input Buffer
++ 공격 충돌 판정 기법: Trace Sweep
 + Data Driven Design
 + State Tree, GAS 기반 Enemy AI
