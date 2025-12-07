@@ -129,8 +129,27 @@ void UBaseAttackAbility::PlayAction()
 
 UAnimMontage* UBaseAttackAbility::SetMontageToPlayTask()
 {
-    if (ComboCounter < 0) ComboCounter = 0;
-    return WeaponAttackData->ComboSequence[ComboCounter].AttackMontage.Get();
+    if (!WeaponAttackData)
+    {
+        DEBUG_LOG(TEXT("SetMontageToPlayTask: No WeaponAttackData"));
+        return nullptr;
+    }
+
+    if (ComboCounter < 0)
+    {
+        ComboCounter = 0;
+    }
+
+    // 소프트 레퍼런스를 실제 오브젝트로 로드
+    const auto& ComboData = WeaponAttackData->ComboSequence[ComboCounter];
+    UAnimMontage* Montage = ComboData.AttackMontage.LoadSynchronous();
+    if (!Montage)
+    {
+        DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load montage. ComboIndex=%d"), ComboCounter);
+        return nullptr;
+    }
+
+    return Montage;
 }
 
 void UBaseAttackAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)

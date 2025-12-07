@@ -72,9 +72,10 @@ void UGASStateTreeAIComponentSchema::SetContextData(FContextDataSetter& ContextD
 	//Actor 가져오기
 	AAIController* AIOwner = ContextDataSetter.GetComponent()->GetAIOwner();
 	AActor* OwnerActor = (AIOwner != nullptr) ? AIOwner->GetPawn() : ContextDataSetter.GetComponent()->GetOwner();
-	
+	AActor* FallbackOwner = ContextDataSetter.GetComponent()->GetOwner();
+
 	UAbilitySystemComponent* ASC = nullptr;
-	
+
 	if (OwnerActor)
 	{
 		//IAbilitySystemInterface를 통해 ASC 가져오기
@@ -82,28 +83,34 @@ void UGASStateTreeAIComponentSchema::SetContextData(FContextDataSetter& ContextD
 		{
 			ASC = ASInterface->GetAbilitySystemComponent();
 		}
-			
+
 		//인터페이스가 없으면 컴포넌트로 직접 찾기
 		if (!ASC)
 		{
 			ASC = OwnerActor->FindComponentByClass<UAbilitySystemComponent>();
 		}
-			
-		DEBUG_LOG(TEXT("Actor: %s, ASC Found: %s"), 
-			*GetNameSafe(OwnerActor), 
-			ASC ? TEXT("Yes") : TEXT("No"));
 	}
-	
+
+	//이전 ASC와 비교하여 변경되었을 때만 로그 출력 (로그 스팸 방지)
+	static UAbilitySystemComponent* LastASC = nullptr;
+
+	if (ASC != LastASC)
+	{
+		DEBUG_LOG(TEXT("Schema::SetContextData: ASC Changed! Old=%p, New=%p, Actor=%s"),
+			LastASC,
+			ASC,
+			*GetNameSafe(OwnerActor ? OwnerActor : FallbackOwner));
+
+		LastASC = ASC;
+	}
+
 	//ASC를 Context에 설정
 	if (!ContextDataSetter.SetContextDataByName(TEXT("AbilitySystemComponent"), FStateTreeDataView(ASC)))
 	{
+		DEBUG_LOG(TEXT("Schema::SetContextData: FAILED to set ASC in context. ASC=%p"), ASC);
 		if (bLogErrors && !ASC)
 		{
-			DEBUG_LOG(TEXT("Failed to set ASC in Context - ASC not found"));
+			DEBUG_LOG(TEXT("Schema::SetContextData: bLogErrors=true and ASC is nullptr"));
 		}
-	}
-	else
-	{
-		DEBUG_LOG(TEXT("Successfully set ASC in Context"));
 	}
 }

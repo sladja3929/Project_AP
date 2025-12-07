@@ -11,6 +11,8 @@
 #include "Perception/AISense_Sight.h"
 #include "Characters/HitDetection/EnemyAttackComponent.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -71,11 +73,30 @@ void ABossCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	DEBUG_LOG(TEXT("BossCharacter::BeginPlay: This=%p, ASC=%p, AttributeSet=%p"),
+		this,
+		AbilitySystemComponent.Get(),
+		AttributeSet.Get());
+
+	if (EnemyData)
+	{
+		DEBUG_LOG(TEXT("BossCharacter::BeginPlay: EnemyData=%s"), *GetNameSafe(EnemyData));
+	}
+	else
+	{
+		DEBUG_LOG(TEXT("BossCharacter::BeginPlay: EnemyData is nullptr"));
+	}
+
+	DEBUG_LOG(TEXT("BossCharacter::BeginPlay: StartAbilities count=%d"), StartAbilities.Num());
+	for (const TSubclassOf<UGameplayAbility>& AbilityClass : StartAbilities)
+	{
+		DEBUG_LOG(TEXT("  StartAbility: %s"), *GetNameSafe(AbilityClass));
+	}
+
 	//EnemyData의 모든 몽타주 프리로드
 	if (EnemyData)
 	{
 		EnemyData->PreloadAllMontages();
-		DEBUG_LOG(TEXT("EnemyData montages preloaded"));
 	}
 
 	//AIController의 Perception 델리게이트 바인딩
@@ -89,7 +110,6 @@ void ABossCharacter::BeginPlay()
 			DEBUG_LOG(TEXT("Perception delegate bound to BossCharacter"));
 		}
 	}
-	DEBUG_LOG(TEXT("BossChar Begin"));
 }
 
 void ABossCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -117,6 +137,7 @@ void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
 			{
 				DetectedPlayer = Player;
 				CreateAndAttachHealthWidget();
+				PlayBossBGM();
 			}
 		}
 		else
@@ -157,7 +178,10 @@ void ABossCharacter::CreateAndAttachHealthWidget()
 	{
 		BossHealthWidget->SetBossAttributeSet(BossAttributeSet);
 	}
-	
+
+	//보스 이름 설정
+	BossHealthWidget->SetBossName(EnemyName);
+
 	BossHealthWidget->AddToViewport();
 
 	bHealthWidgetActive = true;
@@ -178,6 +202,8 @@ void ABossCharacter::RemoveHealthWidget()
 		DEBUG_LOG(TEXT("BossHealthWidget removed"));
 	}
 
+	StopBossBGM();
+
 	DetectedPlayer.Reset();
 	bHealthWidgetActive = false;
 }
@@ -197,4 +223,35 @@ void ABossCharacter::RotateToTarget(const AActor* TargetActor, float RotateTime)
 
 	//BaseCharacter의 RotateToPosition 호출
 	RotateToPosition(TargetActor->GetActorLocation(), RotateTime);
+}
+
+void ABossCharacter::PlayBossBGM()
+{
+	if (!BossBGM)
+	{
+		DEBUG_LOG(TEXT("BossBGM is not set"));
+		return;
+	}
+
+	//이미 재생 중이면 리턴
+	if (BGMAudioComponent && BGMAudioComponent->IsPlaying())
+	{
+		DEBUG_LOG(TEXT("BossBGM is already playing"));
+		return;
+	}
+
+	BGMAudioComponent = UGameplayStatics::SpawnSound2D(this, BossBGM);
+	if (BGMAudioComponent)
+	{
+		DEBUG_LOG(TEXT("BossBGM started playing"));
+	}
+}
+
+void ABossCharacter::StopBossBGM()
+{
+	if (BGMAudioComponent && BGMAudioComponent->IsPlaying())
+	{
+		BGMAudioComponent->Stop();
+		DEBUG_LOG(TEXT("BossBGM stopped"));
+	}
 }

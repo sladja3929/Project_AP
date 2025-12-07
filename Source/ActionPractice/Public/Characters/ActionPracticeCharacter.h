@@ -83,6 +83,9 @@ public:
 
 	TArray<FGameplayAbilitySpec*> FindAbilitySpecsWithInputAction(const UInputAction* InputAction);
 
+	UFUNCTION(BlueprintPure, Category = "Input")
+	bool IsBlockInputPressed() const;
+
 #pragma endregion
 
 protected:

@@ -7,7 +7,7 @@
 #include "GAS/GameplayTagsSubsystem.h"
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAbilityTask_PlayNormalAttackMontage, Log, All);

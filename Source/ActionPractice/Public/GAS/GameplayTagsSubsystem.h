@@ -65,6 +65,7 @@ public:
 	static const FGameplayTag& GetEffectStaminaRegenBlockDurationTag();
 	static const FGameplayTag& GetEffectSprintSpeedMultiplierTag();
 	static const FGameplayTag& GetEffectDamageIncomingDamageTag();
+	static const FGameplayTag& GetEffectCooldownDurationTag();
 #pragma endregion
 
 private:
@@ -121,6 +122,7 @@ private:
 	const FGameplayTag& GetEffectStaminaRegenBlockDurationTagInternal() const;
 	const FGameplayTag& GetEffectSprintSpeedMultiplierTagInternal() const;
 	const FGameplayTag& GetEffectDamageIncomingDamageTagInternal() const;
+	const FGameplayTag& GetEffectCooldownDurationTagInternal() const;
 #pragma endregion
 	
 protected:

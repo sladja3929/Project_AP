@@ -47,36 +47,33 @@ void UEnemyAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 void UEnemyAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	
+
 	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
 	if (!BossCharacter)
 	{
-		DEBUG_LOG(TEXT("No Character"));
+		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - BossCharacter is nullptr. Ability=%s"), *GetName());
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 
-	//HitDetectionSetter 초기화
 	if (!HitDetectionSetter.Init(BossCharacter->GetHitDetectionInterface()))
 	{
-		DEBUG_LOG(TEXT("Failed to init HitDetectionSetter"));
+		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - HitDetectionSetter.Init failed. Ability=%s"), *GetName());
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 
-	//HitDetectionSetter 바인딩
 	if (!HitDetectionSetter.Bind(this))
 	{
-		DEBUG_LOG(TEXT("Failed to bind HitDetectionSetter"));
+		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - HitDetectionSetter.Bind failed. Ability=%s"), *GetName());
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 
-	//공격 데이터 가져오기
 	const UEnemyDataAsset* EnemyData = BossCharacter->GetEnemyData();
 	if (!EnemyData)
 	{
-		DEBUG_LOG(TEXT("ActivateAbility: No EnemyData"));
+		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - EnemyData is nullptr. Ability=%s"), *GetName());
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
@@ -90,14 +87,12 @@ void UEnemyAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	}
 
 	MaxComboCount = EnemyAttackData->ComboSequence.Num();
-	DEBUG_LOG(TEXT("ActivateAbility: Loaded Attack Data - MaxComboCount: %d"), MaxComboCount);
 
 	//Ability 시작 시 AIController로부터 CurrentTarget 정보 캐싱
 	AEnemyAIController* AIController = GetEnemyAIControllerFromActorInfo();
 	if (AIController)
 	{
 		CachedTargetInfo = AIController->GetCurrentTarget();
-		DEBUG_LOG(TEXT("ActivateAbility: Cached Target Info - Distance: %.2f, Angle: %.2f"), CachedTargetInfo.Distance, CachedTargetInfo.AngleToTarget);
 	}
 
 	ComboCounter = 0;
@@ -115,8 +110,6 @@ void UEnemyAttackAbility::SetHitDetectionConfig()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
-
-	DEBUG_LOG(TEXT("Attack Ability: Call Hit Detection Prepare"));
 }
 
 void UEnemyAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& HitResult, FFinalAttackData AttackData)
@@ -160,10 +153,22 @@ UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 		return nullptr;
 	}
 
-	if (ComboCounter < 0) ComboCounter = 0;
+	if (ComboCounter < 0)
+	{
+		ComboCounter = 0;
+	}
 
-	DEBUG_LOG(TEXT("SetMontageToPlayTask: ComboIndex: %d"), ComboCounter);
-	return EnemyAttackData->ComboSequence[ComboCounter].AttackMontage.Get();
+	//소프트 레퍼런스를 실제 오브젝트로 로드
+	const auto& ComboData = EnemyAttackData->ComboSequence[ComboCounter];
+	UAnimMontage* Montage = ComboData.AttackMontage.LoadSynchronous();
+	if (!Montage)
+	{
+		DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load montage. AttackName=%s, ComboIndex=%d"),
+			*AttackName.ToString(), ComboCounter);
+		return nullptr;
+	}
+
+	return Montage;
 }
 
 void UEnemyAttackAbility::ExecuteMontageTask()
@@ -171,7 +176,7 @@ void UEnemyAttackAbility::ExecuteMontageTask()
 	UAnimMontage* MontageToPlay = SetMontageToPlayTask();
 	if (!MontageToPlay)
 	{
-		DEBUG_LOG(TEXT("No Montage to Play"));
+		DEBUG_LOG(TEXT("EnemyAttackAbility::ExecuteMontageTask FAIL - MontageToPlay is nullptr. Ability=%s"), *GetName());
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}
@@ -313,6 +318,9 @@ void UEnemyAttackAbility::OnEventCheckCondition(FGameplayEventData Payload)
 
 void UEnemyAttackAbility::OnEventActionRecoveryEnd(FGameplayEventData Payload)
 {
+	DEBUG_LOG(TEXT("OnEventActionRecoveryEnd: bPerformNextCombo=%s"),
+		bPerformNextCombo ? TEXT("true") : TEXT("false"));
+
 	if (bPerformNextCombo)
 	{
 		DEBUG_LOG(TEXT("OnEventActionRecoveryEnd: Performing Next Combo"));
@@ -327,6 +335,8 @@ void UEnemyAttackAbility::OnEventActionRecoveryEnd(FGameplayEventData Payload)
 void UEnemyAttackAbility::PlayNextCombo()
 {
 	++ComboCounter;
+	DEBUG_LOG(TEXT("PlayNextCombo: ComboCounter=%d / MaxComboCount=%d"),
+		ComboCounter, MaxComboCount);
 
 	//콤보 카운터가 콤보 시퀀스를 벗어나면 종료
 	if (ComboCounter >= MaxComboCount)
@@ -335,8 +345,6 @@ void UEnemyAttackAbility::PlayNextCombo()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}
-
-	DEBUG_LOG(TEXT("PlayNextCombo: ComboCounter: %d"), ComboCounter);
 
 	bPerformNextCombo = true;
 	bCreateTask = false;

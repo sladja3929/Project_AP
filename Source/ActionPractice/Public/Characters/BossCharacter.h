@@ -19,8 +19,10 @@ class ACTIONPRACTICE_API ABossCharacter : public ABaseCharacter
 public:
 #pragma region "Public Variables"
 
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
+	FName EnemyName = NAME_None;
 
-#pragma endregion
+#pragma endregion 
 
 #pragma region "Public Functions"
 
@@ -38,7 +40,7 @@ public:
 	FORCEINLINE class AEnemyAIController* GetEnemyAIController() const { return Cast<AEnemyAIController>(GetController()); }
 
 	const UEnemyDataAsset* GetEnemyData() const { return EnemyData.Get(); }
-
+ 
 	void RotateToTarget(const AActor* TargetActor, float RotateTime);
 
 #pragma endregion
@@ -60,6 +62,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 	TObjectPtr<UEnemyAttackComponent> EnemyAttackComponent;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Audio")
+	TObjectPtr<USoundBase> BossBGM;
+
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> BGMAudioComponent;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -74,6 +82,10 @@ protected:
 
 	void CreateAndAttachHealthWidget();
 	void RemoveHealthWidget();
+
+	// ===== Audio =====
+	void PlayBossBGM();
+	void StopBossBGM();
 
 #pragma endregion
 

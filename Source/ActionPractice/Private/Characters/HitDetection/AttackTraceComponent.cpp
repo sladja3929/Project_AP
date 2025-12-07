@@ -8,7 +8,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackTraceComponent, Log, All);
@@ -127,25 +127,28 @@ void UAttackTraceComponent::UnbindEventCallbacks()
 
 void UAttackTraceComponent::HandleHitDetectionStart(const FGameplayEventData& Payload)
 {
+	DEBUG_LOG(TEXT("HitDetectionStart: Received. bIsPrepared=%s"),
+		bIsPrepared ? TEXT("true") : TEXT("false"));
+
 	if (!bIsPrepared)
 	{
-		DEBUG_LOG(TEXT("HitDetectionStart - Not Prepared"));
+		DEBUG_LOG(TEXT("HitDetectionStart: NOT PREPARED. Ignoring."));
 		return;
 	}
 
 	float Duration = Payload.EventMagnitude;
-
-	DEBUG_LOG(TEXT("HitDetectionStart Event Received - Duration: %.2f"), Duration);
 
 	StartTrace();
 }
 
 void UAttackTraceComponent::HandleHitDetectionEnd(const FGameplayEventData& Payload)
 {
-	DEBUG_LOG(TEXT("HitDetectionEnd Event Received"));
+	DEBUG_LOG(TEXT("HitDetectionEnd: Received. bIsTracing=%s"),
+		bIsTracing ? TEXT("true") : TEXT("false"));
 
 	StopTrace();
-	bIsPrepared = false;
+	//프레임 드랍으로 HitDetectionEnd가 HitDetectionStart보다 먼저 도착할 수 있기 때문에
+	//bIsPrepared를 다음 PrepareHitDetection에서 초기화되도록 여기서 false로 설정하지 않음
 }
 #pragma endregion
 
@@ -169,10 +172,14 @@ void UAttackTraceComponent::PrepareHitDetection(const FGameplayTagContainer& Att
 
 void UAttackTraceComponent::PrepareHitDetection(const FName& AttackName, const int32 ComboIndex)
 {
+	DEBUG_LOG(TEXT("PrepareHitDetection: AttackName=%s, ComboIndex=%d"),
+		*AttackName.ToString(), ComboIndex);
+
 	//자식 클래스에서 설정 로드
 	if (!LoadTraceConfig(AttackName, ComboIndex))
 	{
-		DEBUG_LOG(TEXT("Failed to load trace config for attack name"));
+		DEBUG_LOG(TEXT("PrepareHitDetection: LoadTraceConfig FAILED"));
+		bIsPrepared = false;
 		return;
 	}
 
@@ -180,8 +187,7 @@ void UAttackTraceComponent::PrepareHitDetection(const FName& AttackName, const i
 	BindEventCallbacks();
 
 	bIsPrepared = true;
-
-	DEBUG_LOG(TEXT("PrepareHitDetection - Attack Name: %s, Combo: %d"), *AttackName.ToString(), ComboIndex);
+	DEBUG_LOG(TEXT("PrepareHitDetection: SUCCESS (bIsPrepared=true)"));
 }
 
 void UAttackTraceComponent::BuildSocketConfigs(const TArray<FHitSocketInfo>& SocketInfoArray)
@@ -249,7 +255,8 @@ void UAttackTraceComponent::StopTrace()
 {
 	bIsTracing = false;
 	SetComponentTickEnabled(false);
-	UnbindEventCallbacks();
+	//UnbindEventCallbacks(); // 콤보 전환 시 다음 콤보용 바인딩이 지워지는 것을 방지하기 위해 제거
+	//이벤트 바인딩은 PrepareHitDetection()에서 관리, 언바인딩은 EndPlay()에서만 수행
 
 	DEBUG_LOG(TEXT("Stopped trace, counter: %d"), DebugSweepTraceCounter);
 }
@@ -427,14 +434,14 @@ void UAttackTraceComponent::ProcessHit(AActor* HitActor, const FHitResult& HitRe
 		FString DamageTypeName = TEXT("Unknown");
 
 		//히트 메시지 출력
-		GEngine->AddOnScreenDebugMessage(
+		/*GEngine->AddOnScreenDebugMessage(
 			-1,  //키 (-1은 중복 허용)
 			2.0f,  //표시 시간 (초)
 			MessageColor,  //색상
 			FString::Printf(TEXT("HIT %s, Damage x%.2f"),
 				*HitActor->GetName(),
 				IncomingDamage)
-		);
+		);*/
 	}
 
 	OnHit.Broadcast(HitActor, HitResult, CurrentAttackData);

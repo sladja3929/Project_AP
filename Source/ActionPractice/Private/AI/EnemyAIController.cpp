@@ -53,31 +53,37 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
+	DEBUG_LOG(TEXT("OnPossess: InPawn=%s"), *GetNameSafe(InPawn));
+
 	BossCharacter = Cast<ABossCharacter>(InPawn);
 	if (!BossCharacter.IsValid())
 	{
-		DEBUG_LOG(TEXT("Failed to cast Pawn to BossCharacter"));
+		DEBUG_LOG(TEXT("OnPossess: Failed to cast Pawn to BossCharacter"));
 		return;
 	}
 
 	if (!GASStateTreeAIComponent)
 	{
-		DEBUG_LOG(TEXT("StateTreeComponent is nullptr"));
+		DEBUG_LOG(TEXT("OnPossess: GASStateTreeAIComponent is nullptr"));
 		return;
 	}
 
+	DEBUG_LOG(TEXT("OnPossess: Restarting StateTree logic"));
 	GASStateTreeAIComponent->RestartLogic();
 }
 
 void AEnemyAIController::OnUnPossess()
 {
+	DEBUG_LOG(TEXT("OnUnPossess: Called. Pawn=%s"), *GetNameSafe(GetPawn()));
+
 	if (GASStateTreeAIComponent)
 	{
+		DEBUG_LOG(TEXT("OnUnPossess: Stopping StateTree logic"));
 		GASStateTreeAIComponent->StopLogic("Unpossessed");
 	}
 
 	BossCharacter.Reset();
-	
+
 	Super::OnUnPossess();
 }
 
