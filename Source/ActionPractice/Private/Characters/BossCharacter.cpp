@@ -11,6 +11,8 @@
 #include "Perception/AISense_Sight.h"
 #include "Characters/HitDetection/EnemyAttackComponent.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -135,6 +137,7 @@ void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
 			{
 				DetectedPlayer = Player;
 				CreateAndAttachHealthWidget();
+				PlayBossBGM();
 			}
 		}
 		else
@@ -199,6 +202,8 @@ void ABossCharacter::RemoveHealthWidget()
 		DEBUG_LOG(TEXT("BossHealthWidget removed"));
 	}
 
+	StopBossBGM();
+
 	DetectedPlayer.Reset();
 	bHealthWidgetActive = false;
 }
@@ -218,4 +223,35 @@ void ABossCharacter::RotateToTarget(const AActor* TargetActor, float RotateTime)
 
 	//BaseCharacter의 RotateToPosition 호출
 	RotateToPosition(TargetActor->GetActorLocation(), RotateTime);
+}
+
+void ABossCharacter::PlayBossBGM()
+{
+	if (!BossBGM)
+	{
+		DEBUG_LOG(TEXT("BossBGM is not set"));
+		return;
+	}
+
+	//이미 재생 중이면 리턴
+	if (BGMAudioComponent && BGMAudioComponent->IsPlaying())
+	{
+		DEBUG_LOG(TEXT("BossBGM is already playing"));
+		return;
+	}
+
+	BGMAudioComponent = UGameplayStatics::SpawnSound2D(this, BossBGM);
+	if (BGMAudioComponent)
+	{
+		DEBUG_LOG(TEXT("BossBGM started playing"));
+	}
+}
+
+void ABossCharacter::StopBossBGM()
+{
+	if (BGMAudioComponent && BGMAudioComponent->IsPlaying())
+	{
+		BGMAudioComponent->Stop();
+		DEBUG_LOG(TEXT("BossBGM stopped"));
+	}
 }

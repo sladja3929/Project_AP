@@ -62,6 +62,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 	TObjectPtr<UEnemyAttackComponent> EnemyAttackComponent;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Audio")
+	TObjectPtr<USoundBase> BossBGM;
+
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> BGMAudioComponent;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -76,6 +82,10 @@ protected:
 
 	void CreateAndAttachHealthWidget();
 	void RemoveHealthWidget();
+
+	// ===== Audio =====
+	void PlayBossBGM();
+	void StopBossBGM();
 
 #pragma endregion
 
