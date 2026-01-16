@@ -20,6 +20,13 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+UEnemyAttackAbility::UEnemyAttackAbility()
+{
+	// 보스는 서버 전용 (클라이언트는 애니메이션만 복제로 재생)
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+}
+
 void UEnemyAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
 {
 	Super::OnGiveAbility(ActorInfo, Spec);

@@ -86,6 +86,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Input")
 	bool IsBlockInputPressed() const;
 
+	//===== Replication =====
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 #pragma endregion
 
 protected:
@@ -110,11 +113,11 @@ protected:
 	// ===== Weapon Properties =====
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon")
 	TSubclassOf<AWeapon> WeaponClass = nullptr;
-	
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon")
+
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon", ReplicatedUsing = OnRep_LeftWeapon)
 	TObjectPtr<AWeapon> LeftWeapon = nullptr;
-    
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon")
+
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon", ReplicatedUsing = OnRep_RightWeapon)
 	TObjectPtr<AWeapon> RightWeapon = nullptr;
 
 	// ====== Input Actions ======
@@ -161,14 +164,14 @@ protected:
 	FGameplayTag AbilityAttackTag;
 	
 	// ===== State Variables =====
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State", Replicated)
 	bool bIsLockOn = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State")
 	bool bIsSwitching = false;
 
 	// ===== LockOn =====
-	UPROPERTY(BlueprintReadOnly, Category = "Combat")
+	UPROPERTY(BlueprintReadOnly, Category = "Combat", Replicated)
 	TObjectPtr<AActor> LockedOnTarget = nullptr;
 	
 #pragma endregion
@@ -218,7 +221,14 @@ protected:
 	void OnBlockInputReleased();
 	void OnChargeAttackInput();
 	void OnChargeAttackReleased();
-	
+
+	//===== Replication Functions =====
+	UFUNCTION()
+	void OnRep_LeftWeapon();
+
+	UFUNCTION()
+	void OnRep_RightWeapon();
+
 #pragma endregion
 
 private:

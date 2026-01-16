@@ -13,6 +13,7 @@
 #include "Characters/Enemy/EnemyDataAsset.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -99,17 +100,29 @@ void ABossCharacter::BeginPlay()
 		EnemyData->PreloadAllMontages();
 	}
 
-	//AIController의 Perception 델리게이트 바인딩
-	AEnemyAIController* BossController = GetEnemyAIController();
-	if (BossController)
+	// AI 관련 설정은 서버에서만 (싱글플레이어에서는 항상 true)
+	if (HasAuthority())
 	{
-		UAIPerceptionComponent* PerceptionComponent = BossController->GetPerceptionComponent();
-		if (PerceptionComponent)
+		//AIController의 Perception 델리게이트 바인딩
+		AEnemyAIController* BossController = GetEnemyAIController();
+		if (BossController)
 		{
-			PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &ABossCharacter::OnPlayerDetected);
-			DEBUG_LOG(TEXT("Perception delegate bound to BossCharacter"));
+			UAIPerceptionComponent* PerceptionComponent = BossController->GetPerceptionComponent();
+			if (PerceptionComponent)
+			{
+				PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &ABossCharacter::OnPlayerDetected);
+				DEBUG_LOG(TEXT("Perception delegate bound to BossCharacter"));
+			}
 		}
 	}
+}
+
+void ABossCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	// 보스는 복제할 추가 변수가 거의 없음
+	// DetectedPlayer는 서버 전용, bHealthWidgetActive는 로컬 UI 상태
 }
 
 void ABossCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)

@@ -40,8 +40,11 @@ public:
 	FORCEINLINE class AEnemyAIController* GetEnemyAIController() const { return Cast<AEnemyAIController>(GetController()); }
 
 	const UEnemyDataAsset* GetEnemyData() const { return EnemyData.Get(); }
- 
+
 	void RotateToTarget(const AActor* TargetActor, float RotateTime);
+
+	//===== Replication =====
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 #pragma endregion
 

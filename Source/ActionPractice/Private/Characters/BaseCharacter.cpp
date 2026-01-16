@@ -3,6 +3,7 @@
 #include "GameplayAbilities/Public/Abilities/GameplayAbility.h"
 #include "GAS/AttributeSet/BaseAttributeSet.h"
 #include "Items/AttackData.h"
+#include "Net/UnrealNetwork.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -16,6 +17,10 @@
 ABaseCharacter::ABaseCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
+
+	// 네트워크 복제 활성화
+	bReplicates = true;
+	SetReplicateMovement(true);
 }
 
 void ABaseCharacter::BeginPlay()
@@ -35,6 +40,13 @@ void ABaseCharacter::Tick(float DeltaTime)
 UAbilitySystemComponent* ABaseCharacter::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
+}
+
+void ABaseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	// AbilitySystemComponent와 AttributeSet은 자체적으로 복제되므로 여기서는 등록 불필요
 }
 
 void ABaseCharacter::InitializeAbilitySystem()

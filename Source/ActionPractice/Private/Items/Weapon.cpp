@@ -10,6 +10,7 @@
 #include "Characters/HitDetection/WeaponAttackComponent.h"
 #include "Characters/HitDetection/WeaponCCDComponent.h"
 #include "GAS/AttributeSet/ActionPracticeAttributeSet.h"
+#include "Net/UnrealNetwork.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -24,18 +25,22 @@ AWeapon::AWeapon()
 {
     PrimaryActorTick.bCanEverTick = true;
 
+	// 네트워크 복제 활성화
+	bReplicates = true;
+	SetReplicateMovement(false);  // Attachment로 위치 동기화되므로 Movement는 복제 불필요
+
 	// Scene Component를 Root로 설정
 	USceneComponent* SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	RootComponent = SceneRoot;
-	
+
     // 메시 컴포넌트 생성
     WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMesh"));
 	WeaponMesh->SetupAttachment(RootComponent);
-    
+
     // 콜리전 컴포넌트 추가
     AttackTraceComponent = CreateDefaultSubobject<UWeaponAttackComponent>(TEXT("TraceComponent"));
     CCDComponent = CreateDefaultSubobject<UWeaponCCDComponent>(TEXT("CCDComponent"));
-    
+
     // 기본 콜리전 설정
     WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     WeaponMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
@@ -172,7 +177,21 @@ void AWeapon::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitive
 
 void AWeapon::HandleWeaponHit(AActor* HitActor, const FHitResult& HitResult, FFinalAttackData FinalAttackData)
 {
+	// 서버에서만 데미지 적용 (싱글플레이어에서는 항상 true)
+	if (!HasAuthority())
+	{
+		return;
+	}
+
     //OnHit();
+}
+
+void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	// CalculatedDamage 복제 (서버에서 계산)
+	DOREPLIFETIME(AWeapon, CalculatedDamage);
 }
 
 void AWeapon::OnStrengthChanged(const FOnAttributeChangeData& Data)

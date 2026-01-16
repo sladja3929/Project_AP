@@ -20,6 +20,7 @@
 #include "Input/InputActionDataAsset.h"
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
+#include "Net/UnrealNetwork.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -484,19 +485,25 @@ void AActionPracticeCharacter::WeaponSwitch()
 
 void AActionPracticeCharacter::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, bool bIsLeftHand, bool bIsTwoHanded)
 {
+	// 서버에서만 실행 (싱글플레이어에서는 HasAuthority()가 항상 true)
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	if (!NewWeaponClass) return;
 
 	if(bIsTwoHanded) UnequipWeapon(!bIsLeftHand);
 	UnequipWeapon(bIsLeftHand);
-    
+
 	// 새 무기 스폰
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;
 	SpawnParams.Instigator = GetInstigator();
-	
+
 	AWeapon* NewWeapon = GetWorld()->SpawnActor<AWeapon>(NewWeaponClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
     EWeaponEnums type = NewWeapon->GetWeaponType();
-	
+
 	if (NewWeapon && type != EWeaponEnums::None)
 	{
 		FString SocketString = bIsLeftHand ? "hand_l" : "hand_r";
@@ -515,7 +522,7 @@ void AActionPracticeCharacter::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, 
 			SocketString += "_shield";
 			break;
 		}
-		
+
 		FName SocketName = FName(*SocketString);
 		DEBUG_LOG(TEXT("Equiped Weapon: %s"), *SocketString);
 		NewWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
@@ -529,7 +536,7 @@ void AActionPracticeCharacter::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, 
 		{
 			LeftWeapon = NewWeapon;
 		}
-		
+
 		else
 		{
 			RightWeapon = NewWeapon;
@@ -728,5 +735,81 @@ TArray<FGameplayAbilitySpec*> AActionPracticeCharacter::FindAbilitySpecsWithInpu
 	}
 
 	return SameAssetSpecs;
+}
+#pragma endregion
+
+#pragma region "Replication Functions"
+void AActionPracticeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AActionPracticeCharacter, bIsLockOn);
+	DOREPLIFETIME(AActionPracticeCharacter, LockedOnTarget);
+	DOREPLIFETIME(AActionPracticeCharacter, LeftWeapon);
+	DOREPLIFETIME(AActionPracticeCharacter, RightWeapon);
+}
+
+void AActionPracticeCharacter::OnRep_LeftWeapon()
+{
+	if (LeftWeapon && GetMesh())
+	{
+		// 무기 타입에 따라 소켓 이름 결정
+		EWeaponEnums type = LeftWeapon->GetWeaponType();
+		if (type != EWeaponEnums::None)
+		{
+			FString SocketString = "hand_l";
+
+			switch (type)
+			{
+			case EWeaponEnums::StraightSword:
+				SocketString += "_sword";
+				break;
+
+			case EWeaponEnums::GreatSword:
+				SocketString += "_greatsword";
+				break;
+
+			case EWeaponEnums::Shield:
+				SocketString += "_shield";
+				break;
+			}
+
+			FName SocketName = FName(*SocketString);
+			LeftWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
+			DEBUG_LOG(TEXT("OnRep_LeftWeapon: Attached to %s"), *SocketString);
+		}
+	}
+}
+
+void AActionPracticeCharacter::OnRep_RightWeapon()
+{
+	if (RightWeapon && GetMesh())
+	{
+		// 무기 타입에 따라 소켓 이름 결정
+		EWeaponEnums type = RightWeapon->GetWeaponType();
+		if (type != EWeaponEnums::None)
+		{
+			FString SocketString = "hand_r";
+
+			switch (type)
+			{
+			case EWeaponEnums::StraightSword:
+				SocketString += "_sword";
+				break;
+
+			case EWeaponEnums::GreatSword:
+				SocketString += "_greatsword";
+				break;
+
+			case EWeaponEnums::Shield:
+				SocketString += "_shield";
+				break;
+			}
+
+			FName SocketName = FName(*SocketString);
+			RightWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
+			DEBUG_LOG(TEXT("OnRep_RightWeapon: Attached to %s"), *SocketString);
+		}
+	}
 }
 #pragma endregion

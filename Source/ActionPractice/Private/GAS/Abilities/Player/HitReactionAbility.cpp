@@ -18,6 +18,10 @@
 
 UHitReactionAbility::UHitReactionAbility()
 {
+	// 피격은 서버에서 시작
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
+	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
 	bRotateBeforeAction = false;
 	StaminaCost = -1.0f; // 스태미나 체크 안함
 }

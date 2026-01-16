@@ -232,13 +232,20 @@ void UWeaponCCDComponent::UnbindEventCallbacks()
 #pragma endregion
 
 #pragma region "Collision Handling"
-void UWeaponCCDComponent::OnCapsuleBeginOverlap(UPrimitiveComponent* OverlappedComponent, 
+void UWeaponCCDComponent::OnCapsuleBeginOverlap(UPrimitiveComponent* OverlappedComponent,
                                                 AActor* OtherActor,
-                                                UPrimitiveComponent* OtherComp, 
+                                                UPrimitiveComponent* OtherComp,
                                                 int32 OtherBodyIndex,
-                                                bool bFromSweep, 
+                                                bool bFromSweep,
                                                 const FHitResult& SweepResult)
 {
+	// 히트 판정은 서버에서만 (싱글플레이어에서는 항상 true)
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor || !OwnerActor->HasAuthority())
+	{
+		return;
+	}
+
     if (!bIsDetecting || !OtherActor) return;
 
     if (ValidateHit(OtherActor))
