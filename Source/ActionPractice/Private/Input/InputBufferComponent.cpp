@@ -63,6 +63,14 @@ void UInputBufferComponent::BeginPlay()
 		DEBUG_LOG(TEXT("EventActionPlayBufferTag is not valid"));
 	}
 
+	//이벤트 바인딩
+	UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent();
+	if (ASC)
+	{
+		EnableBufferInputHandle = ASC->GenericGameplayEventCallbacks.FindOrAdd(EventNotifyEnableBufferInputTag).AddUObject(this, &UInputBufferComponent::OnEventEnableBufferInput);
+		PlayBufferHandle = ASC->GenericGameplayEventCallbacks.FindOrAdd(EventActionPlayBufferTag).AddUObject(this, &UInputBufferComponent::OnEventPlayBuffer);
+	}
+
 	Super::BeginPlay();
 }
 
@@ -287,6 +295,7 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 
 	for (auto& Spec : TryActivateSpecs)
 	{
+		DEBUG_LOG(TEXT("CurrSpec: %s"), *Spec->Handle.ToString());
 		//첫 실행이거나, bRetriggerInstancedAbility = true여서 재실행될 때
 		if (ASC->TryActivateAbility(Spec->Handle))
 		{
@@ -404,6 +413,8 @@ void UInputBufferComponent::ServerBufferInput_Implementation(FGameplayTag InputA
 
 void UInputBufferComponent::ProcessPendingInputs()
 {
+	bool ba = true;
+	if (ba) return;
 	if (!GetWorld())
 	{
 		return;
@@ -460,5 +471,43 @@ void UInputBufferComponent::OnRepBufferState()
 
 void UInputBufferComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	//이벤트 해제
+	if (OwnerCharacter)
+	{
+		UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent();
+		if (ASC)
+		{
+			if (EnableBufferInputHandle.IsValid())
+			{
+				ASC->GenericGameplayEventCallbacks.FindOrAdd(EventNotifyEnableBufferInputTag).Remove(EnableBufferInputHandle);
+				EnableBufferInputHandle.Reset();
+			}
+			if (PlayBufferHandle.IsValid())
+			{
+				ASC->GenericGameplayEventCallbacks.FindOrAdd(EventActionPlayBufferTag).Remove(PlayBufferHandle);
+				PlayBufferHandle.Reset();
+			}
+		}
+	}
+
 	Super::EndPlay(EndPlayReason);
+}
+
+void UInputBufferComponent::OnEventEnableBufferInput(const FGameplayEventData* Payload)
+{
+	if (!Payload)
+	{
+		return;
+	}
+
+	//EventMagnitude가 1이면 Enable, 0이면 Disable
+	const bool bEnabled = Payload->EventMagnitude > 0.5f;
+	EnableBufferInput(bEnabled);
+	DEBUG_LOG(TEXT("OnEventEnableBufferInput: %s"), bEnabled ? TEXT("Enabled") : TEXT("Disabled"));
+}
+
+void UInputBufferComponent::OnEventPlayBuffer(const FGameplayEventData* Payload)
+{
+	ExecuteBuffer();
+	DEBUG_LOG(TEXT("OnEventPlayBuffer: Buffer Executed"));
 }

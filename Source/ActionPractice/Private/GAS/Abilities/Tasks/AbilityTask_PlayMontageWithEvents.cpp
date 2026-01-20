@@ -213,8 +213,24 @@ void UAbilityTask_PlayMontageWithEvents::StopPlayingMontage()
         return;
     }
 
-    //ASC의 CurrentMontageStop을 사용하여 네트워크 복제 지원
+    // 내가 재생했던 몽타주가 아니면, 다른 어빌리티(예: Roll)가 막 재생한 몽타주를 끊어버릴 수 있음.
+    if (!MontageToPlay)
+    {
+        return;
+    }
+
+    UAnimMontage* CurrentMontage = AbilitySystemComponent->GetCurrentMontage();
+    if (CurrentMontage != MontageToPlay)
+    {
+        DEBUG_LOG(TEXT("StopPlayingMontage skipped. Current=%s, Mine=%s"),
+            *GetNameSafe(CurrentMontage),
+            *GetNameSafe(MontageToPlay));
+        return;
+    }
+
     AbilitySystemComponent->CurrentMontageStop();
+
+    DEBUG_LOG(TEXT("StopPlayingMontage executed. Montage=%s"), *GetNameSafe(MontageToPlay));
 }
 #pragma endregion
 

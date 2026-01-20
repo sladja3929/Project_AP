@@ -101,7 +101,7 @@ void AActionPracticeCharacter::BeginPlay()
 		DEBUG_LOG(TEXT("AbilityAttackTag is not valid"));
 	}
 
-	InitializeAbilitySystem();
+	//InitializeAbilitySystem();
 
 	EquipWeapon(RightWeaponClass, false, false);
 	EquipWeapon(LeftWeaponClass, true, false);

@@ -33,6 +33,7 @@ void UActionRecoveryAbility::OnGiveAbility(const FGameplayAbilityActorInfo* Acto
 	ActionRecoveryEndTag = UGameplayTagsSubsystem::GetEventNotifyActionRecoveryEndTag();
 	EventInputByBufferTag = UGameplayTagsSubsystem::GetEventActionInputByBufferTag();
 	EventPlayBufferTag = UGameplayTagsSubsystem::GetEventActionPlayBufferTag();
+	EventEnableBufferInputTag = UGameplayTagsSubsystem::GetEventNotifyEnableBufferInputTag();
 	StateRecoveringTag = UGameplayTagsSubsystem::GetStateRecoveringTag();
 
 	if (!ActionRecoveryStartTag.IsValid())
@@ -50,6 +51,10 @@ void UActionRecoveryAbility::OnGiveAbility(const FGameplayAbilityActorInfo* Acto
 	if (!EventPlayBufferTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("EventPlayBufferTag is not valid"));
+	}
+	if (!EventEnableBufferInputTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("EventEnableBufferInputTag is not valid"));
 	}
 	if (!StateRecoveringTag.IsValid())
 	{
@@ -250,7 +255,7 @@ void UActionRecoveryAbility::OnCurveRisingEdgeReceived(FName CurveName)
 		}
 
 		//EnableBufferInput 상승 에지: 버퍼 입력 활성화
-		BufferComp->EnableBufferInput(true);
+		SendEnableBufferInputEvent(true);
 	}
 	else if (CurveName == CurveName_ActionRecovery)
 	{
@@ -277,52 +282,56 @@ void UActionRecoveryAbility::OnCurveFallingEdgeReceived(FName CurveName)
 	}
 }
 
-void UActionRecoveryAbility::ExecuteBuffer()
-{
-	if (!GetAvatarActorFromActorInfo() || !GetAvatarActorFromActorInfo()->HasAuthority())
-	{
-		return;
-	}
-
-	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
-	if (!Character)
-	{
-		DEBUG_LOG(TEXT("ExecuteBuffer: No Character"));
-		return;
-	}
-
-	UInputBufferComponent* BufferComp = Character->GetInputBufferComponent();
-	if (!BufferComp)
-	{
-		DEBUG_LOG(TEXT("ExecuteBuffer: No InputBufferComponent"));
-		return;
-	}
-
-	//대기 입력 처리 (소비 시점)
-	BufferComp->ProcessPendingInputs();
-
-	BufferComp->ExecuteBuffer();
-	DEBUG_LOG(TEXT("ExecuteBuffer: Buffer Executed"));
-
-	BufferComp->EnableBufferInput(false);
-	DEBUG_LOG(TEXT("ExecuteBuffer: Buffer Closed"));
-}
-
 void UActionRecoveryAbility::OnActionRecoveryEnd() 
 {
 	DEBUG_LOG(TEXT("OnActionRecoveryEnd: State.Recovering removed"));
 
 	bActionRecoveryEnded = true;
 	RemoveStateRecoveringTags();
-	ExecuteBuffer();
+	SendPlayBufferEvent();
 }
 #pragma endregion
 
+void UActionRecoveryAbility::SendEnableBufferInputEvent(bool bEnabled)
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!ASC)
+	{
+		DEBUG_LOG(TEXT("SendEnableBufferInputEvent: No ASC"));
+		return;
+	}
+
+	FGameplayEventData EventData;
+	EventData.Instigator = GetAvatarActorFromActorInfo();
+	EventData.Target = GetAvatarActorFromActorInfo();
+	EventData.EventMagnitude = bEnabled ? 1.0f : 0.0f;
+	EventData.EventTag = EventEnableBufferInputTag;
+
+	ASC->HandleGameplayEvent(EventEnableBufferInputTag, &EventData);
+	DEBUG_LOG(TEXT("SendEnableBufferInputEvent: %s"), bEnabled ? TEXT("Enabled") : TEXT("Disabled"));
+}
+
+void UActionRecoveryAbility::SendPlayBufferEvent()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!ASC)
+	{
+		DEBUG_LOG(TEXT("SendPlayBufferEvent: No ASC"));
+		return;
+	}
+
+	FGameplayEventData EventData;
+	EventData.Instigator = GetAvatarActorFromActorInfo();
+	EventData.Target = GetAvatarActorFromActorInfo();
+	EventData.EventTag = EventPlayBufferTag;
+
+	ASC->HandleGameplayEvent(EventPlayBufferTag, &EventData);
+	DEBUG_LOG(TEXT("SendPlayBufferEvent: Event Sent"));
+}
 
 void UActionRecoveryAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
-{
+{	
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
-	
 	//커브 엣지 누락 대비 리커버리 종료 로직 활성화
 	if (!bActionRecoveryEnded) OnActionRecoveryEnd();
 }

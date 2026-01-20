@@ -132,6 +132,10 @@ protected:
 	
     void ActivateAbilityByTag(FGameplayTag ActionTag);
 
+	//이벤트 핸들러
+	void OnEventEnableBufferInput(const FGameplayEventData* Payload);
+	void OnEventPlayBuffer(const FGameplayEventData* Payload);
+
 #pragma endregion
 
 private:

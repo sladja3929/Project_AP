@@ -46,7 +46,10 @@ bool UBaseAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 
 	if (!bSuperCanActivate)
 	{
-		DEBUG_LOG(TEXT("BaseAbility::CanActivateAbility FAILED at Super. Ability=%s"), *GetName());
+		const FString RelevantTagStr =	(OptionalRelevantTags != nullptr) ? OptionalRelevantTags->ToStringSimple() : TEXT("OptionalRelevantTags=null");
+
+		DEBUG_LOG(TEXT("BaseAbility::CanActivateAbility FAILED at Super. Ability=%s, RelevantTags=%s"),
+			*GetName(), *RelevantTagStr);
 		return false;
 	}
 
