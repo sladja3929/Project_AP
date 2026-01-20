@@ -239,7 +239,7 @@ void UWeaponCCDComponent::OnCapsuleBeginOverlap(UPrimitiveComponent* OverlappedC
                                                 bool bFromSweep,
                                                 const FHitResult& SweepResult)
 {
-	// 히트 판정은 서버에서만 (싱글플레이어에서는 항상 true)
+	//히트 판정은 서버에서만 (싱글플레이어에서는 항상 true)
 	AActor* OwnerActor = GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority())
 	{

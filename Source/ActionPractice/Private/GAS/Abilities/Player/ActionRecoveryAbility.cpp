@@ -16,6 +16,10 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+//커브 이름 상수 정의
+const FName UActionRecoveryAbility::CurveName_EnableBufferInput = TEXT("EnableBufferInput");
+const FName UActionRecoveryAbility::CurveName_ActionRecovery = TEXT("ActionRecovery");
+
 UActionRecoveryAbility::UActionRecoveryAbility()
 {
 
@@ -63,6 +67,8 @@ void UActionRecoveryAbility::ActivateAbility(const FGameplayAbilitySpecHandle Ha
 void UActionRecoveryAbility::ActivateInitSettings()
 {
 	Super::ActivateInitSettings();
+
+	bActionRecoveryEnded = false;
 }
 
 void UActionRecoveryAbility::AddStateRecoveringTag()
@@ -170,6 +176,7 @@ void UActionRecoveryAbility::BindEventsAndReadyMontageTask()
 	{
 		DEBUG_LOG(TEXT("No MontageWithEvents Task"));
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return;
 	}
 
 	//커스텀 몽타주 태스크 델리게이트 바인딩
@@ -177,10 +184,19 @@ void UActionRecoveryAbility::BindEventsAndReadyMontageTask()
 	PlayMontageWithEventsTask->OnMontageInterrupted.AddDynamic(this, &UActionRecoveryAbility::OnTaskMontageInterrupted);
 	PlayMontageWithEventsTask->OnNotifyEventsReceived.AddDynamic(this, &UActionRecoveryAbility::OnTaskNotifyEventsReceived);
 
-	//노티파이 이벤트 바인딩
-	PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(ActionRecoveryStartTag);
-	PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(ActionRecoveryEndTag);
-	
+	//=== 커브 폴링 활성화 (노티파이 대체) ===
+	TArray<FName> CurveNames;
+	CurveNames.Add(CurveName_EnableBufferInput);
+	CurveNames.Add(CurveName_ActionRecovery);
+	PlayMontageWithEventsTask->EnableCurvePolling(CurveNames);
+
+	//커브 에지 델리게이트 바인딩
+	PlayMontageWithEventsTask->OnCurveRisingEdge.AddDynamic(this, &UActionRecoveryAbility::OnCurveRisingEdgeReceived);
+	PlayMontageWithEventsTask->OnCurveFallingEdge.AddDynamic(this, &UActionRecoveryAbility::OnCurveFallingEdgeReceived);
+
+	//노티파이 이벤트 바인딩 - ActionRecovery는 커브로 대체, 자식 클래스의 노티파이(HitDetection 등)는 자식에서 바인딩
+	//기존 노티파이 바인딩 제거됨 (ActionRecoveryStart/End)
+
 	//태스크 활성화
 	PlayMontageWithEventsTask->ReadyForActivation();
 }
@@ -210,34 +226,103 @@ void UActionRecoveryAbility::OnTaskMontageInterrupted()
 
 void UActionRecoveryAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)
 {
-	if (Payload.EventTag == ActionRecoveryStartTag) OnEventActionRecoveryStart(Payload);
-	
-	else if (Payload.EventTag == ActionRecoveryEndTag) OnEventActionRecoveryEnd(Payload);
+	//★ ActionRecoveryStart/End 노티파이는 커브 폴링으로 대체됨
+	//자식 클래스에서 추가 노티파이를 처리할 수 있도록 빈 함수로 유지
 }
 
-void UActionRecoveryAbility::OnEventActionRecoveryStart(FGameplayEventData Payload)
+#pragma region "Curve Edge Handlers"
+void UActionRecoveryAbility::OnCurveRisingEdgeReceived(FName CurveName)
 {
-	AddStateRecoveringTag();
-};
+	DEBUG_LOG(TEXT("Curve Rising Edge: %s"), *CurveName.ToString());
 
-void UActionRecoveryAbility::OnEventActionRecoveryEnd(FGameplayEventData Payload)
-{
-	RemoveStateRecoveringTags();
-
-	//Input Buffer Play 이벤트
-	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	if (CurveName == CurveName_EnableBufferInput)
 	{
-		FGameplayEventData EventData;
-		EventData.EventTag = EventPlayBufferTag;
-			
-		ASC->HandleGameplayEvent(EventPlayBufferTag, &EventData);
-		DEBUG_LOG(TEXT("Play Buffer Event Activated"));
+		AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
+		if (!Character)
+		{
+			return;
+		}
+		
+		UInputBufferComponent* BufferComp = Character->GetInputBufferComponent();
+		if (!BufferComp)
+		{
+			return;
+		}
+
+		//EnableBufferInput 상승 에지: 버퍼 입력 활성화
+		BufferComp->EnableBufferInput(true);
+	}
+	else if (CurveName == CurveName_ActionRecovery)
+	{
+		//ActionRecovery 상승 에지: State.Recovering 태그 추가
+		if (GetAvatarActorFromActorInfo() && GetAvatarActorFromActorInfo()->HasAuthority())
+		{
+			AddStateRecoveringTag();
+		}
 	}
 }
 
+void UActionRecoveryAbility::OnCurveFallingEdgeReceived(FName CurveName)
+{
+	DEBUG_LOG(TEXT("Curve Falling Edge: %s"), *CurveName.ToString());
+
+	if (CurveName == CurveName_EnableBufferInput)
+	{
+		//EnableBufferInput 하강 에지: 버퍼 닫지 않음 (ActionRecovery 하강에서 일괄 처리)
+	}
+	else if (CurveName == CurveName_ActionRecovery)
+	{
+		//ActionRecovery 하강 에지: 리커버리 종료 + 버퍼 실행 + 버퍼 닫기
+		OnActionRecoveryEnd();
+	}
+}
+
+void UActionRecoveryAbility::ExecuteBuffer()
+{
+	if (!GetAvatarActorFromActorInfo() || !GetAvatarActorFromActorInfo()->HasAuthority())
+	{
+		return;
+	}
+
+	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
+	if (!Character)
+	{
+		DEBUG_LOG(TEXT("ExecuteBuffer: No Character"));
+		return;
+	}
+
+	UInputBufferComponent* BufferComp = Character->GetInputBufferComponent();
+	if (!BufferComp)
+	{
+		DEBUG_LOG(TEXT("ExecuteBuffer: No InputBufferComponent"));
+		return;
+	}
+
+	//대기 입력 처리 (소비 시점)
+	BufferComp->ProcessPendingInputs();
+
+	BufferComp->ExecuteBuffer();
+	DEBUG_LOG(TEXT("ExecuteBuffer: Buffer Executed"));
+
+	BufferComp->EnableBufferInput(false);
+	DEBUG_LOG(TEXT("ExecuteBuffer: Buffer Closed"));
+}
+
+void UActionRecoveryAbility::OnActionRecoveryEnd() 
+{
+	DEBUG_LOG(TEXT("OnActionRecoveryEnd: State.Recovering removed"));
+
+	bActionRecoveryEnded = true;
+	RemoveStateRecoveringTags();
+	ExecuteBuffer();
+}
+#pragma endregion
+
+
 void UActionRecoveryAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	//RemoveStateRecoveringTags();
-	
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+	
+	//커브 엣지 누락 대비 리커버리 종료 로직 활성화
+	if (!bActionRecoveryEnded) OnActionRecoveryEnd();
 }

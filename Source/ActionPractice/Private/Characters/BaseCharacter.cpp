@@ -18,9 +18,12 @@ ABaseCharacter::ABaseCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// 네트워크 복제 활성화
+	//네트워크 복제 활성화
 	bReplicates = true;
 	SetReplicateMovement(true);
+
+	//데디케이티드 서버에서도 애니메이션 틱 활성화 (몽타주 콜백을 위해 필수)
+	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 }
 
 void ABaseCharacter::BeginPlay()
@@ -46,7 +49,7 @@ void ABaseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	// AbilitySystemComponent와 AttributeSet은 자체적으로 복제되므로 여기서는 등록 불필요
+	//AbilitySystemComponent와 AttributeSet은 GAS에서 자동 복사
 }
 
 void ABaseCharacter::InitializeAbilitySystem()

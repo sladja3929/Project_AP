@@ -5,14 +5,14 @@
 
 AActionPracticeGameMode::AActionPracticeGameMode()
 {
-	// 기본 설정
+	//기본 설정
 }
 
 void AActionPracticeGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 서버에서만 보스 스폰 (싱글플레이어에서는 항상 true)
+	//서버에서만 보스 스폰 (싱글플레이어에서는 항상 true)
 	if (HasAuthority() && BossClass)
 	{
 		FActorSpawnParameters SpawnParams;
@@ -34,7 +34,7 @@ void AActionPracticeGameMode::BeginPlay()
 
 AActor* AActionPracticeGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
-	// 모든 PlayerStart 찾기
+	//모든 PlayerStart 찾기
 	TArray<AActor*> PlayerStarts;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), PlayerStarts);
 
@@ -44,7 +44,7 @@ AActor* AActionPracticeGameMode::ChoosePlayerStart_Implementation(AController* P
 		return Super::ChoosePlayerStart_Implementation(Player);
 	}
 
-	// 플레이어 수에 따라 다른 위치 할당 (간단한 라운드로빈)
+	//플레이어 수에 따라 다른 위치 할당 (간단한 라운드로빈)
 	int32 NumPlayers = GetNumPlayers();
 	int32 StartIndex = (NumPlayers - 1) % PlayerStarts.Num();
 

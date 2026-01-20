@@ -90,6 +90,14 @@ protected:
 	void PlayBossBGM();
 	void StopBossBGM();
 
+	// ===== Network =====
+	//모든 클라이언트에서 보스 조우 연출 (BGM, UI)
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnBossEncounter();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnBossDisengage();
+
 #pragma endregion
 
 private:

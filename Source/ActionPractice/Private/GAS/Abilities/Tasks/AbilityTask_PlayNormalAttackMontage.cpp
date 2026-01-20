@@ -147,16 +147,23 @@ void UAbilityTask_PlayNormalAttackMontage::PlayAttackMontage()
     {
         AbilitySystemComponent->AddLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag());
     }
-    
-    float PlayLength = AnimInstance->Montage_Play(CurrentMontage, Rate);
+
+    //ASC의 PlayMontage를 사용하여 네트워크 복제 지원
+    float PlayLength = AbilitySystemComponent->PlayMontage(
+        Ability,
+        Ability->GetCurrentActivationInfo(),
+        CurrentMontage,
+        Rate,
+        StartSectionName
+    );
     DEBUG_LOG(TEXT("Montage Play Result: %f, Montage Name: %s"), PlayLength, CurrentMontage ? *CurrentMontage->GetName() : TEXT("NULL"));
 
-    // 블렌드 아웃 델리게이트 바인딩
+    //블렌드 아웃 델리게이트 바인딩
     BlendingOutDelegate = FOnMontageBlendingOutStarted::CreateUObject(this, &UAbilityTask_PlayNormalAttackMontage::OnMontageBlendingOut);
     AnimInstance->Montage_SetBlendingOutDelegate(BlendingOutDelegate, CurrentMontage);
     DEBUG_LOG(TEXT("BlendingOutDelegate Bound Successfully"));
 
-    // 몽타주 종료 델리게이트 바인딩
+    //몽타주 종료 델리게이트 바인딩
     MontageEndedDelegate = FOnMontageEnded::CreateUObject(this, &UAbilityTask_PlayNormalAttackMontage::OnMontageEnded);
     AnimInstance->Montage_SetEndDelegate(MontageEndedDelegate, CurrentMontage);
     DEBUG_LOG(TEXT("MontageEndedDelegate Bound Successfully"));
@@ -327,18 +334,13 @@ void UAbilityTask_PlayNormalAttackMontage::UnregisterGameplayEventCallbacks()
 #pragma region "Montage Functions"
 void UAbilityTask_PlayNormalAttackMontage::StopPlayingMontage()
 {
-    const FGameplayAbilityActorInfo* ActorInfo = Ability->GetCurrentActorInfo();
-    if (!ActorInfo)
+    if (!AbilitySystemComponent.IsValid())
     {
         return;
     }
 
-    UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
-    if (AnimInstance && CurrentMontage)
-    {
-        float BlendOutTime = CurrentMontage->BlendOut.GetBlendTime();
-        AnimInstance->Montage_Stop(BlendOutTime, CurrentMontage);
-    }
+    //ASC의 CurrentMontageStop을 사용하여 네트워크 복제 지원
+    AbilitySystemComponent->CurrentMontageStop();
 }
 
 void UAbilityTask_PlayNormalAttackMontage::OnMontageBlendingOut(UAnimMontage* Montage, bool bInterrupted)

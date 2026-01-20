@@ -25,7 +25,7 @@ AWeapon::AWeapon()
 {
     PrimaryActorTick.bCanEverTick = true;
 
-	// 네트워크 복제 활성화
+	//네트워크 복제 활성화
 	bReplicates = true;
 	SetReplicateMovement(false);  // Attachment로 위치 동기화되므로 Movement는 복제 불필요
 
@@ -177,7 +177,7 @@ void AWeapon::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitive
 
 void AWeapon::HandleWeaponHit(AActor* HitActor, const FHitResult& HitResult, FFinalAttackData FinalAttackData)
 {
-	// 서버에서만 데미지 적용 (싱글플레이어에서는 항상 true)
+	//서버에서만 데미지 적용 (싱글플레이어에서는 항상 true)
 	if (!HasAuthority())
 	{
 		return;

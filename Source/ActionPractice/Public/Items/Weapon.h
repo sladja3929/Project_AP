@@ -88,7 +88,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Stats")
 	TObjectPtr<UWeaponDataAsset> WeaponData;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Stats")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Stats", Replicated)
 	float CalculatedDamage;
 
 	//플레이어 근력/기량 Attribute가 바뀔 때

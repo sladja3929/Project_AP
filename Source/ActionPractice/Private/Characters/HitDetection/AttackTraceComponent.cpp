@@ -8,7 +8,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackTraceComponent, Log, All);
@@ -263,7 +263,7 @@ void UAttackTraceComponent::StopTrace()
 
 void UAttackTraceComponent::PerformTrace(float DeltaTime)
 {
-	// 히트 판정은 서버에서만 (싱글플레이어에서는 항상 true)
+	//히트 판정은 서버에서만 (싱글플레이어에서는 항상 true)
 	AActor* OwnerActor = GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority())
 	{

@@ -79,7 +79,9 @@ protected:
 	//사용되는 태그들
 	FGameplayTag EventNotifyRotateToTargetTag;
 	FGameplayTag EventNotifyCheckConditionTag;
-	FGameplayTag EventNotifyActionRecoveryEndTag;
+
+	//커브 폴링 관련
+	static const FName CurveName_ActionRecovery;
 
 #pragma endregion
 
@@ -119,9 +121,16 @@ protected:
 	UFUNCTION()
 	virtual void OnEventCheckCondition(FGameplayEventData Payload);
 
-	//ActionRecoveryEnd 노티파이 콜백 함수
+	//=== 커브 에지 핸들러 ===
 	UFUNCTION()
-	virtual void OnEventActionRecoveryEnd(FGameplayEventData Payload);
+	virtual void OnCurveRisingEdgeReceived(FName CurveName);
+
+	UFUNCTION()
+	virtual void OnCurveFallingEdgeReceived(FName CurveName);
+
+	//ActionRecovery 커브 하강 에지에서 호출
+	UFUNCTION()
+	virtual void OnActionRecoveryEnd();
 
 	//다음 콤보 실행 함수
 	UFUNCTION()

@@ -50,7 +50,9 @@ protected:
 	virtual UAnimMontage* SetMontageToPlayTask() override;
 	virtual void BindEventsAndReadyMontageTask() override;
 	virtual void OnTaskNotifyEventsReceived(FGameplayEventData Payload) override;
-	virtual void OnEventActionRecoveryEnd(FGameplayEventData Payload) override;
+
+	//커브 기반 ActionRecovery 종료 처리 (노티파이 기반 OnEventActionRecoveryEnd 대체)
+	virtual void OnActionRecoveryEnd() override;
 	
 	UFUNCTION()
 	virtual void OnNotifyInvincibleStart(FGameplayEventData Payload);

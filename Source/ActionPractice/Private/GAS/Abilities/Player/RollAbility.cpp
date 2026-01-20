@@ -23,6 +23,7 @@ URollAbility::URollAbility()
 	StaminaCost = 20.0f;
 	RotateTime = 0.05f;
 	bIgnoreLockOn = true;
+	//NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 }
 
 void URollAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
@@ -104,21 +105,21 @@ void URollAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)
 	if (Payload.EventTag == EventNotifyInvincibleStartTag) OnNotifyInvincibleStart(Payload);
 }
 
-void URollAbility::OnEventActionRecoveryEnd(FGameplayEventData Payload)
+void URollAbility::OnActionRecoveryEnd()
 {
 	//JustRolled 태그 부여
 	UActionPracticeAbilitySystemComponent* APASC = GetActionPracticeAbilitySystemComponentFromActorInfo();
 	if (!APASC)
 	{
 		DEBUG_LOG(TEXT("No APASC"));
-		Super::OnEventActionRecoveryEnd(Payload);
+		Super::OnActionRecoveryEnd();
 		return;
 	}
 
 	if (!JustRolledWindowEffect)
 	{
 		DEBUG_LOG(TEXT("No JustRolledWindowEffect"));
-		Super::OnEventActionRecoveryEnd(Payload);
+		Super::OnActionRecoveryEnd();
 		return;
 	}
 
@@ -128,15 +129,15 @@ void URollAbility::OnEventActionRecoveryEnd(FGameplayEventData Payload)
 	if (!EffectSpec.IsValid())
 	{
 		DEBUG_LOG(TEXT("Failed to create JustRolled Effect Spec"));
-		Super::OnEventActionRecoveryEnd(Payload);
+		Super::OnActionRecoveryEnd();
 		return;
 	}
 
 	APASC->SetSpecSetByCallerMagnitude(EffectSpec, EffectJustRolledDurationTag, JustRolledWindowDuration);
 	APASC->ApplyGameplayEffectSpecToSelf(*EffectSpec.Data.Get());
 	DEBUG_LOG(TEXT("JustRolled EffectWindow Attached"));
-	
-	Super::OnEventActionRecoveryEnd(Payload);
+
+	Super::OnActionRecoveryEnd();
 }
 
 void URollAbility::OnNotifyInvincibleStart(FGameplayEventData Payload)

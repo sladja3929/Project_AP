@@ -485,7 +485,7 @@ void AActionPracticeCharacter::WeaponSwitch()
 
 void AActionPracticeCharacter::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, bool bIsLeftHand, bool bIsTwoHanded)
 {
-	// 서버에서만 실행 (싱글플레이어에서는 HasAuthority()가 항상 true)
+	//서버에서만 실행 (싱글플레이어에서는 HasAuthority()가 항상 true)
 	if (!HasAuthority())
 	{
 		return;
@@ -496,7 +496,7 @@ void AActionPracticeCharacter::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, 
 	if(bIsTwoHanded) UnequipWeapon(!bIsLeftHand);
 	UnequipWeapon(bIsLeftHand);
 
-	// 새 무기 스폰
+	//새 무기 생성
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;
 	SpawnParams.Instigator = GetInstigator();
@@ -649,29 +649,30 @@ void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
-	
+
 	InputBufferComponent->bBufferActionReleased = false;
-	//다른 어빌리티가 수행중이고 입력 저장 가능할 때는 버퍼로 전달, Ability->InputPressed는 버퍼 이외의 구간에서만 사용
-	if (InputBufferComponent->bCanBufferInput)
+
+	//다른 어빌리티가 수행중이고 입력 저장 가능할 때는 버퍼로 전달 (클라이언트에서 가능할 때)
+	if (InputBufferComponent->bInternalBufferEnabled)
 	{
 		DEBUG_LOG(TEXT("Character: Buffer"));
-		InputBufferComponent->BufferNextAction(InputAction);
+		InputBufferComponent->BufferInput(InputAction, false);
 	}
-
 	else
 	{
 		for (auto& Spec : TryActivateSpecs)
 		{
 			if (Spec->IsActive())
 			{
+				DEBUG_LOG(TEXT("GASInputPressed: Ability already active, calling InputPressed - %s"), *GetNameSafe(Spec->Ability));
 				Spec->InputPressed = true;
 				AbilitySystemComponent->AbilitySpecInputPressed(*Spec);
 			}
-
 			else
 			{
 				Spec->InputPressed = true;
-				AbilitySystemComponent->TryActivateAbility(Spec->Handle);
+				bool bSuccess = AbilitySystemComponent->TryActivateAbility(Spec->Handle);
+				DEBUG_LOG(TEXT("GASInputPressed: TryActivateAbility %s - %s"), bSuccess ? TEXT("SUCCESS") : TEXT("FAILED"), *GetNameSafe(Spec->Ability));
 			}
 		}
 	}
@@ -683,14 +684,15 @@ void AActionPracticeCharacter::GASInputReleased(const UInputAction* InputAction)
 
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
-	
-	//다른 어빌리티가 수행중이고 입력 저장 가능할 때는 버퍼로 전달, Ability->InputPressed는 버퍼 이외의 구간에서만 사용
-	if (InputBufferComponent->bCanBufferInput)
+
+	InputBufferComponent->bBufferActionReleased = true;
+
+	//다른 어빌리티가 수행중이고 입력 저장 가능할 때는 버퍼로 전달 (클라이언트에서 가능할 때)
+	if (InputBufferComponent->bInternalBufferEnabled)
 	{
 		DEBUG_LOG(TEXT("Character: UnBuffer"));
-		InputBufferComponent->UnBufferHoldAction(InputAction);
+		InputBufferComponent->BufferInput(InputAction, true);
 	}
-	
 	else
 	{
 		for (auto& Spec : TryActivateSpecs)
@@ -753,7 +755,7 @@ void AActionPracticeCharacter::OnRep_LeftWeapon()
 {
 	if (LeftWeapon && GetMesh())
 	{
-		// 무기 타입에 따라 소켓 이름 결정
+		//무기 타입에 따라 소켓 이름 결정
 		EWeaponEnums type = LeftWeapon->GetWeaponType();
 		if (type != EWeaponEnums::None)
 		{
@@ -785,7 +787,7 @@ void AActionPracticeCharacter::OnRep_RightWeapon()
 {
 	if (RightWeapon && GetMesh())
 	{
-		// 무기 타입에 따라 소켓 이름 결정
+		//무기 타입에 따라 소켓 이름 결정
 		EWeaponEnums type = RightWeapon->GetWeaponType();
 		if (type != EWeaponEnums::None)
 		{

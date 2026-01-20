@@ -18,7 +18,8 @@
 UAbilityTask_PlayMontageWithEvents::UAbilityTask_PlayMontageWithEvents(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
-    
+    //틱 태스크 - 커브 폴링 사용 시 활성화됨
+    bTickingTask = false;
 }
 
 UAbilityTask_PlayMontageWithEvents* UAbilityTask_PlayMontageWithEvents::CreatePlayMontageWithEventsProxy(
@@ -73,33 +74,99 @@ void UAbilityTask_PlayMontageWithEvents::Activate()
     SetWaitingOnAvatar();
 }
 
+void UAbilityTask_PlayMontageWithEvents::TickTask(float DeltaTime)
+{
+    Super::TickTask(DeltaTime);
+
+    if (!bUseCurvePolling || !Ability || !AbilitySystemComponent.IsValid())
+    {
+        return;
+    }
+
+    const FGameplayAbilityActorInfo* ActorInfo = Ability->GetCurrentActorInfo();
+    UAnimInstance* AnimInstance = ActorInfo ? ActorInfo->GetAnimInstance() : nullptr;
+
+    if (AnimInstance)
+    {
+        //커브 폴링 실행
+        CurvePoller.Poll(AnimInstance);
+
+        //에지 브로드캐스트
+        if (ShouldBroadcastAbilityTaskDelegates())
+        {
+            for (const FName& CurveName : CurvePoller.RisingEdgeCurves)
+            {
+                DEBUG_LOG(TEXT("Curve Rising Edge: %s"), *CurveName.ToString());
+                OnCurveRisingEdge.Broadcast(CurveName);
+            }
+
+            for (const FName& CurveName : CurvePoller.FallingEdgeCurves)
+            {
+                DEBUG_LOG(TEXT("Curve Falling Edge: %s"), *CurveName.ToString());
+                OnCurveFallingEdge.Broadcast(CurveName);
+            }
+        }
+    }
+}
+
+#pragma region "Curve Polling Functions"
+void UAbilityTask_PlayMontageWithEvents::EnableCurvePolling(const TArray<FName>& CurveNames)
+{
+    CurvePoller.Initialize(CurveNames);
+    bUseCurvePolling = true;
+    bTickingTask = true;
+    DEBUG_LOG(TEXT("Curve Polling Enabled with %d curves"), CurveNames.Num());
+}
+
+void UAbilityTask_PlayMontageWithEvents::DisableCurvePolling()
+{
+    bUseCurvePolling = false;
+    bTickingTask = false;
+    CurvePoller.Reset();
+    DEBUG_LOG(TEXT("Curve Polling Disabled"));
+}
+
+void UAbilityTask_PlayMontageWithEvents::ResetCurvePoller()
+{
+    CurvePoller.Reset();
+    DEBUG_LOG(TEXT("Curve Poller Reset"));
+}
+#pragma endregion
+
 #pragma region "Montage Play Functions"
 void UAbilityTask_PlayMontageWithEvents::PlayMontage()
 {
     const FGameplayAbilityActorInfo* ActorInfo = Ability->GetCurrentActorInfo();
     UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
-    
+
     if (!AnimInstance)
     {
         EndTask();
         return;
     }
-    
+
     if (!MontageToPlay)
     {
         DEBUG_LOG(TEXT("Invalid montage"));
         EndTask();
         return;
     }
-    
-    float PlayLength = AnimInstance->Montage_Play(MontageToPlay, Rate);
+
+    //ASC의 PlayMontage를 사용하여 네트워크 복제 지원
+    float PlayLength = AbilitySystemComponent->PlayMontage(
+        Ability,
+        Ability->GetCurrentActivationInfo(),
+        MontageToPlay,
+        Rate,
+        StartSectionName
+    );
     DEBUG_LOG(TEXT("Montage Play Result: %f, Montage Name: %s"), PlayLength, MontageToPlay ? *MontageToPlay->GetName() : TEXT("NULL"));
 
     BindMontageCallbacks();
 
     ACharacter* Character = Cast<ACharacter>(GetAvatarActor());
     if (Character && (Character->GetLocalRole() == ROLE_Authority ||
-        (Character->GetLocalRole() == ROLE_AutonomousProxy && 
+        (Character->GetLocalRole() == ROLE_AutonomousProxy &&
          Ability->GetNetExecutionPolicy() == EGameplayAbilityNetExecutionPolicy::LocalPredicted)))
     {
         Character->SetAnimRootMotionTranslationScale(AnimRootMotionTranslationScale);
@@ -114,15 +181,23 @@ void UAbilityTask_PlayMontageWithEvents::ChangeMontageAndPlay(UAnimMontage* NewM
         DEBUG_LOG(TEXT("No Montage or AnimInstance or Task"));
         //return;
     }
-    
+
     bStopBroadCastMontageEvents = true;
     UnbindMontageCallbacks();
     StopPlayingMontage();
 
     MontageToPlay = NewMontage;
-    float PlayLength = AnimInstance->Montage_Play(MontageToPlay, Rate);
+
+    //ASC의 PlayMontage를 사용하여 네트워크 복제 지원
+    float PlayLength = AbilitySystemComponent->PlayMontage(
+        Ability,
+        Ability->GetCurrentActivationInfo(),
+        MontageToPlay,
+        Rate,
+        StartSectionName
+    );
     DEBUG_LOG(TEXT("Montage Play Result: %f, Montage Name: %s"), PlayLength, MontageToPlay ? *MontageToPlay->GetName() : TEXT("NULL"));
-    
+
     if (PlayLength > 0.0f)
     {
         //새 콜백 바인딩
@@ -133,18 +208,13 @@ void UAbilityTask_PlayMontageWithEvents::ChangeMontageAndPlay(UAnimMontage* NewM
 
 void UAbilityTask_PlayMontageWithEvents::StopPlayingMontage()
 {
-    const FGameplayAbilityActorInfo* ActorInfo = Ability->GetCurrentActorInfo();
-    if (!ActorInfo)
+    if (!AbilitySystemComponent.IsValid())
     {
         return;
     }
 
-    UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
-    if (AnimInstance && MontageToPlay)
-    {
-        float BlendOutTime = MontageToPlay->BlendOut.GetBlendTime();
-        AnimInstance->Montage_Stop(BlendOutTime, MontageToPlay);
-    }
+    //ASC의 CurrentMontageStop을 사용하여 네트워크 복제 지원
+    AbilitySystemComponent->CurrentMontageStop();
 }
 #pragma endregion
 
@@ -361,15 +431,19 @@ void UAbilityTask_PlayMontageWithEvents::OnDestroy(bool AbilityEnded)
     {
         StopPlayingMontage();
     }
-    
+
     //이벤트 콜백 해제
     UnbindAllEventCallbacks();
-    
+
     //몽타주 델리게이트 해제
     UnbindMontageCallbacks();
-    
+
+    //커브 폴링 정리
+    bUseCurvePolling = false;
+    bTickingTask = false;
+
     bStopMontageWhenAbilityCancelled = false;
-    
+
     MontageToPlay = nullptr;
 
     Super::OnDestroy(AbilityEnded);

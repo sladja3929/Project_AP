@@ -19,8 +19,8 @@
 
 UNormalAttackAbility::UNormalAttackAbility()
 {
-	// 공격은 서버에서 시작 (히트 판정 권한)
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
+	//클라이언트 예측 실행 (콤보 입력 버퍼링을 위해 클라이언트에서도 태스크 필요)
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
     StaminaCost = 15.0f;

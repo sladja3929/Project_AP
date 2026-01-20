@@ -7,7 +7,7 @@
 #include "AbilitySystemComponent.h"
 #include "Characters/ActionPracticeCharacter.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogHitReactionAbility, Log, All);
@@ -18,12 +18,12 @@
 
 UHitReactionAbility::UHitReactionAbility()
 {
-	// 피격은 서버에서 시작
+	//피격은 서버에서 시작
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
 	bRotateBeforeAction = false;
-	StaminaCost = -1.0f; // 스태미나 체크 안함
+	StaminaCost = -1.0f; //스태미나 체크 안함
 }
 
 void UHitReactionAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)

@@ -15,7 +15,7 @@
 
 UBossAbilitySystemComponent::UBossAbilitySystemComponent()
 {
-	// 보스는 Minimal mode 사용 (서버 권한, GameplayEffect만 복제)
+	//보스는 Minimal mode 사용 (서버 권한, GameplayEffect만 복제)
 	SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 }
 

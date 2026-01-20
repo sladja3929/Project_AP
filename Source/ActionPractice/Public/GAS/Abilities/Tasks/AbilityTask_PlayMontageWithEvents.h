@@ -3,12 +3,14 @@
 #include "CoreMinimal.h"
 #include "Abilities/Tasks/AbilityTask.h"
 #include "Abilities/GameplayAbilityTypes.h"
+#include "GAS/Abilities/Tasks/MontageCurvePoller.h"
 #include "AbilityTask_PlayMontageWithEvents.generated.h"
 
 class UAnimMontage;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMontageDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FEventsDelegate, FGameplayEventData, Payload);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCurveEdgeDelegate, FName, CurveName);
 
 UCLASS()
 class ACTIONPRACTICE_API UAbilityTask_PlayMontageWithEvents : public UAbilityTask
@@ -34,12 +36,23 @@ public:
     //노티파이 델리게이트 (여러 태그 이벤트들을 하나의 델리게이트로 관리)
     UPROPERTY(BlueprintAssignable)
     FEventsDelegate OnNotifyEventsReceived;
-    
+
+    //커브 에지 델리게이트
+    UPROPERTY(BlueprintAssignable)
+    FCurveEdgeDelegate OnCurveRisingEdge;
+
+    UPROPERTY(BlueprintAssignable)
+    FCurveEdgeDelegate OnCurveFallingEdge;
+
     UPROPERTY()
     bool bStopMontageWhenAbilityCancelled = false;
 
     UPROPERTY()
     bool bStopBroadCastMontageEvents = false;
+
+    //커브 폴링 활성화 여부
+    UPROPERTY()
+    bool bUseCurvePolling = false;
     
 #pragma endregion
 
@@ -59,11 +72,24 @@ public:
         float AnimRootMotionTranslationScale = 1.0f);
 
     virtual void Activate() override;
+    virtual void TickTask(float DeltaTime) override;
     virtual void OnDestroy(bool AbilityEnded) override;
     virtual void ExternalCancel() override;
 
     UFUNCTION()
     void ChangeMontageAndPlay(UAnimMontage* NewMontage);
+
+    //커브 폴링 활성화 - 어빌리티에서 호출
+    UFUNCTION()
+    void EnableCurvePolling(const TArray<FName>& CurveNames);
+
+    //커브 폴링 비활성화
+    UFUNCTION()
+    void DisableCurvePolling();
+
+    //커브 폴러 리셋 (몽타주 변경 시)
+    UFUNCTION()
+    void ResetCurvePoller();
 
     //어빌리티에서 호출하여 노티파이 이벤트 바인드/언바인드
     UFUNCTION()
@@ -99,9 +125,13 @@ protected:
     //수신할 이벤트 태그를 모은 컨테이너
     UPROPERTY()
     FGameplayTagContainer EventTagsToReceive;
-    
+
+    //커브 폴러
+    UPROPERTY()
+    FMontageCurvePoller CurvePoller;
+
 #pragma endregion
-    
+
 #pragma region "Protected Functions" //=============================================================
     
     UFUNCTION()

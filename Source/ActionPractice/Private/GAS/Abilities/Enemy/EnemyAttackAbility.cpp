@@ -11,7 +11,7 @@
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAttackAbility, Log, All);
@@ -20,9 +20,12 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+//커브 이름 상수 정의
+const FName UEnemyAttackAbility::CurveName_ActionRecovery = TEXT("ActionRecovery");
+
 UEnemyAttackAbility::UEnemyAttackAbility()
 {
-	// 보스는 서버 전용 (클라이언트는 애니메이션만 복제로 재생)
+	//보스는 서버 전용 (클라이언트는 애니메이션만 복제로 재생)
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 }
@@ -33,7 +36,6 @@ void UEnemyAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 
 	EventNotifyRotateToTargetTag = UGameplayTagsSubsystem::GetEventNotifyRotateToTargetTag();
 	EventNotifyCheckConditionTag = UGameplayTagsSubsystem::GetEventNotifyCheckConditionTag();
-	EventNotifyActionRecoveryEndTag = UGameplayTagsSubsystem::GetEventNotifyActionRecoveryEndTag();
 
 	if (!EventNotifyRotateToTargetTag.IsValid())
 	{
@@ -43,11 +45,6 @@ void UEnemyAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 	if (!EventNotifyCheckConditionTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("EventNotifyCheckConditionTag is not valid"));
-	}
-
-	if (!EventNotifyActionRecoveryEndTag.IsValid())
-	{
-		DEBUG_LOG(TEXT("EventNotifyActionRecoveryEndTag is not valid"));
 	}
 }
 
@@ -221,10 +218,18 @@ void UEnemyAttackAbility::BindEventsAndReadyMontageTask()
 	PlayMontageWithEventsTask->OnMontageInterrupted.AddDynamic(this, &UEnemyAttackAbility::OnTaskMontageInterrupted);
 	PlayMontageWithEventsTask->OnNotifyEventsReceived.AddDynamic(this, &UEnemyAttackAbility::OnTaskNotifyEventsReceived);
 
-	//노티파이 이벤트 바인딩
+	//=== 커브 폴링 활성화 (ActionRecovery 노티파이 대체) ===
+	TArray<FName> CurveNames;
+	CurveNames.Add(CurveName_ActionRecovery);
+	PlayMontageWithEventsTask->EnableCurvePolling(CurveNames);
+
+	//커브 에지 델리게이트 바인딩
+	PlayMontageWithEventsTask->OnCurveRisingEdge.AddDynamic(this, &UEnemyAttackAbility::OnCurveRisingEdgeReceived);
+	PlayMontageWithEventsTask->OnCurveFallingEdge.AddDynamic(this, &UEnemyAttackAbility::OnCurveFallingEdgeReceived);
+
+	//노티파이 이벤트 바인딩 (RotateToTarget, CheckCondition만 유지)
 	PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(EventNotifyRotateToTargetTag);
 	PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(EventNotifyCheckConditionTag);
-	PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(EventNotifyActionRecoveryEndTag);
 
 	//태스크 활성화
 	PlayMontageWithEventsTask->ReadyForActivation();
@@ -244,6 +249,7 @@ void UEnemyAttackAbility::OnTaskMontageInterrupted()
 
 void UEnemyAttackAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)
 {
+	//★ ActionRecoveryEnd 노티파이는 커브 폴링으로 대체됨
 	if (Payload.EventTag == EventNotifyRotateToTargetTag)
 	{
 		OnEventRotateToTarget(Payload);
@@ -251,10 +257,6 @@ void UEnemyAttackAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)
 	else if (Payload.EventTag == EventNotifyCheckConditionTag)
 	{
 		OnEventCheckCondition(Payload);
-	}
-	else if (Payload.EventTag == EventNotifyActionRecoveryEndTag)
-	{
-		OnEventActionRecoveryEnd(Payload);
 	}
 }
 
@@ -323,21 +325,41 @@ void UEnemyAttackAbility::OnEventCheckCondition(FGameplayEventData Payload)
 	DEBUG_LOG(TEXT("OnEventCheckCondition: Passed - Distance: %.2f, Angle: %.2f"), CurrentTargetInfo.Distance, CurrentTargetInfo.AngleToTarget);
 }
 
-void UEnemyAttackAbility::OnEventActionRecoveryEnd(FGameplayEventData Payload)
+#pragma region "Curve Edge Handlers"
+void UEnemyAttackAbility::OnCurveRisingEdgeReceived(FName CurveName)
 {
-	DEBUG_LOG(TEXT("OnEventActionRecoveryEnd: bPerformNextCombo=%s"),
+	DEBUG_LOG(TEXT("Curve Rising Edge: %s"), *CurveName.ToString());
+
+	//ActionRecovery 상승 에지는 현재 특별한 처리 없음
+}
+
+void UEnemyAttackAbility::OnCurveFallingEdgeReceived(FName CurveName)
+{
+	DEBUG_LOG(TEXT("Curve Falling Edge: %s"), *CurveName.ToString());
+
+	if (CurveName == CurveName_ActionRecovery)
+	{
+		//ActionRecovery 하강 에지: 콤보 판정
+		OnActionRecoveryEnd();
+	}
+}
+
+void UEnemyAttackAbility::OnActionRecoveryEnd()
+{
+	DEBUG_LOG(TEXT("OnActionRecoveryEnd: bPerformNextCombo=%s"),
 		bPerformNextCombo ? TEXT("true") : TEXT("false"));
 
 	if (bPerformNextCombo)
 	{
-		DEBUG_LOG(TEXT("OnEventActionRecoveryEnd: Performing Next Combo"));
+		DEBUG_LOG(TEXT("OnActionRecoveryEnd: Performing Next Combo"));
 		PlayNextCombo();
 	}
 	else
 	{
-		DEBUG_LOG(TEXT("OnEventActionRecoveryEnd: Combo Cancelled"));
+		DEBUG_LOG(TEXT("OnActionRecoveryEnd: Combo Cancelled"));
 	}
 }
+#pragma endregion
 
 void UEnemyAttackAbility::PlayNextCombo()
 {

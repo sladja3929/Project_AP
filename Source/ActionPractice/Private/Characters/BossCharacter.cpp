@@ -100,7 +100,7 @@ void ABossCharacter::BeginPlay()
 		EnemyData->PreloadAllMontages();
 	}
 
-	// AI 관련 설정은 서버에서만 (싱글플레이어에서는 항상 true)
+	//AI 관련 설정은 서버에서만 (싱글플레이어에서는 항상 true)
 	if (HasAuthority())
 	{
 		//AIController의 Perception 델리게이트 바인딩
@@ -121,7 +121,7 @@ void ABossCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	// 보스는 복제할 추가 변수가 거의 없음
+	//보스는 복제할 추가 변수가 거의 없음
 	// DetectedPlayer는 서버 전용, bHealthWidgetActive는 로컬 UI 상태
 }
 
@@ -149,8 +149,10 @@ void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
 			if (!bHealthWidgetActive)
 			{
 				DetectedPlayer = Player;
-				CreateAndAttachHealthWidget();
-				PlayBossBGM();
+				bHealthWidgetActive = true;
+
+				//서버에서 모든 클라이언트에 조우 연출 전파
+				Multicast_OnBossEncounter();
 			}
 		}
 		else
@@ -159,7 +161,11 @@ void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
 
 			if (Actor == DetectedPlayer.Get())
 			{
-				RemoveHealthWidget();
+				bHealthWidgetActive = false;
+				DetectedPlayer.Reset();
+
+				//서버에서 모든 클라이언트에 이탈 연출 전파
+				Multicast_OnBossDisengage();
 			}
 		}
 	}
@@ -167,9 +173,10 @@ void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
 
 void ABossCharacter::CreateAndAttachHealthWidget()
 {
-	if (bHealthWidgetActive)
+	//이미 위젯이 있으면 리턴
+	if (BossHealthWidget)
 	{
-		DEBUG_LOG(TEXT("BossHealthWidget already active"));
+		DEBUG_LOG(TEXT("BossHealthWidget already exists"));
 		return;
 	}
 
@@ -178,7 +185,7 @@ void ABossCharacter::CreateAndAttachHealthWidget()
 		DEBUG_LOG(TEXT("BossHealthWidgetClass is not set"));
 		return;
 	}
-	
+
 	BossHealthWidget = CreateWidget<UBossHealthWidget>(GetWorld(), BossHealthWidgetClass);
 	if (!BossHealthWidget)
 	{
@@ -197,28 +204,19 @@ void ABossCharacter::CreateAndAttachHealthWidget()
 
 	BossHealthWidget->AddToViewport();
 
-	bHealthWidgetActive = true;
 	DEBUG_LOG(TEXT("BossHealthWidget created and attached"));
 }
 
 void ABossCharacter::RemoveHealthWidget()
 {
-	if (!bHealthWidgetActive)
+	if (!BossHealthWidget)
 	{
 		return;
 	}
 
-	if (BossHealthWidget)
-	{
-		BossHealthWidget->RemoveFromParent();
-		BossHealthWidget = nullptr;
-		DEBUG_LOG(TEXT("BossHealthWidget removed"));
-	}
-
-	StopBossBGM();
-
-	DetectedPlayer.Reset();
-	bHealthWidgetActive = false;
+	BossHealthWidget->RemoveFromParent();
+	BossHealthWidget = nullptr;
+	DEBUG_LOG(TEXT("BossHealthWidget removed"));
 }
 
 void ABossCharacter::Tick(float DeltaTime)
@@ -267,4 +265,20 @@ void ABossCharacter::StopBossBGM()
 		BGMAudioComponent->Stop();
 		DEBUG_LOG(TEXT("BossBGM stopped"));
 	}
+}
+
+void ABossCharacter::Multicast_OnBossEncounter_Implementation()
+{
+	DEBUG_LOG(TEXT("Multicast_OnBossEncounter called"));
+
+	CreateAndAttachHealthWidget();
+	PlayBossBGM();
+}
+
+void ABossCharacter::Multicast_OnBossDisengage_Implementation()
+{
+	DEBUG_LOG(TEXT("Multicast_OnBossDisengage called"));
+
+	RemoveHealthWidget();
+	StopBossBGM();
 }

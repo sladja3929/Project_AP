@@ -4,8 +4,9 @@
 #include "Abilities/GameplayAbility.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "Input/InputActionDataAsset.h"
+#include "Net/UnrealNetwork.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogInputBufferComponent, Log, All);
@@ -14,9 +15,21 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+
 UInputBufferComponent::UInputBufferComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+
+	//컴포넌트 복제 활성화
+	SetIsReplicatedByDefault(true);
+}
+
+void UInputBufferComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	//COND_OwnerOnly로 소유 클라만 받도록 (트래픽 최소화)
+	DOREPLIFETIME_CONDITION(UInputBufferComponent, bServerBufferEnabled, COND_OwnerOnly);
 }
 
 void UInputBufferComponent::BeginPlay()
@@ -28,6 +41,9 @@ void UInputBufferComponent::BeginPlay()
 	{
 		return;
 	}
+
+	//InputActionData 캐싱
+	CachedInputActionData = OwnerCharacter->GetInputActionData();
 
 	//태그 초기화
 	EventNotifyEnableBufferInputTag = UGameplayTagsSubsystem::GetEventNotifyEnableBufferInputTag();
@@ -47,100 +63,216 @@ void UInputBufferComponent::BeginPlay()
 		DEBUG_LOG(TEXT("EventActionPlayBufferTag is not valid"));
 	}
 
-	if (UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent())
-	{
-		EnableBufferInputHandle = ASC->GenericGameplayEventCallbacks
-		.FindOrAdd(EventNotifyEnableBufferInputTag)
-		.AddLambda([this](const FGameplayEventData* EventData)
-			{
-				if (IsValid(this) && EventData)
-				{
-					OnEnableBufferInput(*EventData);
-				}
-			});
-
-		PlayBufferHandle = ASC->GenericGameplayEventCallbacks
-		.FindOrAdd(EventActionPlayBufferTag)
-		.AddLambda([this](const FGameplayEventData* EventData)
-			{
-				if (IsValid(this) && EventData)
-				{
-					OnPlayBuffer(*EventData);
-				}
-			});
-	}
-
-	else DEBUG_LOG(TEXT("No ASC"));
-	
 	Super::BeginPlay();
 }
 
-bool UInputBufferComponent::CanBufferAction(const UInputAction* InputAction, int32& OutPriority, bool& bIsHoldAction) const
+#pragma region "Buffer Action Functions"
+bool UInputBufferComponent::CheckActionRule(FGameplayTag ActionTag, int32& OutPriority, bool& bIsHoldAction) const
 {
-	if (!InputAction || !OwnerCharacter)
+	if (!ActionTag.IsValid() || !OwnerCharacter || !CachedInputActionData)
 	{
+		DEBUG_LOG(TEXT("CheckActionRule: No Character or Data Asset"));
+		bIsHoldAction = false;
+		return false;
+	}
+
+	const UInputAction* InputAction = CachedInputActionData->FindInputActionByTag(ActionTag);
+	if (!InputAction)
+	{
+		DEBUG_LOG(TEXT("CheckActionRule: No IA - %s"), *ActionTag.ToString());
+		OutPriority = -1;
+		bIsHoldAction = false;
+		return false;
+	}
+	
+	const FInputActionAbilityRule* InputActionRule = CachedInputActionData->FindRuleByAction(InputAction);
+	if (!InputActionRule)
+	{
+		DEBUG_LOG(TEXT("CheckActionRule: No Rule - %s"), *ActionTag.ToString());
 		OutPriority = -1;
 		bIsHoldAction = false;
 		return false;
 	}
 
-	const UInputActionDataAsset* InputActionData = OwnerCharacter->GetInputActionData();
-	if (!InputActionData)
-	{
-		OutPriority = -1;
-		bIsHoldAction = false;
-		return false;
-	}
-	
-	const FInputActionAbilityRule* InputActionRule = InputActionData->FindRuleByAction(InputAction);
-	if (!InputActionRule)
-	{
-		OutPriority = -1;
-		bIsHoldAction = false;
-		return false;
-	}
-	
 	OutPriority = InputActionRule->BufferPriority;
 	bIsHoldAction = InputActionRule->bIsHoldAction;
 	return InputActionRule->bCanBuffered;
 }
 
-void UInputBufferComponent::BufferNextAction(const UInputAction* InputedAction)
+void UInputBufferComponent::BufferInput(const UInputAction* InputAction, bool bIsReleased)
 {
-	if (!bCanBufferInput) return;
-
-	int32 NewActionPriority;
-	bool bIsHoldAction;
-	if (!CanBufferAction(InputedAction, NewActionPriority, bIsHoldAction))
+	if (!InputAction || !OwnerCharacter || !CachedInputActionData)
 	{
-		DEBUG_LOG(TEXT("Cannot buffer action, bCanBuffered is false - Action: %s"), *InputedAction->GetName());
 		return;
 	}
 
-	if (bIsHoldAction)
+	//버퍼 윈도우가 닫혀있으면 아무것도 하지 않음
+	if (!bInternalBufferEnabled)
 	{
-		BufferedHoldAction.Add(InputedAction);
-		DEBUG_LOG(TEXT("Buffered hold action added - Action: %s"), *InputedAction->GetName());
+		return;
+	}
+
+	const FGameplayTag InputTag = CachedInputActionData->FindTagByInputAction(InputAction);
+	if (!InputTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("BufferInput - No tag for action %s"), *GetNameSafe(InputAction));
+		return;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor)
+	{
+		return;
+	}
+
+	//release 입력은 단발 액션이면 “실행 플래그” 의미, hold 액션이면 “해제(버퍼 제거)” 의미가 될 수 있으므로
+	//태그/룰 판별은 아래 내부 로직(BufferInputInternal/ServerBufferInput)에서 처리되게 둠.
+
+	if (OwnerActor->HasAuthority())
+	{
+		//Standalone/Server: 공통 버퍼 상태에 직접 반영
+		InternalBufferInput(InputTag, bIsReleased);
 	}
 	
-	else if (NewActionPriority >= CurrentBufferPriority)
-	{
-		bBufferActionReleased = false;
-		BufferedAction = InputedAction;
-		CurrentBufferPriority = NewActionPriority;
-		DEBUG_LOG(TEXT("Buffered action updated - Action: %s"), *InputedAction->GetName());
-	}
 	else
 	{
-		DEBUG_LOG(TEXT("Buffer action ignored - Lower priority: %d vs %d"), NewActionPriority, CurrentBufferPriority);
+		//Client: 서버에 태그 기반 입력 전달 (TTL/그레이스 포함)
+		ServerBufferInput(InputTag, bIsReleased);
 	}
 }
 
-void UInputBufferComponent::UnBufferHoldAction(const UInputAction* InputedAction)
+void UInputBufferComponent::InternalBufferInput(FGameplayTag InputActionTag, bool bIsReleased)
 {
-	bBufferActionReleased = true;
-	BufferedHoldAction.Remove(InputedAction);
-	DEBUG_LOG(TEXT("Buffered hold action removed - Action: %s"), *InputedAction->GetName());
+	int32 NewActionPriority = -1;
+	bool bIsHoldAction = false;
+
+	if (!CheckActionRule(InputActionTag, NewActionPriority, bIsHoldAction))
+	{
+		DEBUG_LOG(TEXT("BufferInputInternal Cannot buffer - %s"), *InputActionTag.ToString());
+		return;
+	}
+
+	//단발 액션 Released는 무시
+	if (bIsReleased && !bIsHoldAction)
+	{
+		DEBUG_LOG(TEXT("BufferInputInternal Ignored - Non-hold released %s"), *InputActionTag.ToString());
+		return;
+	}
+
+	//홀드 액션일 경우
+	if (bIsHoldAction)
+	{
+		if (bIsReleased)
+		{
+			BufferedHoldActionTags.Remove(InputActionTag);
+			DEBUG_LOG(TEXT("BufferInputInternal Hold action removed - %s"), *InputActionTag.ToString());
+		}
+		
+		else
+		{
+			BufferedHoldActionTags.Add(InputActionTag);
+			DEBUG_LOG(TEXT("BufferInputInternal Hold action added - %s"), *InputActionTag.ToString());
+		}
+	}
+
+	//단발 액션일 경우
+	else
+	{
+		if (NewActionPriority >= BufferPriority)
+		{
+			BufferedActionTag = InputActionTag;
+			BufferPriority = NewActionPriority;
+			bBufferedActionReleased = bIsReleased;
+
+			DEBUG_LOG(TEXT("BufferInputInternal Action buffered - %s Priority %d Released %s"),
+					  *InputActionTag.ToString(),
+					  NewActionPriority,
+					  bIsReleased ? TEXT("true") : TEXT("false"));
+		}
+		
+		else
+		{
+			DEBUG_LOG(TEXT("BufferInputInternal Action ignored - Lower priority %d vs %d"),
+					  NewActionPriority, BufferPriority);
+		}
+	}
+}
+
+bool UInputBufferComponent::IsBufferWaiting()
+{
+	return BufferedActionTag.IsValid() || (BufferedHoldActionTags.Num() > 0);
+}
+
+void UInputBufferComponent::ExecuteBuffer()
+{
+	if (!OwnerCharacter)
+	{
+		return;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor)
+	{
+		return;
+	}
+
+	//클라이언트는 아예 저장된 버퍼 실행에 관여하지 못함
+	if (!OwnerActor->HasAuthority()) 
+	{
+		return;
+	}
+
+	//윈도우 닫기
+	bInternalBufferEnabled = false;
+	bServerBufferEnabled = false;
+	
+	DEBUG_LOG(TEXT("ExecuteBuffer called"));
+
+	//저장된 단발 액션 실행
+	if (BufferedActionTag.IsValid())
+	{
+		ActivateAbilityByTag(BufferedActionTag);
+
+		BufferedActionTag = FGameplayTag();
+		BufferPriority = -1;
+		bBufferedActionReleased = false;
+
+		DEBUG_LOG(TEXT("ExecuteBuffer: Normal buffer executed"));
+	}
+
+	//저장된 모든 홀드 액션 실행
+	else if (BufferedHoldActionTags.Num() > 0)
+	{
+		for (const FGameplayTag& Tag : BufferedHoldActionTags)
+		{
+			ActivateAbilityByTag(Tag);
+		}
+
+		BufferedHoldActionTags.Empty();
+		DEBUG_LOG(TEXT("ExecuteBuffer: Hold buffers executed"));
+	}
+	
+	else
+	{
+		DEBUG_LOG(TEXT("ExecuteBuffer: No buffered action"));
+	}
+}
+
+void UInputBufferComponent::ActivateAbilityByTag(FGameplayTag ActionTag)
+{
+	if (!ActionTag.IsValid() || !OwnerCharacter || !CachedInputActionData)
+	{
+		return;
+	}
+
+	const UInputAction* InputAction = CachedInputActionData->FindInputActionByTag(ActionTag);
+	if (!InputAction)
+	{
+		DEBUG_LOG(TEXT("ActivateAbilityByTag InputAction not found for tag %s"), *ActionTag.ToString());
+		return;
+	}
+
+	ActivateAbility(InputAction);
 }
 
 void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
@@ -186,70 +318,147 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 	}
 }
 
-void UInputBufferComponent::ActivateBufferAction()
+void UInputBufferComponent::EnableBufferInput(bool bEnabled)
 {
-	bCanBufferInput = false;
+	//클라이언트 버퍼 윈도우는 항상 변경
+	bInternalBufferEnabled = bEnabled;
 
-	//일반버퍼와 홀드버퍼가 같이 있다면 버퍼만 실행, 홀드버퍼는 일반버퍼 액션 실행 후 일반버퍼가 비어있다면 실행
-	if (BufferedAction)
+	if (!OwnerCharacter)
 	{
-		ActivateAbility(BufferedAction);
-		
-		BufferedAction = nullptr;
-		CurrentBufferPriority = -1;
+		return;
 	}
-	
-	else if (BufferedHoldAction.Num() > 0)
+
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor)
 	{
-		for (const UInputAction* InputAction : BufferedHoldAction)
+		return;
+	}
+
+	//서버/스탠드어론: 서버 버퍼 윈도우 변경
+	if (OwnerActor->HasAuthority())
+	{
+		bServerBufferEnabled = bEnabled;
+
+		//서버가 윈도우 오픈할 때 지연된 입력 버퍼에 저장
+		if (bEnabled)
 		{
-			ActivateAbility(InputAction);
+			ProcessPendingInputs();
 		}
-		
-		BufferedHoldAction.Empty();
-	}	
-}
-
-bool UInputBufferComponent::IsBufferWaiting()
-{
-	return BufferedAction != nullptr;
-}
-
-void UInputBufferComponent::OnEnableBufferInput(const FGameplayEventData& EventData)
-{
-	bCanBufferInput = true;
-	DEBUG_LOG(TEXT("Enable Buffer Input - Can Buffer Action"));
-}
-
-void UInputBufferComponent::OnPlayBuffer(const FGameplayEventData& EventData)
-{
-	bCanBufferInput = false;
-	
-	if (BufferedAction || BufferedHoldAction.Num() > 0) //저장한 행동이 있을 경우
-	{
-		DEBUG_LOG(TEXT("Play Buffer"));
-		ActivateBufferAction();
 	}
 
-	else DEBUG_LOG(TEXT("Play Buffer - No Buffered Action"));
+	DEBUG_LOG(TEXT("EnableBufferInput %s"), bEnabled ? TEXT("Enabled") : TEXT("Disabled"));
 }
+
+#pragma endregion
+
+#pragma region "Server RPC Functions"
+
+void UInputBufferComponent::ServerBufferInput_Implementation(FGameplayTag InputActionTag, bool bIsReleased)
+{
+	if (!CachedInputActionData)
+	{
+		DEBUG_LOG(TEXT("ServerBufferInput CachedInputActionData is null"));
+		return;
+	}
+
+	int32 Priority = -1;
+	bool bIsHoldAction = false;
+	if (!CheckActionRule(InputActionTag, Priority, bIsHoldAction))
+	{
+		DEBUG_LOG(TEXT("ServerBufferInput Cannot buffer action for tag %s"), *InputActionTag.ToString());
+		return;
+	}
+
+	//홀드 해제는 즉시 제거
+	if (bIsReleased && bIsHoldAction)
+	{
+		BufferedHoldActionTags.Remove(InputActionTag);
+		PendingInputs.Remove(InputActionTag);
+		DEBUG_LOG(TEXT("ServerBufferInput Hold action released - %s"), *InputActionTag.ToString());
+		return;
+	}
+
+	//서버 윈도우가 열려있으면 바로 저장 가능
+	if (bServerBufferEnabled)
+	{
+		InternalBufferInput(InputActionTag, bIsReleased);
+	}
+
+	//서버 윈도우가 닫혀있으면 네트워크 지연을 고려해서 TTL 저장
+	else
+	{
+		FPendingInput Pending;
+		Pending.ActionTag    = InputActionTag;
+		Pending.bIsReleased  = bIsReleased;
+		Pending.Timestamp    = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+		Pending.bIsHoldAction = bIsHoldAction;
+
+		PendingInputs.Add(InputActionTag, Pending);
+
+		DEBUG_LOG(TEXT("ServerBufferInput Input pending - %s Buffer disabled"),
+				  *InputActionTag.ToString());
+
+		CleanupExpiredPendingInputs();
+	}
+}
+
+void UInputBufferComponent::ProcessPendingInputs()
+{
+	if (!GetWorld())
+	{
+		return;
+	}
+
+	const float CurrentTime = GetWorld()->GetTimeSeconds();
+
+	for (const auto& Pair : PendingInputs)
+	{
+		const FPendingInput& Pending = Pair.Value;
+
+		if (CurrentTime - Pending.Timestamp <= InputGracePeriod)
+		{
+			InternalBufferInput(Pending.ActionTag, Pending.bIsReleased);
+			DEBUG_LOG(TEXT("ProcessPendingInputs Processed - %s"), *Pending.ActionTag.ToString());
+		}
+		else
+		{
+			DEBUG_LOG(TEXT("ProcessPendingInputs Expired - %s"), *Pending.ActionTag.ToString());
+		}
+	}
+
+	PendingInputs.Empty();
+}
+
+void UInputBufferComponent::CleanupExpiredPendingInputs()
+{
+	if (!GetWorld())
+	{
+		return;
+	}
+
+	const float CurrentTime = GetWorld()->GetTimeSeconds();
+
+	for (auto It = PendingInputs.CreateIterator(); It; ++It)
+	{
+		if (CurrentTime - It.Value().Timestamp > InputGracePeriod)
+		{
+			DEBUG_LOG(TEXT("CleanupExpiredPendingInputs Removed expired - %s"),
+					  *It.Key().ToString());
+			It.RemoveCurrent();
+		}
+	}
+}
+
+void UInputBufferComponent::OnRepBufferState()
+{
+	//bInternalBufferEnabled = bServerBufferEnabled;
+	
+	//DEBUG_LOG(TEXT("OnRepBufferState %s"), bServerBufferEnabled ? TEXT("Enabled") : TEXT("Disabled"));
+}
+
+#pragma endregion
 
 void UInputBufferComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent())
-	{
-		if (EnableBufferInputHandle.IsValid())
-		{
-			ASC->GenericGameplayEventCallbacks.FindOrAdd(EventNotifyEnableBufferInputTag)
-				.Remove(EnableBufferInputHandle);
-		}
-
-		if (PlayBufferHandle.IsValid())
-		{
-			ASC->GenericGameplayEventCallbacks.FindOrAdd(EventActionPlayBufferTag)
-				.Remove(PlayBufferHandle);
-		}
-	}
-	
 	Super::EndPlay(EndPlayReason);
 }

@@ -30,6 +30,10 @@ public:
 protected:
 #pragma region "Protected Variables"
 
+	//리커버리 종료 수행 여부 (EndAbility에서 체크용)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rotate")
+	bool bActionRecoveryEnded = false;
+	
     //액션 수행 전 회전을 할지 여부
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rotate")
 	bool bRotateBeforeAction = true;
@@ -60,6 +64,10 @@ protected:
 	FGameplayTag EventInputByBufferTag;
 	FGameplayTag EventPlayBufferTag;
 	FGameplayTag StateRecoveringTag;
+
+	//커브 폴링 관련
+	static const FName CurveName_EnableBufferInput;
+	static const FName CurveName_ActionRecovery;
 
 #pragma endregion
 
@@ -105,16 +113,24 @@ protected:
 	UFUNCTION()
 	virtual void OnTaskNotifyEventsReceived(FGameplayEventData Payload);
 
-	//ActionRecovery 노티파이 콜백 함수들, State.Recovering는 노티파이와 별개로 스테미나 소모 체크 직후 무조건 부착
-	UFUNCTION()
-	virtual void OnEventActionRecoveryStart(FGameplayEventData Payload);
-	
-	UFUNCTION()
-	virtual void OnEventActionRecoveryEnd(FGameplayEventData Payload);
-
 	//InputByBuffer GameplayEvent 콜백 함수
 	UFUNCTION()
 	virtual void OnEventInputByBuffer(FGameplayEventData Payload) {}
+
+	//=== 커브 에지 핸들러 ===
+	UFUNCTION()
+	virtual void OnCurveRisingEdgeReceived(FName CurveName);
+
+	UFUNCTION()
+	virtual void OnCurveFallingEdgeReceived(FName CurveName);
+
+	//ActionRecovery 커브 하강 에지에서 호출되는 가상 함수
+	//자식 클래스에서 오버라이드하여 추가 로직 구현 가능 (예: RollAbility의 JustRolledWindow)
+	UFUNCTION()
+	virtual void OnActionRecoveryEnd();
+
+	//버퍼 관련 처리 (서버 권한 체크 포함)
+	void ExecuteBuffer();
 
 #pragma endregion
 
