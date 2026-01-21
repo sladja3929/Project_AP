@@ -359,10 +359,9 @@ void AActionPracticeCharacter::CancelActionForMove()
 	{
 		return;
 	}
-    
+	
 	//Attack 어빌리티가 활성화되어 있는지 확인
 	bool bHasActiveAttackAbility = AbilitySystemComponent->HasMatchingGameplayTag(StateAbilityAttackingTag);
-
 	if (bHasActiveAttackAbility)
 	{
 		//State.Recovering 태그가 없으면 어빌리티 캔슬 가능 (ActionRecoveryEnd 이후)
@@ -646,7 +645,7 @@ void AActionPracticeCharacter::CreateAttributeSet()
 void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 {
 	if (!AbilitySystemComponent || !InputAction) return;
-
+	
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
 
@@ -681,7 +680,7 @@ void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 void AActionPracticeCharacter::GASInputReleased(const UInputAction* InputAction)
 {
 	if (!AbilitySystemComponent || !InputAction) return;
-
+	
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
 

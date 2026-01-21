@@ -63,14 +63,6 @@ void UInputBufferComponent::BeginPlay()
 		DEBUG_LOG(TEXT("EventActionPlayBufferTag is not valid"));
 	}
 
-	//이벤트 바인딩
-	UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent();
-	if (ASC)
-	{
-		EnableBufferInputHandle = ASC->GenericGameplayEventCallbacks.FindOrAdd(EventNotifyEnableBufferInputTag).AddUObject(this, &UInputBufferComponent::OnEventEnableBufferInput);
-		PlayBufferHandle = ASC->GenericGameplayEventCallbacks.FindOrAdd(EventActionPlayBufferTag).AddUObject(this, &UInputBufferComponent::OnEventPlayBuffer);
-	}
-
 	Super::BeginPlay();
 }
 
@@ -133,20 +125,24 @@ void UInputBufferComponent::BufferInput(const UInputAction* InputAction, bool bI
 		return;
 	}
 
-	//release 입력은 단발 액션이면 “실행 플래그” 의미, hold 액션이면 “해제(버퍼 제거)” 의미가 될 수 있으므로
-	//태그/룰 판별은 아래 내부 로직(BufferInputInternal/ServerBufferInput)에서 처리되게 둠.
-
+	// 1) 서버(Standalone/Listen Server 포함): 권한 측에서만 버퍼 처리
 	if (OwnerActor->HasAuthority())
 	{
-		//Standalone/Server: 공통 버퍼 상태에 직접 반영
 		InternalBufferInput(InputTag, bIsReleased);
+		return;
 	}
-	
-	else
+
+	// 2) 클라: 소유 클라만 예측 버퍼 + 서버 RPC
+	if (!OwnerCharacter->IsLocallyControlled())
 	{
-		//Client: 서버에 태그 기반 입력 전달 (TTL/그레이스 포함)
-		ServerBufferInput(InputTag, bIsReleased);
+		return;
 	}
+
+	// (Predicted) 로컬에서도 즉시 버퍼에 쌓아, 클라 ExecuteBuffer가 실제로 태그를 소비할 수 있게 함
+	InternalBufferInput(InputTag, bIsReleased);
+
+	// (Authoritative) 서버에도 동일 입력을 보내 동기화
+	ServerBufferInput(InputTag, bIsReleased);
 }
 
 void UInputBufferComponent::InternalBufferInput(FGameplayTag InputActionTag, bool bIsReleased)
@@ -213,22 +209,14 @@ bool UInputBufferComponent::IsBufferWaiting()
 
 void UInputBufferComponent::ExecuteBuffer()
 {
-	if (!OwnerCharacter)
-	{
-		return;
-	}
+	if (!OwnerCharacter) return;
 
 	AActor* OwnerActor = GetOwner();
-	if (!OwnerActor)
-	{
-		return;
-	}
+	if (!OwnerActor) return;
 
 	//클라이언트는 아예 저장된 버퍼 실행에 관여하지 못함
-	if (!OwnerActor->HasAuthority()) 
-	{
-		return;
-	}
+	const bool bCanExecuteBuffer = OwnerActor->HasAuthority() || OwnerCharacter->IsLocallyControlled();
+	if (!bCanExecuteBuffer) return;
 
 	//윈도우 닫기
 	bInternalBufferEnabled = false;
@@ -292,19 +280,13 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = OwnerCharacter->FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
-
+	
 	for (auto& Spec : TryActivateSpecs)
 	{
-		DEBUG_LOG(TEXT("CurrSpec: %s"), *Spec->Handle.ToString());
-		//첫 실행이거나, bRetriggerInstancedAbility = true여서 재실행될 때
-		if (ASC->TryActivateAbility(Spec->Handle))
-		{
-			DEBUG_LOG(TEXT("Play Buffer - Activate Ability: %s"), *GetNameSafe(Spec->Ability->GetClass()));
-			Spec->InputPressed = true;
-		}
+		DEBUG_LOG(TEXT("CurrSpecNum: %s"), *Spec->Handle.ToString());
 
 		//어빌리티가 이미 실행중 / bRetriggerInstancedAbility = false여서 Try를 실패했을 때 (콤보 공격)
-		else if (Spec->IsActive()) //CanActivateAbility 실패로 활성화하지 못했을 때를 거르기 위해 실행 중 체크
+		if (Spec->IsActive()) //CanActivateAbility 실패로 활성화하지 못했을 때를 거르기 위해 실행 중 체크
 		{
 			DEBUG_LOG(TEXT("Play Buffer - Play Buffer Event: %s"), *GetNameSafe(Spec->Ability->GetClass()));
 			Spec->InputPressed = true;
@@ -320,6 +302,13 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 			EventData.EventTag = EventActionInputByBufferTag;
 			
 			ASC->HandleGameplayEvent(EventActionInputByBufferTag, &EventData);
+		}
+		
+		//첫 실행이거나, bRetriggerInstancedAbility = true여서 재실행될 때
+		else if (ASC->TryActivateAbility(Spec->Handle))
+		{
+			DEBUG_LOG(TEXT("Play Buffer - Activate Ability: %s"), *GetNameSafe(Spec->Ability->GetClass()));
+			Spec->InputPressed = true;
 		}
 
 		//다 아닐때
@@ -413,8 +402,6 @@ void UInputBufferComponent::ServerBufferInput_Implementation(FGameplayTag InputA
 
 void UInputBufferComponent::ProcessPendingInputs()
 {
-	bool ba = true;
-	if (ba) return;
 	if (!GetWorld())
 	{
 		return;
@@ -462,52 +449,14 @@ void UInputBufferComponent::CleanupExpiredPendingInputs()
 
 void UInputBufferComponent::OnRepBufferState()
 {
-	//bInternalBufferEnabled = bServerBufferEnabled;
+	bInternalBufferEnabled = bServerBufferEnabled;
 	
-	//DEBUG_LOG(TEXT("OnRepBufferState %s"), bServerBufferEnabled ? TEXT("Enabled") : TEXT("Disabled"));
+	DEBUG_LOG(TEXT("OnRepBufferState %s"), bServerBufferEnabled ? TEXT("Enabled") : TEXT("Disabled"));
 }
 
 #pragma endregion
 
 void UInputBufferComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	//이벤트 해제
-	if (OwnerCharacter)
-	{
-		UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent();
-		if (ASC)
-		{
-			if (EnableBufferInputHandle.IsValid())
-			{
-				ASC->GenericGameplayEventCallbacks.FindOrAdd(EventNotifyEnableBufferInputTag).Remove(EnableBufferInputHandle);
-				EnableBufferInputHandle.Reset();
-			}
-			if (PlayBufferHandle.IsValid())
-			{
-				ASC->GenericGameplayEventCallbacks.FindOrAdd(EventActionPlayBufferTag).Remove(PlayBufferHandle);
-				PlayBufferHandle.Reset();
-			}
-		}
-	}
-
 	Super::EndPlay(EndPlayReason);
-}
-
-void UInputBufferComponent::OnEventEnableBufferInput(const FGameplayEventData* Payload)
-{
-	if (!Payload)
-	{
-		return;
-	}
-
-	//EventMagnitude가 1이면 Enable, 0이면 Disable
-	const bool bEnabled = Payload->EventMagnitude > 0.5f;
-	EnableBufferInput(bEnabled);
-	DEBUG_LOG(TEXT("OnEventEnableBufferInput: %s"), bEnabled ? TEXT("Enabled") : TEXT("Disabled"));
-}
-
-void UInputBufferComponent::OnEventPlayBuffer(const FGameplayEventData* Payload)
-{
-	ExecuteBuffer();
-	DEBUG_LOG(TEXT("OnEventPlayBuffer: Buffer Executed"));
 }

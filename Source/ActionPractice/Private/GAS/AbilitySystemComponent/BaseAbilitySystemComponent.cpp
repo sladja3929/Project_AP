@@ -36,7 +36,7 @@ void UBaseAbilitySystemComponent::BeginPlay()
 }
 
 void UBaseAbilitySystemComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
+{	
 	Super::EndPlay(EndPlayReason);
 }
 

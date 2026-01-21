@@ -133,10 +133,6 @@ protected:
 	//버퍼 관련 처리 (서버 권한 체크 포함)
 	void ExecuteBuffer();
 
-	//버퍼 이벤트 송신 함수
-	void SendEnableBufferInputEvent(bool bEnabled);
-	void SendPlayBufferEvent();
-
 #pragma endregion
 
 private:

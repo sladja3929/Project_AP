@@ -71,7 +71,7 @@ public:
 
     //PendingInputs가 살아있는 최대 시간(초) - 기본 0.1초 = 100ms.
     UPROPERTY(EditDefaultsOnly, Category="Input Buffer")
-    float InputGracePeriod = 0.1f;
+    float InputGracePeriod = 0.25f;
 
 #pragma endregion
 
@@ -131,10 +131,6 @@ protected:
     void OnRepBufferState();
 	
     void ActivateAbilityByTag(FGameplayTag ActionTag);
-
-	//이벤트 핸들러
-	void OnEventEnableBufferInput(const FGameplayEventData* Payload);
-	void OnEventPlayBuffer(const FGameplayEventData* Payload);
 
 #pragma endregion
 

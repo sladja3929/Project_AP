@@ -149,3 +149,8 @@ void UActionPracticeAbilitySystemComponent::CheckBlockSuccess(AActor* SourceActo
 		bBlockedLastAttack = true;
 	}
 }
+
+void UActionPracticeAbilitySystemComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+}
