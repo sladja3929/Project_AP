@@ -8,7 +8,7 @@
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogSprintAbility, Log, All);
@@ -40,8 +40,8 @@ void USprintAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
 	
 	DEBUG_LOG(TEXT("Sprint Ability Activated"));
 	StartSprinting();
+	StartWaitInputReleaseTask(true);
 }
-
 
 void USprintAbility::ActivateInitSettings()
 {
@@ -252,10 +252,11 @@ void USprintAbility::CheckSprintConditions()
 	}
 }
 
-void USprintAbility::InputReleased(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
+void USprintAbility::HandleWaitInputReleased(float TimeHeld)
 {
-	DEBUG_LOG(TEXT("Sprint Input Released - End Ability"));
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+	DEBUG_LOG(TEXT("Sprint WaitInputRelease - End Ability (TimeHeld: %.3f)"), TimeHeld);
+
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void USprintAbility::CancelAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,	const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateCancelAbility)

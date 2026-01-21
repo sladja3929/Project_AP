@@ -684,24 +684,26 @@ void AActionPracticeCharacter::GASInputReleased(const UInputAction* InputAction)
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
 
-	InputBufferComponent->bBufferActionReleased = true;
+	if (InputBufferComponent) InputBufferComponent->bBufferActionReleased = true;
 
-	//다른 어빌리티가 수행중이고 입력 저장 가능할 때는 버퍼로 전달 (클라이언트에서 가능할 때)
-	if (InputBufferComponent->bInternalBufferEnabled)
+	//버퍼 ON/OFF와 무관하게, 현재 활성화된 어빌리티가 있으면 릴리즈를 먼저 전달
+	bool bAnyActiveAbility = false;
+	for (auto& Spec : TryActivateSpecs)
 	{
-		DEBUG_LOG(TEXT("Character: UnBuffer"));
-		InputBufferComponent->BufferInput(InputAction, true);
+		if (!Spec->IsActive())
+			continue;
+
+		bAnyActiveAbility = true;
+
+		Spec->InputPressed = false;
+		AbilitySystemComponent->AbilitySpecInputReleased(*Spec);
 	}
-	else
+
+	//활성 어빌리티가 없을 때만 릴리즈 버퍼링 (홀드가 아니면 InputBuffer 내부에서 자동 무시됨)
+	if (!bAnyActiveAbility && InputBufferComponent && InputBufferComponent->bInternalBufferEnabled)
 	{
-		for (auto& Spec : TryActivateSpecs)
-		{
-			if (Spec->IsActive())
-			{
-				Spec->InputPressed = false;
-				AbilitySystemComponent->AbilitySpecInputReleased(*Spec);
-			}
-		}
+		DEBUG_LOG(TEXT("Character UnBuffer"));
+		InputBufferComponent->BufferInput(InputAction, true);
 	}
 }
 

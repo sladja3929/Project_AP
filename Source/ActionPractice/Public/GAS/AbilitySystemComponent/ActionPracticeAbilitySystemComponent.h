@@ -26,6 +26,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="Attributes")
 	const UActionPracticeAttributeSet* GetActionPracticeAttributeSet() const;
 
+	//WaitInputRelease / WaitInputPress 계열 태스크용 입력 이벤트 브릿지
+	virtual void AbilitySpecInputPressed(FGameplayAbilitySpec& Spec) override;
+	virtual void AbilitySpecInputReleased(FGameplayAbilitySpec& Spec) override;
+	
 	//===== Defense Policy Override =====
 	virtual void CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
 	virtual void PrepareHitReactionEventData(FGameplayEventData& OutEventData, const FFinalAttackData& FinalAttackData) override;

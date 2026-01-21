@@ -8,7 +8,7 @@
 #include "Items/WeaponDataAsset.h"
 #include "Items/AttackData.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogBaseAbilitySystemComponent, Log, All);
@@ -48,6 +48,50 @@ void UActionPracticeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwner
 	Super::InitAbilityActorInfo(InOwnerActor, InAvatarActor);
 
 	CachedAPCharacter = Cast<AActionPracticeCharacter>(InOwnerActor);
+}
+
+void UActionPracticeAbilitySystemComponent::AbilitySpecInputPressed(FGameplayAbilitySpec& Spec)
+{
+	Super::AbilitySpecInputPressed(Spec);
+
+	//활성화된 어빌리티(대부분 LocalPredicted)가 입력 이벤트를 태스크로 받을 수 있게 브릿지
+	if (IsOwnerActorAuthoritative() || !Spec.IsActive())
+	{
+		return;
+	}
+
+	TArray<UGameplayAbility*> Instances = Spec.GetAbilityInstances();
+	if (Instances.IsEmpty() || !Instances.Last())
+	{
+		return;
+	}
+
+	const FGameplayAbilityActivationInfo& ActivationInfo = Instances.Last()->GetCurrentActivationInfoRef();
+	const FPredictionKey OriginalPredictionKey = ActivationInfo.GetActivationPredictionKey();
+
+	InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Spec.Handle, OriginalPredictionKey);
+}
+
+void UActionPracticeAbilitySystemComponent::AbilitySpecInputReleased(FGameplayAbilitySpec& Spec)
+{
+	Super::AbilitySpecInputReleased(Spec);
+
+	//WaitInputRelease가 기다리는 이벤트
+	if (IsOwnerActorAuthoritative() || !Spec.IsActive())
+	{
+		return;
+	}
+
+	TArray<UGameplayAbility*> Instances = Spec.GetAbilityInstances();
+	if (Instances.IsEmpty() || !Instances.Last())
+	{
+		return;
+	}
+
+	const FGameplayAbilityActivationInfo& ActivationInfo = Instances.Last()->GetCurrentActivationInfoRef();
+	const FPredictionKey OriginalPredictionKey = ActivationInfo.GetActivationPredictionKey();
+
+	InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Spec.Handle, OriginalPredictionKey);
 }
 
 const UActionPracticeAttributeSet* UActionPracticeAbilitySystemComponent::GetActionPracticeAttributeSet() const 

@@ -10,7 +10,7 @@
 #include "GAS/Abilities/Player/WeaponAbilityStatics.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogChargeAttackAbility, Log, All);
@@ -22,7 +22,7 @@
 UChargeAttackAbility::UChargeAttackAbility()
 {
 	//공격은 서버에서 시작 (히트 판정 권한)
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
     StaminaCost = 15.0f;

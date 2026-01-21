@@ -10,7 +10,7 @@
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "Items/WeaponDataAsset.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogBlockAbility, Log, All);
@@ -33,6 +33,8 @@ void UBlockAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, con
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	
 	PlayAction();
+
+	StartWaitInputReleaseTask(true);
 }
 
 void UBlockAbility::ActivateInitSettings()
@@ -136,11 +138,11 @@ void UBlockAbility::OnTaskMontageInterrupted()
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
-
-void UBlockAbility::InputReleased(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
+void UBlockAbility::HandleWaitInputReleased(float TimeHeld)
 {
-	DEBUG_LOG(TEXT("Block Input Released - End Ability"));
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+	DEBUG_LOG(TEXT("Block WaitInputRelease - End Ability (TimeHeld: %.3f)"), TimeHeld);
+
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void UBlockAbility::CancelAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,	const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateCancelAbility)
