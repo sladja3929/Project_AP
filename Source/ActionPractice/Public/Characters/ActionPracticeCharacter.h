@@ -222,6 +222,14 @@ protected:
 	void OnChargeAttackInput();
 	void OnChargeAttackReleased();
 
+	
+	// ===== Rotation Helper =====
+	bool CalculateYawFromMovementInput(float& OutYaw) const;
+
+	//서버에 회전 요청(RPC)
+	UFUNCTION(Server, Reliable)
+	void Server_RequestRotateToYaw(float TargetYaw, float RotateTime);
+	
 	//===== Replication Functions =====
 	UFUNCTION()
 	void OnRep_LeftWeapon();

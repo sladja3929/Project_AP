@@ -56,30 +56,49 @@ void USprintAbility::ActivateInitSettings()
 	SprintSpeedMultiplier = Character->SprintSpeedMultiplier;
 }
 
+bool USprintAbility::ShouldRunSprintChecks() const
+{
+	const AActor* Avatar = GetAvatarActorFromActorInfo();
+	const AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
+
+	const bool bIsAuthority = (Avatar && Avatar->HasAuthority());
+	const bool bIsLocallyControlled = (Character && Character->IsLocallyControlled());
+
+	return bIsAuthority || bIsLocallyControlled;
+}
+
 void USprintAbility::StartSprinting()
 {
-	if (!StartStaminaDrainEffect())
-	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-		return;
-	}
+	const AActor* Avatar = GetAvatarActorFromActorInfo();
+	const bool bIsAuthority = (Avatar && Avatar->HasAuthority());
 
-	if (!StartSprintEffect())
+	//속도 증가 이펙트: 클라/서버 모두 시도 (예측용)
+	const bool bSprintApplied = StartSprintEffect();
+	if (bIsAuthority && !bSprintApplied)
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 	
-	//스프린트 조건 확인 타이머
-	if (GetWorld())
+	else if (!bSprintApplied)
 	{
-		GetWorld()->GetTimerManager().SetTimer(
-			SprintCheckTimer,
-			this,
-			&USprintAbility::CheckSprintConditions,
-			0.1f,
-			true
-		);
+		DEBUG_LOG(TEXT("SprintEffect apply failed on non-authority (will not end ability)."));
+	}
+	
+	//스태미나 소모 이펙트: 서버에서만 필수
+	if (bIsAuthority)
+	{
+		if (!StartStaminaDrainEffect())
+		{
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+			return;
+		}
+	}
+	
+	//체크 타이머: Authority 또는 LocallyControlled에서만 실행
+	if (ShouldRunSprintChecks() && GetWorld())
+	{
+		GetWorld()->GetTimerManager().SetTimer(SprintCheckTimer, this, &USprintAbility::CheckSprintConditions, 0.1f, true);
 	}
 
 	DEBUG_LOG(TEXT("Sprint started"));
@@ -107,25 +126,15 @@ bool USprintAbility::CanContinueSprinting() const
 {
 	UActionPracticeAttributeSet* AttributeSet = GetActionPracticeAttributeSetFromActorInfo();
 	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
-
 	if (!AttributeSet || !Character)
 	{
 		return false;
 	}
 
 	//스테미나 부족
-	if (AttributeSet->GetStamina() <= 0)
+	if (AttributeSet->GetStamina() <= 0.0f)
 	{
 		DEBUG_LOG(TEXT("CanContinueSprinting Stop - No Stamina"));
-		return false;
-	}
-
-	//이동 입력이 없으면
-	FVector2D MovementInput = Character->GetCurrentMovementInput();
-	DEBUG_LOG(TEXT("Real-time MovementInput: %f"), MovementInput.Size());
-	if (MovementInput.Size() < 0.1f)
-	{
-		DEBUG_LOG(TEXT("CanContinueSprinting Stop - No Movement Input"));
 		return false;
 	}
 
@@ -137,7 +146,77 @@ bool USprintAbility::CanContinueSprinting() const
 		return false;
 	}
 
+	//이동 입력이 없으면: 클라/서버 분기
+	//서버: 물리 상태 기반
+	const AActor* Avatar = GetAvatarActorFromActorInfo();
+	if (Avatar && Avatar->HasAuthority())
+	{
+		if (!MovementComp)
+		{
+			return false;
+		}
+
+		const float Accel2D = MovementComp->GetCurrentAcceleration().Size2D();
+		const float Speed2D = MovementComp->Velocity.Size2D();
+
+		DEBUG_LOG(TEXT("Server/Proxy MoveCheck Accel2D=%.2f Speed2D=%.2f"), Accel2D, Speed2D);
+
+		if (Accel2D <= ServerMinAccelerationToKeepSprint && Speed2D <= ServerMinSpeedToKeepSprint)
+		{
+			DEBUG_LOG(TEXT("CanContinueSprinting Stop - Not Moving (Authority)"));
+			return false;
+		}
+
+		return true;
+	}
+	
+	//로컬: 입력 기반
+	if (Character->IsLocallyControlled())
+	{
+		const FVector2D MovementInput = Character->GetCurrentMovementInput();
+		DEBUG_LOG(TEXT("Real-time MovementInput %.3f"), MovementInput.Size());
+
+		if (MovementInput.Size() <= MovementInputThreshold)
+		{
+			DEBUG_LOG(TEXT("CanContinueSprinting Stop - No Movement Input (Local)"));
+			return false;
+		}
+
+		return true;
+	}
+
+	//나머지(시뮬 프록시 등)는 기존 Server/Proxy 로직을 유지하거나,
+	//보수적으로 true/false 중 정책 결정 가능. (여기서는 기존 물리판정 유지)
+	if (!MovementComp)
+	{
+		return false;
+	}
+
+	const float Accel2D = MovementComp->GetCurrentAcceleration().Size2D();
+	const float Speed2D = MovementComp->Velocity.Size2D();
+
+	DEBUG_LOG(TEXT("Server/Proxy MoveCheck Accel2D=%.2f Speed2D=%.2f"), Accel2D, Speed2D);
+
+	if (Accel2D <= ServerMinAccelerationToKeepSprint && Speed2D <= ServerMinSpeedToKeepSprint)
+	{
+		DEBUG_LOG(TEXT("CanContinueSprinting Stop - Not Moving (Server/Proxy)"));
+		return false;
+	}
+
 	return true;
+}
+
+void USprintAbility::CheckSprintConditions()
+{
+	if (!ShouldRunSprintChecks())
+	{
+		return;
+	}
+
+	if (!CanContinueSprinting())
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
 }
 
 bool USprintAbility::StartSprintEffect()
@@ -149,7 +228,7 @@ bool USprintAbility::StartSprintEffect()
 		return false;
 	}
 
-	// 기존 이펙트가 살아있으면 재설정(해제 후 재적용)
+	//기존 이펙트가 살아있으면 재설정(해제 후 재적용)
 	if (SprintHandle.IsValid())
 	{
 		APASC->RemoveActiveGameplayEffect(SprintHandle);
@@ -194,6 +273,14 @@ void USprintAbility::StopSprintEffect()
 
 bool USprintAbility::StartStaminaDrainEffect()
 {
+	//드레인은 서버 권한으로만 운영
+	const AActor* Avatar = GetAvatarActorFromActorInfo();
+	if (!Avatar || !Avatar->HasAuthority())
+	{
+		DEBUG_LOG(TEXT("StartStaminaDrainEffect skipped on non-authority."));
+		return true;
+	}
+	
 	UActionPracticeAbilitySystemComponent* APASC = GetActionPracticeAbilitySystemComponentFromActorInfo();
 	if (!APASC)
 	{
@@ -244,18 +331,9 @@ void USprintAbility::StopStaminaDrainEffect()
 	}
 }
 
-void USprintAbility::CheckSprintConditions()
-{
-	if (!CanContinueSprinting())
-	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-	}
-}
-
 void USprintAbility::HandleWaitInputReleased(float TimeHeld)
 {
 	DEBUG_LOG(TEXT("Sprint WaitInputRelease - End Ability (TimeHeld: %.3f)"), TimeHeld);
-
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 

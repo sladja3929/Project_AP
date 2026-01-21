@@ -325,32 +325,56 @@ void AActionPracticeCharacter::RotateCharacterToInputDirection(float RotateTime,
 
 		//BaseCharacter의 RotateToPosition 호출
 		RotateToPosition(LockedOnTarget->GetActorLocation(), RotateTime);
+		return;
 	}
 
 	//아니면 입력 방향으로
-	else
+	float DesiredYaw = 0.0f;
+	if (!CalculateYawFromMovementInput(DesiredYaw))
 	{
-		//현재 입력 값 가져오기
-		FVector2D MovementInput = GetCurrentMovementInput();
-		if (MovementInput.IsZero()) return;
-		
-		//카메라의 Yaw 회전만 가져오기
-		FRotator CameraRotation = FollowCamera->GetComponentRotation();
-		FRotator CameraYaw = FRotator(0.0f, CameraRotation.Yaw, 0.0f);
-
-		//입력 벡터를 3D로 변환
-		FVector InputDirection = FVector(MovementInput.Y, MovementInput.X, 0.0f);
-
-		//카메라 기준으로 입력 방향 변환
-		FVector WorldDirection = CameraYaw.RotateVector(InputDirection);
-		WorldDirection.Normalize();
-
-		//목표 회전 계산
-		FRotator TargetRotation = FRotator(0.0f, WorldDirection.Rotation().Yaw, 0.0f);
-
-		//BaseCharacter의 RotateToRotation 호출
-		RotateToRotation(TargetRotation, RotateTime);
+		return;
 	}
+
+	const FRotator TargetRotation(0.0f, DesiredYaw, 0.0f);
+
+	//로컬 회전
+	RotateToRotation(TargetRotation, RotateTime);
+
+	//서버 회전 RPC
+	if (!HasAuthority())
+	{
+		Server_RequestRotateToYaw(DesiredYaw, RotateTime);
+	}
+}
+
+void AActionPracticeCharacter::Server_RequestRotateToYaw_Implementation(float TargetYaw, float RotateTime)
+{
+	const FRotator TargetRotation(0.0f, TargetYaw, 0.0f);
+	RotateToRotation(TargetRotation, RotateTime);
+}
+
+bool AActionPracticeCharacter::CalculateYawFromMovementInput(float& OutYaw) const
+{
+	const FVector2D MovementInput = GetCurrentMovementInput();
+	if (MovementInput.IsZero())
+	{
+		return false;
+	}
+
+	const FRotator CameraRotation = FollowCamera->GetComponentRotation();
+	const FRotator CameraYaw(0.0f, CameraRotation.Yaw, 0.0f);
+
+	const FVector InputDirection(MovementInput.Y, MovementInput.X, 0.0f);
+	FVector WorldDirection = CameraYaw.RotateVector(InputDirection);
+	WorldDirection.Z = 0.0f;
+
+	if (!WorldDirection.Normalize())
+	{
+		return false;
+	}
+
+	OutYaw = WorldDirection.Rotation().Yaw;
+	return true;
 }
 
 void AActionPracticeCharacter::CancelActionForMove()

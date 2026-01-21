@@ -128,7 +128,7 @@ void UInputBufferComponent::BufferInput(const UInputAction* InputAction, bool bI
 	// 1) 서버(Standalone/Listen Server 포함): 권한 측에서만 버퍼 처리
 	if (OwnerActor->HasAuthority())
 	{
-		InternalBufferInput(InputTag, bIsReleased);
+		BufferInputInternal(InputTag, bIsReleased);
 		return;
 	}
 
@@ -139,13 +139,13 @@ void UInputBufferComponent::BufferInput(const UInputAction* InputAction, bool bI
 	}
 
 	// (Predicted) 로컬에서도 즉시 버퍼에 쌓아, 클라 ExecuteBuffer가 실제로 태그를 소비할 수 있게 함
-	InternalBufferInput(InputTag, bIsReleased);
+	BufferInputInternal(InputTag, bIsReleased);
 
 	// (Authoritative) 서버에도 동일 입력을 보내 동기화
-	ServerBufferInput(InputTag, bIsReleased);
+	Server_BufferInput(InputTag, bIsReleased);
 }
 
-void UInputBufferComponent::InternalBufferInput(FGameplayTag InputActionTag, bool bIsReleased)
+void UInputBufferComponent::BufferInputInternal(FGameplayTag InputActionTag, bool bIsReleased)
 {
 	int32 NewActionPriority = -1;
 	bool bIsHoldAction = false;
@@ -351,7 +351,7 @@ void UInputBufferComponent::EnableBufferInput(bool bEnabled)
 
 #pragma region "Server RPC Functions"
 
-void UInputBufferComponent::ServerBufferInput_Implementation(FGameplayTag InputActionTag, bool bIsReleased)
+void UInputBufferComponent::Server_BufferInput_Implementation(FGameplayTag InputActionTag, bool bIsReleased)
 {
 	if (!CachedInputActionData)
 	{
@@ -379,7 +379,7 @@ void UInputBufferComponent::ServerBufferInput_Implementation(FGameplayTag InputA
 	//서버 윈도우가 열려있으면 바로 저장 가능
 	if (bServerBufferEnabled)
 	{
-		InternalBufferInput(InputActionTag, bIsReleased);
+		BufferInputInternal(InputActionTag, bIsReleased);
 	}
 
 	//서버 윈도우가 닫혀있으면 네트워크 지연을 고려해서 TTL 저장
@@ -415,7 +415,7 @@ void UInputBufferComponent::ProcessPendingInputs()
 
 		if (CurrentTime - Pending.Timestamp <= InputGracePeriod)
 		{
-			InternalBufferInput(Pending.ActionTag, Pending.bIsReleased);
+			BufferInputInternal(Pending.ActionTag, Pending.bIsReleased);
 			DEBUG_LOG(TEXT("ProcessPendingInputs Processed - %s"), *Pending.ActionTag.ToString());
 		}
 		else

@@ -121,11 +121,11 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	//서버/스탠드어론에서 버퍼 저장
-	void InternalBufferInput(FGameplayTag InputActionTag, bool bIsReleased);
+	void BufferInputInternal(FGameplayTag InputActionTag, bool bIsReleased);
 
 	//서버 RPC: 클라이언트에서 서버로 버퍼 저장 요청
 	UFUNCTION(Server, Reliable)
-	void ServerBufferInput(FGameplayTag InputActionTag, bool bIsReleased);
+	void Server_BufferInput(FGameplayTag InputActionTag, bool bIsReleased);
 	
     UFUNCTION()
     void OnRepBufferState();

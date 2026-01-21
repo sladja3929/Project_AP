@@ -21,7 +21,6 @@
 
 UChargeAttackAbility::UChargeAttackAbility()
 {
-	//공격은 서버에서 시작 (히트 판정 권한)
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
