@@ -91,7 +91,7 @@ void UAbilityTask_PlayMontageWithEvents::TickTask(float DeltaTime)
         //커브 폴링 실행
         CurvePoller.Poll(AnimInstance);
 
-        //에지 브로드캐스트
+        //엣지 브로드캐스트
         if (ShouldBroadcastAbilityTaskDelegates())
         {
             for (const FName& CurveName : CurvePoller.RisingEdgeCurves)
@@ -116,6 +116,17 @@ void UAbilityTask_PlayMontageWithEvents::EnableCurvePolling(const TArray<FName>&
     bUseCurvePolling = true;
     bTickingTask = true;
     DEBUG_LOG(TEXT("Curve Polling Enabled with %d curves"), CurveNames.Num());
+}
+
+void UAbilityTask_PlayMontageWithEvents::AddCurveToPolling(FName CurveName)
+{
+    if (!CurvePoller.CurveNames.Contains(CurveName))
+    {
+        CurvePoller.CurveNames.Add(CurveName);
+        CurvePoller.ActiveStates.Add(CurveName, false);
+        CurvePoller.CurrentValues.Add(CurveName, 0.0f);
+        DEBUG_LOG(TEXT("Curve Added to Polling: %s"), *CurveName.ToString());
+    }
 }
 
 void UAbilityTask_PlayMontageWithEvents::DisableCurvePolling()

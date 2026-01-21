@@ -83,6 +83,10 @@ public:
     UFUNCTION()
     void EnableCurvePolling(const TArray<FName>& CurveNames);
 
+    //기존 커브 폴링 목록에 커브 추가
+    UFUNCTION()
+    void AddCurveToPolling(FName CurveName);
+
     //커브 폴링 비활성화
     UFUNCTION()
     void DisableCurvePolling();

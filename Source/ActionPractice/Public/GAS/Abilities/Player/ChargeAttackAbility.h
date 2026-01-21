@@ -5,6 +5,14 @@
 #include "Engine/Engine.h"
 #include "ChargeAttackAbility.generated.h"
 
+UENUM()
+enum class EAPChargePhase : uint8
+{
+	Charging_PreStart,
+	Charging_Active,
+	Attack
+};
+
 UCLASS()
 class ACTIONPRACTICE_API UChargeAttackAbility : public UBaseAttackAbility
 {
@@ -15,9 +23,9 @@ public:
 
 	UChargeAttackAbility();
 	virtual void OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 	virtual void InputPressed(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) override;
-	virtual void InputReleased(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) override;
 	virtual void CancelAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,	const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateCancelAbility) override;
 
 #pragma endregion
@@ -28,12 +36,6 @@ protected:
 	UPROPERTY()
 	bool bMaxCharged = false;
 
-	UPROPERTY()
-	bool bIsCharging = false;
-
-	UPROPERTY()
-	bool bNoCharge = false;
-
 	//PlayAction, ExecuteMontageTask 파라미터
 	UPROPERTY()
 	bool bCreateTask = false;
@@ -43,7 +45,9 @@ protected:
 
 	//사용되는 태그들
 	FGameplayTag EventNotifyResetComboTag;
-	FGameplayTag EventNotifyChargeStartTag;
+
+	//커브 폴링 관련
+	static const FName CurveName_ChargeStart;
 
 #pragma endregion
 
@@ -58,7 +62,7 @@ protected:
 	virtual void BindEventsAndReadyMontageTask() override;
 	
 	UFUNCTION()
-	void PlayNextCharge();
+	void PlayNextCharge(bool bInReleaseRequested);
 	
 	virtual void OnTaskMontageCompleted() override;
 	virtual void OnTaskNotifyEventsReceived(FGameplayEventData Payload) override;
@@ -66,21 +70,28 @@ protected:
 	UFUNCTION()
 	void OnNotifyResetCombo(FGameplayEventData Payload);
 
-	UFUNCTION()
-	void OnNotifyChargeStart(FGameplayEventData Payload);
+	virtual void OnCurveRisingEdgeReceived(FName CurveName) override;
 
 	virtual void OnEventInputByBuffer(FGameplayEventData Payload) override;
 
 	virtual void OnHitDetected(AActor* HitActor, const FHitResult& HitResult, FFinalAttackData AttackData) override;
-	
+
+	virtual void HandleWaitInputReleased(float TimeHeld) override;
+
 #pragma endregion
 
 private:
 #pragma region "Private Variables"
 
+	EAPChargePhase ChargePhase = EAPChargePhase::Charging_PreStart;
+
+	bool bReleaseRequested = false;
+
 #pragma endregion
 
 #pragma region "Private Functions"
+
+	void TransitionToAttack(bool bInMaxCharged, bool bInCreateNewTask);
 
 #pragma endregion
 };
