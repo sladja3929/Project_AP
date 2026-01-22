@@ -712,20 +712,17 @@ void AActionPracticeCharacter::GASInputReleased(const UInputAction* InputAction)
 	if (TryActivateSpecs.IsEmpty()) return;
 
 	//버퍼 ON/OFF와 무관하게, 현재 활성화된 어빌리티가 있으면 릴리즈를 먼저 전달
-	bool bAnyActiveAbility = false;
 	for (auto& Spec : TryActivateSpecs)
 	{
 		if (!Spec->IsActive())
 			continue;
 
-		bAnyActiveAbility = true;
-
 		Spec->InputPressed = false;
 		AbilitySystemComponent->AbilitySpecInputReleased(*Spec);
 	}
 
-	//활성 어빌리티가 없을 때만 릴리즈 버퍼링
-	if (!bAnyActiveAbility && InputBufferComponent && InputBufferComponent->bBufferWindowOpened)
+	//릴리즈 버퍼링
+	if (InputBufferComponent && InputBufferComponent->bBufferWindowOpened)
 	{
 		DEBUG_LOG(TEXT("Character UnBuffer"));
 		InputBufferComponent->BufferInput(InputAction, true);

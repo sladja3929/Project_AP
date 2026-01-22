@@ -11,7 +11,7 @@
 #include "GAS/Abilities/Player/WeaponAbilityStatics.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogChargeAttackAbility, Log, All);
@@ -25,21 +25,27 @@ const FName UChargeAttackAbility::CurveName_ChargeStart = TEXT("ChargeStart");
 
 UChargeAttackAbility::UChargeAttackAbility()
 {
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
-	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+    //공격은 서버에서 시작 (히트 판정 권한)
+    NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+    InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
     StaminaCost = 15.0f;
 }
 
 void UChargeAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
 {
-	Super::OnGiveAbility(ActorInfo, Spec);
+    Super::OnGiveAbility(ActorInfo, Spec);
 
     EventNotifyResetComboTag = UGameplayTagsSubsystem::GetEventNotifyResetComboTag();
-
+    EventNotifyChargeStartTag = UGameplayTagsSubsystem::GetEventNotifyChargeStartTag();
+    
     if (!EventNotifyResetComboTag.IsValid())
     {
         DEBUG_LOG(TEXT("EventNotifyResetComboTag is not valid"));
+    }
+    if (!EventNotifyChargeStartTag.IsValid())
+    {
+        DEBUG_LOG(TEXT("EventNotifyChargeStartTag is not valid"));
     }
 }
 
@@ -53,21 +59,19 @@ void UChargeAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 void UChargeAttackAbility::ActivateInitSettings()
 {
     Super::ActivateInitSettings();
-
+    
     ReadyInputByBufferTask();
 
     //무기 데이터 적용, SubAttack: 차지 몽타주, Attack: 공격 실행 몽타주
     MaxComboCount = WeaponAttackData->ComboSequence.Num();
-
+    
     bMaxCharged = false;
-    bIsAttackMontage = false;
-
-    //Phase/Release 초기화
-    ChargePhase = EAPChargePhase::Charging_PreStart;
-    bReleaseRequested = false;
-
+    bIsChargingMontage = false;
+    bNoCharge = false;
+    
     DEBUG_LOG(TEXT("Charge Ability Activated"));
     bCreateTask = true;
+    bIsAttackMontage = false;
 }
 
 void UChargeAttackAbility::InputPressed(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
@@ -75,8 +79,8 @@ void UChargeAttackAbility::InputPressed(const FGameplayAbilitySpecHandle Handle,
     //ActionRecoveryEnd 이후 구간에서 입력이 들어오면 콤보 실행
     if (!GetAbilitySystemComponentFromActorInfo()->HasMatchingGameplayTag(StateRecoveringTag))
     {
-        //TransitionToAttack guard가 다시 열리도록 새 사이클 초기화
-        PlayNextCharge(false);
+        bNoCharge = false;
+        PlayNextCharge();
         DEBUG_LOG(TEXT("Input Pressed - After Recovery"));
     }
 }
@@ -163,67 +167,41 @@ void UChargeAttackAbility::BindEventsAndReadyMontageTask()
     PlayMontageWithEventsTask->AddCurveToPolling(CurveName_ChargeStart);
 }
 
-void UChargeAttackAbility::TransitionToAttack(bool bInMaxCharged, bool bInCreateNewTask)
-{
-    //같은 사이클에서 중복 전환 방지
-    if (ChargePhase == EAPChargePhase::Attack)
-    {
-        return;
-    }
-
-    ChargePhase = EAPChargePhase::Attack;
-
-    //Attack으로 넘어가는 순간 WaitInputReleaseTask 정리
-    if (WaitInputReleaseTask)
-    {
-        WaitInputReleaseTask->EndTask();
-        WaitInputReleaseTask = nullptr;
-    }
-
-    bMaxCharged = bInMaxCharged;
-    bIsAttackMontage = true;
-
-    //진행 중 전환(Release)은 ChangeMontage, Charge 완료 전환은 새 Task
-    bCreateTask = bInCreateNewTask;
-
-    PlayAction();
-}
-
-void UChargeAttackAbility::PlayNextCharge(bool bInReleaseRequested)
+void UChargeAttackAbility::PlayNextCharge()
 {
     ComboCounter++;
-
+    bMaxCharged = false;
+    bIsChargingMontage = false;
+    
     if (ComboCounter >= MaxComboCount)
     {
         ComboCounter = 0;
     }
-
-    //다음 콤보 시작 시 TransitionToAttack 실행 가능 상태 초기화
-    ChargePhase = EAPChargePhase::Charging_PreStart;
-    bReleaseRequested = bInReleaseRequested;
-
-    bMaxCharged = false;
+    
+    bCreateTask = false;
     bIsAttackMontage = false;
-    bCreateTask = (PlayMontageWithEventsTask == nullptr);
-
-    //릴리즈 감지도 매 콤보별 갱신
-    StartWaitInputReleaseTask(true);
-
     PlayAction();
 }
 
 void UChargeAttackAbility::OnTaskMontageCompleted()
 {
-    //Charge 몽타주가 끝난 상황에서 아직 Attack으로 안 넘어갔다면 풀차지
-    if (ChargePhase == EAPChargePhase::Charging_Active && !bReleaseRequested)
+    //차지 몽타주가 끝날 때 = 완전히 차지했을 때
+    if (bIsChargingMontage)
     {
+        bMaxCharged = true;
+        
         DEBUG_LOG(TEXT("Montage Completed - Max Charge"));
-        TransitionToAttack(true, true); // Charge가 끝났으니 새 Task 생성으로 Attack 재생
-        return;
+        bCreateTask = true;
+        bIsAttackMontage = true;
+        PlayAction();  
+        
+        bIsChargingMontage = false;
     }
 
-    //Attack 몽타주 완료는 능력 종료
-    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+    else
+    {
+        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+    }
 }
 
 void UChargeAttackAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)
@@ -246,13 +224,16 @@ void UChargeAttackAbility::OnCurveRisingEdgeReceived(FName CurveName)
     if (CurveName == CurveName_ChargeStart)
     {
         DEBUG_LOG(TEXT("Charge Start (Curve Rising Edge)"));
-
-        ChargePhase = EAPChargePhase::Charging_Active;
-
-        //ChargeStart 전에 Release -> ChargeStart 들어오면 바로 Attack
-        if (bReleaseRequested)
+        bIsChargingMontage = true;
+      
+        if (bNoCharge) //이미 뗴져 있다면 바로 공격
         {
-            TransitionToAttack(false, false); //진행 중이므로 ChangeMontage로 전환
+            bCreateTask = false;
+            bIsAttackMontage = true;
+            PlayAction();
+
+            bIsChargingMontage = false;
+            bNoCharge = false;
         }
     }
 }
@@ -260,13 +241,10 @@ void UChargeAttackAbility::OnCurveRisingEdgeReceived(FName CurveName)
 void UChargeAttackAbility::OnEventInputByBuffer(FGameplayEventData Payload)
 {
     if (Payload.OptionalObject && Payload.OptionalObject != this) return;
-
-    const bool bBufferedRelease = (Payload.EventMagnitude != 0.0f);
     
-    //TransitionToAttack guard가 다시 열리도록 새 사이클 초기화
-    PlayNextCharge(bBufferedRelease);
-
-    DEBUG_LOG(TEXT("Input By Buffer - Play Next Charge"));
+    bNoCharge = Payload.EventMagnitude != 0.0f;
+    PlayNextCharge();
+    DEBUG_LOG(TEXT("Input By Buffer - Play Next Charge %s"), bNoCharge ? TEXT("No Charge") : TEXT("Charge"));
 }
 
 void UChargeAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& HitResult, FFinalAttackData AttackData)
@@ -278,16 +256,21 @@ void UChargeAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& Hit
 
 void UChargeAttackAbility::HandleWaitInputReleased(float TimeHeld)
 {
-    bReleaseRequested = true;
-
-    //ChargeStart 이후면 즉시 Attack으로 전환
-    if (ChargePhase == EAPChargePhase::Charging_Active)
+    //차지를 멈췄을 때
+    if (bIsChargingMontage) //차지중이라면
     {
-        TransitionToAttack(false, false); // 진행 중이므로 ChangeMontage
-        return;
+        bCreateTask = false;
+        bIsAttackMontage = true;
+        PlayAction();
+
+        bIsChargingMontage = false;
     }
 
-    DEBUG_LOG(TEXT("HandleWaitInputReleased - Waiting ChargeStart"));
+    else //차지중이 아니라면 (선딜 전에 뗌)
+    {
+        DEBUG_LOG(TEXT("Input Released - No Charge true"));    
+        bNoCharge = true;
+    }
 }
 
 void UChargeAttackAbility::CancelAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateCancelAbility)
@@ -300,10 +283,9 @@ void UChargeAttackAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, c
 {
     ComboCounter = 0;
     bMaxCharged = false;
-    bIsAttackMontage = false;
-
-    ChargePhase = EAPChargePhase::Charging_PreStart;
-    bReleaseRequested = false;
-
+    bIsChargingMontage = false;
+    bNoCharge = false;
+    
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
+

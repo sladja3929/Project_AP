@@ -167,7 +167,7 @@ void UInputBufferComponent::BufferInputInternal(FGameplayTag InputActionTag, boo
 			//Both 액션이면서 Released일 경우 저장
 			bBufferedActionReleased = bIsReleased;
 
-			DEBUG_LOG(TEXT("BufferInputInternal Action buffered - %s Priority %d Released %s"),
+			DEBUG_LOG(TEXT("BufferInputInternal Action buffered - %s Priority: %d Released: %s"),
 					  *InputActionTag.ToString(),
 					  NewActionPriority,
 					  bIsReleased ? TEXT("true") : TEXT("false"));
