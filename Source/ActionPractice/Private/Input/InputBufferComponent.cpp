@@ -67,12 +67,12 @@ void UInputBufferComponent::BeginPlay()
 }
 
 #pragma region "Buffer Action Functions"
-bool UInputBufferComponent::CheckActionRule(FGameplayTag ActionTag, int32& OutPriority, bool& bIsHoldAction) const
+bool UInputBufferComponent::CheckActionRule(FGameplayTag ActionTag, int32& OutPriority, EInputBehavior& OutInputBehavior) const
 {
 	if (!ActionTag.IsValid() || !OwnerCharacter || !CachedInputActionData)
 	{
 		DEBUG_LOG(TEXT("CheckActionRule: No Character or Data Asset"));
-		bIsHoldAction = false;
+		OutInputBehavior = EInputBehavior::Tap;
 		return false;
 	}
 
@@ -81,21 +81,21 @@ bool UInputBufferComponent::CheckActionRule(FGameplayTag ActionTag, int32& OutPr
 	{
 		DEBUG_LOG(TEXT("CheckActionRule: No IA - %s"), *ActionTag.ToString());
 		OutPriority = -1;
-		bIsHoldAction = false;
+		OutInputBehavior = EInputBehavior::Tap;
 		return false;
 	}
-	
+
 	const FInputActionAbilityRule* InputActionRule = CachedInputActionData->FindRuleByAction(InputAction);
 	if (!InputActionRule)
 	{
 		DEBUG_LOG(TEXT("CheckActionRule: No Rule - %s"), *ActionTag.ToString());
 		OutPriority = -1;
-		bIsHoldAction = false;
+		OutInputBehavior = EInputBehavior::Tap;
 		return false;
 	}
 
 	OutPriority = InputActionRule->BufferPriority;
-	bIsHoldAction = InputActionRule->bIsHoldAction;
+	OutInputBehavior = InputActionRule->InputBehavior;
 	return InputActionRule->bCanBuffered;
 }
 
@@ -125,53 +125,54 @@ void UInputBufferComponent::BufferInput(const UInputAction* InputAction, bool bI
 		return;
 	}
 
-	// 1) 서버(Standalone/Listen Server 포함): 권한 측에서만 버퍼 처리
+	//서버: 권한 측에서만 버퍼 처리
 	if (OwnerActor->HasAuthority())
 	{
 		BufferInputInternal(InputTag, bIsReleased);
 		return;
 	}
 
-	// 2) 클라: 소유 클라만 예측 버퍼 + 서버 RPC
+	//소유 클라이언트 확인
 	if (!OwnerCharacter->IsLocallyControlled())
 	{
 		return;
 	}
 
-	// (Predicted) 로컬에서도 즉시 버퍼에 쌓아, 클라 ExecuteBuffer가 실제로 태그를 소비할 수 있게 함
+	//클라: 소유 클라만 예측 버퍼 + 서버 RPC
+	//LocalPredicted: 클라에서도 즉시 버퍼에 쌓아, 클라 ExecuteBuffer가 실제로 태그를 소비할 수 있게 함
 	BufferInputInternal(InputTag, bIsReleased);
 
-	// (Authoritative) 서버에도 동일 입력을 보내 동기화
+	//서버에도 동일 입력을 보내 동기화
 	Server_BufferInput(InputTag, bIsReleased);
 }
 
 void UInputBufferComponent::BufferInputInternal(FGameplayTag InputActionTag, bool bIsReleased)
 {
 	int32 NewActionPriority = -1;
-	bool bIsHoldAction = false;
+	EInputBehavior InputBehavior = EInputBehavior::Tap;
 
-	if (!CheckActionRule(InputActionTag, NewActionPriority, bIsHoldAction))
+	if (!CheckActionRule(InputActionTag, NewActionPriority, InputBehavior))
 	{
 		DEBUG_LOG(TEXT("BufferInputInternal Cannot buffer - %s"), *InputActionTag.ToString());
 		return;
 	}
 
-	//단발 액션 Released는 무시
-	if (bIsReleased && !bIsHoldAction)
+	//Tap 액션 Released는 무시
+	if (bIsReleased && InputBehavior == EInputBehavior::Tap)
 	{
-		DEBUG_LOG(TEXT("BufferInputInternal Ignored - Non-hold released %s"), *InputActionTag.ToString());
+		DEBUG_LOG(TEXT("BufferInputInternal Ignored - Tap released %s"), *InputActionTag.ToString());
 		return;
 	}
 
-	//홀드 액션일 경우
-	if (bIsHoldAction)
+	//Hold 액션일 경우 목록에 추가/제거
+	if (InputBehavior == EInputBehavior::Hold)
 	{
 		if (bIsReleased)
 		{
 			BufferedHoldActionTags.Remove(InputActionTag);
 			DEBUG_LOG(TEXT("BufferInputInternal Hold action removed - %s"), *InputActionTag.ToString());
 		}
-		
+
 		else
 		{
 			BufferedHoldActionTags.Add(InputActionTag);
@@ -179,13 +180,14 @@ void UInputBufferComponent::BufferInputInternal(FGameplayTag InputActionTag, boo
 		}
 	}
 
-	//단발 액션일 경우
+	//Tap 또는 Both 액션일 경우 우선순위 비교 후 저장
 	else
 	{
 		if (NewActionPriority >= BufferPriority)
 		{
 			BufferedActionTag = InputActionTag;
 			BufferPriority = NewActionPriority;
+			//Both 액션이면서 Released일 경우 저장
 			bBufferedActionReleased = bIsReleased;
 
 			DEBUG_LOG(TEXT("BufferInputInternal Action buffered - %s Priority %d Released %s"),
@@ -193,7 +195,7 @@ void UInputBufferComponent::BufferInputInternal(FGameplayTag InputActionTag, boo
 					  NewActionPriority,
 					  bIsReleased ? TEXT("true") : TEXT("false"));
 		}
-		
+
 		else
 		{
 			DEBUG_LOG(TEXT("BufferInputInternal Action ignored - Lower priority %d vs %d"),
@@ -214,7 +216,7 @@ void UInputBufferComponent::ExecuteBuffer()
 	AActor* OwnerActor = GetOwner();
 	if (!OwnerActor) return;
 
-	//클라이언트는 아예 저장된 버퍼 실행에 관여하지 못함
+	//프록시는 저장된 버퍼 실행에 관여하지 못함
 	const bool bCanExecuteBuffer = OwnerActor->HasAuthority() || OwnerCharacter->IsLocallyControlled();
 	if (!bCanExecuteBuffer) return;
 
@@ -360,15 +362,15 @@ void UInputBufferComponent::Server_BufferInput_Implementation(FGameplayTag Input
 	}
 
 	int32 Priority = -1;
-	bool bIsHoldAction = false;
-	if (!CheckActionRule(InputActionTag, Priority, bIsHoldAction))
+	EInputBehavior InputBehavior = EInputBehavior::Tap;
+	if (!CheckActionRule(InputActionTag, Priority, InputBehavior))
 	{
 		DEBUG_LOG(TEXT("ServerBufferInput Cannot buffer action for tag %s"), *InputActionTag.ToString());
 		return;
 	}
 
-	//홀드 해제는 즉시 제거
-	if (bIsReleased && bIsHoldAction)
+	//Hold 해제는 즉시 제거
+	if (bIsReleased && InputBehavior == EInputBehavior::Hold)
 	{
 		BufferedHoldActionTags.Remove(InputActionTag);
 		PendingInputs.Remove(InputActionTag);
@@ -389,7 +391,7 @@ void UInputBufferComponent::Server_BufferInput_Implementation(FGameplayTag Input
 		Pending.ActionTag    = InputActionTag;
 		Pending.bIsReleased  = bIsReleased;
 		Pending.Timestamp    = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
-		Pending.bIsHoldAction = bIsHoldAction;
+		Pending.InputBehavior = InputBehavior;
 
 		PendingInputs.Add(InputActionTag, Pending);
 

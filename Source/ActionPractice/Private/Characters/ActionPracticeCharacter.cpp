@@ -675,7 +675,7 @@ void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 
 	InputBufferComponent->bBufferActionReleased = false;
 
-	//다른 어빌리티가 수행중이고 입력 저장 가능할 때는 버퍼로 전달 (클라이언트에서 가능할 때)
+	//다른 어빌리티가 수행중이고 입력 저장 가능할 때는 버퍼링
 	if (InputBufferComponent->bInternalBufferEnabled)
 	{
 		DEBUG_LOG(TEXT("Character: Buffer"));
@@ -685,12 +685,17 @@ void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 	{
 		for (auto& Spec : TryActivateSpecs)
 		{
+			//해당 어빌리티가 이미 실행중이면 이벤트 전달
 			if (Spec->IsActive())
 			{
-				DEBUG_LOG(TEXT("GASInputPressed: Ability already active, calling InputPressed - %s"), *GetNameSafe(Spec->Ability));
+				DEBUG_LOG(TEXT("GASInputPressed: Ability already active, calling Input Event - %s"), *GetNameSafe(Spec->Ability));
 				Spec->InputPressed = true;
+				//레거시: 실행 중인 어빌리티에 Pressed 전달은 Attack밖에 없기 때문에 기존 Pressed 비활성화, IA를 전달하는 이벤트 송신으로 변경
 				AbilitySystemComponent->AbilitySpecInputPressed(*Spec);
+
+				
 			}
+			//해당 어빌리티가 비활성화 상태면
 			else
 			{
 				Spec->InputPressed = true;
@@ -723,7 +728,7 @@ void AActionPracticeCharacter::GASInputReleased(const UInputAction* InputAction)
 		AbilitySystemComponent->AbilitySpecInputReleased(*Spec);
 	}
 
-	//활성 어빌리티가 없을 때만 릴리즈 버퍼링 (홀드가 아니면 InputBuffer 내부에서 자동 무시됨)
+	//활성 어빌리티가 없을 때만 릴리즈 버퍼링
 	if (!bAnyActiveAbility && InputBufferComponent && InputBufferComponent->bInternalBufferEnabled)
 	{
 		DEBUG_LOG(TEXT("Character UnBuffer"));

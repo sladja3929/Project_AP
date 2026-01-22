@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Components/ActorComponent.h"
+#include "Input/InputActionDataAsset.h"
 #include "InputBufferComponent.generated.h"
 
 class AActionPracticeCharacter;
@@ -28,7 +29,7 @@ struct FPendingInput
 	float Timestamp = 0.0f;
 
 	UPROPERTY()
-	bool bIsHoldAction = false;
+	EInputBehavior InputBehavior = EInputBehavior::Tap;
 };
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -147,7 +148,7 @@ private:
 
 #pragma region "Private Functions"
 
-    bool CheckActionRule(FGameplayTag ActionTag, int32& OutPriority, bool& bIsHoldAction) const;
+    bool CheckActionRule(FGameplayTag ActionTag, int32& OutPriority, EInputBehavior& OutInputBehavior) const;
 
     void ActivateAbility(const UInputAction* InputAction);
 	

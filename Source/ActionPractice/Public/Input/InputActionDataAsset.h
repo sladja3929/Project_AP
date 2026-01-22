@@ -8,6 +8,14 @@
 #include "Engine/AssetManager.h"
 #include "InputActionDataAsset.generated.h"
 
+UENUM(BlueprintType)
+enum class EInputBehavior : uint8
+{
+    Tap,
+    Hold,
+    Both
+};
+
 USTRUCT(BlueprintType)
 struct FInputActionAbilityRule
 {
@@ -22,9 +30,10 @@ struct FInputActionAbilityRule
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input Buffer")
     int BufferPriority = 0;
 
+    //입력 동작 방식: Tap(단발), Hold(지속), Both(둘 다 가능)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input Buffer")
-    bool bIsHoldAction = false;
-
+    EInputBehavior InputBehavior = EInputBehavior::Tap;
+    
     //RPC용 태그 식별자 - 네트워크에서 InputAction 대신 사용
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network")
     FGameplayTag InputActionTag;
@@ -96,20 +105,6 @@ public:
         }
 
         return FGameplayTag();
-    }
-
-    //태그로 홀드 액션 여부 확인
-    bool IsHoldActionByTag(FGameplayTag Tag) const
-    {
-        const UInputAction* InputAction = FindInputActionByTag(Tag);
-        if (InputAction)
-        {
-            if (const FInputActionAbilityRule* Rule = FindRuleByAction(InputAction))
-            {
-                return Rule->bIsHoldAction;
-            }
-        }
-        return false;
     }
 
 #pragma endregion
