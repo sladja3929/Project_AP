@@ -5,6 +5,14 @@
 #include "Engine/Engine.h"
 #include "NormalAttackAbility.generated.h"
 
+/*** 일반공격 트리거/액션 설명
+ * 1. TryActivate로 어빌리티 실행
+ * 2. PlayBuffer: ActionRecovery 사이에 입력이 들어옴. 연계 공격 수행
+ * 3. InputPressed: ActionRecovery가 끝난 후 입력이 들어옴. 연계 공격 수행
+ * 4. ResetCombo: 공격 몽타주 끝자락에 수신. 콤보 카운터 -1로 리셋
+ * 5. 어빌리티 종료
+ */
+
 UCLASS()
 class ACTIONPRACTICE_API UNormalAttackAbility : public UBaseAttackAbility
 {

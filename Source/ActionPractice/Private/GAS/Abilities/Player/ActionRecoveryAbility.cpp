@@ -291,8 +291,8 @@ void UActionRecoveryAbility::ExecuteBuffer()
 		return;
 	}
 
-	const bool bCanExecuteBuffer = Character->HasAuthority() || Character->IsLocallyControlled();
-	if (!bCanExecuteBuffer)
+	//프록시는 저장된 버퍼 실행에 관여하지 못함
+	if (!Character->IsLocallyControlled())
 	{
 		return;
 	}
@@ -303,9 +303,6 @@ void UActionRecoveryAbility::ExecuteBuffer()
 		DEBUG_LOG(TEXT("ExecuteBuffer: No InputBufferComponent"));
 		return;
 	}
-
-	//대기 입력 처리 (소비 시점)
-	BufferComp->ProcessPendingInputs();
 
 	BufferComp->ExecuteBuffer();
 	DEBUG_LOG(TEXT("ExecuteBuffer: Buffer Executed"));

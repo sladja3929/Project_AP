@@ -60,7 +60,6 @@ void UNormalAttackAbility::InputPressed(const FGameplayAbilitySpecHandle Handle,
     }
 }
 
-
 void UNormalAttackAbility::PlayNextAttack()
 {
     ++ComboCounter;
@@ -75,16 +74,6 @@ void UNormalAttackAbility::PlayNextAttack()
     bCreateTask = false;
     PlayAction();
 }
-
-/* 공격 수행 메커니즘
- * 1. 몽타주 실행 (State.IsRecovering 태그 추가)
- * 2. EnableComboInput = 입력 저장 가능 구간, 다음 공격과 구르기 저장 가능 (구르기를 저장해도 다음 공격 우선 저장)
- * 3. ActionRecoveryEnd = 공격 선딜이 끝나는 지점
- * 3-1. 2~3 사이 저장한 행동이 있을 경우 CheckComboInput으로 행동 수행
- * 3-2. 2~3 사이 저장한 행동이 없을 경우 입력이 들어오면 다음 공격 가능, 이동/점프/구르기로 캔슬 가능 (State.IsRecovering 태그 제거)
- * 4. ResetCombo = 공격 콤보가 초기화되어 다음 콤보로 연계되지 않음
- * 5. 몽타주 종료 (ResetCombo와 같지 않음)
- */
 
 void UNormalAttackAbility::ExecuteMontageTask()
 {

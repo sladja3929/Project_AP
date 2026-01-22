@@ -16,6 +16,10 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+/***
+* 레거시 클래스: 사용하지 않음, PlayMontageWithEvents로 대체
+*/
+
 UAbilityTask_PlayNormalAttackMontage::UAbilityTask_PlayNormalAttackMontage(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {

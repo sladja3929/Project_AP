@@ -65,10 +65,6 @@ void UChargeAttackAbility::ActivateInitSettings()
     //Phase/Release 초기화
     ChargePhase = EAPChargePhase::Charging_PreStart;
     bReleaseRequested = false;
-    if (UInputBufferComponent* BufferComp = GetInputBufferComponentFromActorInfo())
-    {
-        bReleaseRequested = BufferComp->bBufferActionReleased;
-    }
 
     DEBUG_LOG(TEXT("Charge Ability Activated"));
     bCreateTask = true;

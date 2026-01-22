@@ -19,17 +19,6 @@
 UInputBufferComponent::UInputBufferComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-
-	//컴포넌트 복제 활성화
-	SetIsReplicatedByDefault(true);
-}
-
-void UInputBufferComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	//COND_OwnerOnly로 소유 클라만 받도록 (트래픽 최소화)
-	DOREPLIFETIME_CONDITION(UInputBufferComponent, bServerBufferEnabled, COND_OwnerOnly);
 }
 
 void UInputBufferComponent::BeginPlay()
@@ -107,7 +96,7 @@ void UInputBufferComponent::BufferInput(const UInputAction* InputAction, bool bI
 	}
 
 	//버퍼 윈도우가 닫혀있으면 아무것도 하지 않음
-	if (!bInternalBufferEnabled)
+	if (!bBufferWindowOpened)
 	{
 		return;
 	}
@@ -125,25 +114,13 @@ void UInputBufferComponent::BufferInput(const UInputAction* InputAction, bool bI
 		return;
 	}
 
-	//서버: 권한 측에서만 버퍼 처리
-	if (OwnerActor->HasAuthority())
-	{
-		BufferInputInternal(InputTag, bIsReleased);
-		return;
-	}
-
 	//소유 클라이언트 확인
 	if (!OwnerCharacter->IsLocallyControlled())
 	{
 		return;
 	}
-
-	//클라: 소유 클라만 예측 버퍼 + 서버 RPC
-	//LocalPredicted: 클라에서도 즉시 버퍼에 쌓아, 클라 ExecuteBuffer가 실제로 태그를 소비할 수 있게 함
+	
 	BufferInputInternal(InputTag, bIsReleased);
-
-	//서버에도 동일 입력을 보내 동기화
-	Server_BufferInput(InputTag, bIsReleased);
 }
 
 void UInputBufferComponent::BufferInputInternal(FGameplayTag InputActionTag, bool bIsReleased)
@@ -217,12 +194,10 @@ void UInputBufferComponent::ExecuteBuffer()
 	if (!OwnerActor) return;
 
 	//프록시는 저장된 버퍼 실행에 관여하지 못함
-	const bool bCanExecuteBuffer = OwnerActor->HasAuthority() || OwnerCharacter->IsLocallyControlled();
-	if (!bCanExecuteBuffer) return;
+	if (!OwnerCharacter->IsLocallyControlled()) return;
 
 	//윈도우 닫기
-	bInternalBufferEnabled = false;
-	bServerBufferEnabled = false;
+	bBufferWindowOpened = false;
 	
 	DEBUG_LOG(TEXT("ExecuteBuffer called"));
 
@@ -287,7 +262,7 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 	{
 		DEBUG_LOG(TEXT("CurrSpecNum: %s"), *Spec->Handle.ToString());
 
-		//어빌리티가 이미 실행중 / bRetriggerInstancedAbility = false여서 Try를 실패했을 때 (콤보 공격)
+		//어빌리티가 이미 실행중 or bRetriggerInstancedAbility = false여서 Try를 실패했을 때 (콤보 공격)
 		if (Spec->IsActive()) //CanActivateAbility 실패로 활성화하지 못했을 때를 거르기 위해 실행 중 체크
 		{
 			DEBUG_LOG(TEXT("Play Buffer - Play Buffer Event: %s"), *GetNameSafe(Spec->Ability->GetClass()));
@@ -300,13 +275,13 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 			FGameplayEventData EventData;
 			EventData.OptionalObject = Instance;
 			//bool 값을 EventMagnitude를 통해 전달
-			EventData.EventMagnitude = bBufferActionReleased ? 1.0f : 0.0f;
+			EventData.EventMagnitude = bBufferedActionReleased ? 1.0f : 0.0f;
 			EventData.EventTag = EventActionInputByBufferTag;
 			
 			ASC->HandleGameplayEvent(EventActionInputByBufferTag, &EventData);
 		}
 		
-		//첫 실행이거나, bRetriggerInstancedAbility = true여서 재실행될 때
+		//첫 실행 or bRetriggerInstancedAbility = true여서 재실행될 때
 		else if (ASC->TryActivateAbility(Spec->Handle))
 		{
 			DEBUG_LOG(TEXT("Play Buffer - Activate Ability: %s"), *GetNameSafe(Spec->Ability->GetClass()));
@@ -321,139 +296,9 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 void UInputBufferComponent::EnableBufferInput(bool bEnabled)
 {
 	//클라이언트 버퍼 윈도우는 항상 변경
-	bInternalBufferEnabled = bEnabled;
-
-	if (!OwnerCharacter)
-	{
-		return;
-	}
-
-	AActor* OwnerActor = GetOwner();
-	if (!OwnerActor)
-	{
-		return;
-	}
-
-	//서버/스탠드어론: 서버 버퍼 윈도우 변경
-	if (OwnerActor->HasAuthority())
-	{
-		bServerBufferEnabled = bEnabled;
-
-		//서버가 윈도우 오픈할 때 지연된 입력 버퍼에 저장
-		if (bEnabled)
-		{
-			ProcessPendingInputs();
-		}
-	}
+	bBufferWindowOpened = bEnabled;
 
 	DEBUG_LOG(TEXT("EnableBufferInput %s"), bEnabled ? TEXT("Enabled") : TEXT("Disabled"));
-}
-
-#pragma endregion
-
-#pragma region "Server RPC Functions"
-
-void UInputBufferComponent::Server_BufferInput_Implementation(FGameplayTag InputActionTag, bool bIsReleased)
-{
-	if (!CachedInputActionData)
-	{
-		DEBUG_LOG(TEXT("ServerBufferInput CachedInputActionData is null"));
-		return;
-	}
-
-	int32 Priority = -1;
-	EInputBehavior InputBehavior = EInputBehavior::Tap;
-	if (!CheckActionRule(InputActionTag, Priority, InputBehavior))
-	{
-		DEBUG_LOG(TEXT("ServerBufferInput Cannot buffer action for tag %s"), *InputActionTag.ToString());
-		return;
-	}
-
-	//Hold 해제는 즉시 제거
-	if (bIsReleased && InputBehavior == EInputBehavior::Hold)
-	{
-		BufferedHoldActionTags.Remove(InputActionTag);
-		PendingInputs.Remove(InputActionTag);
-		DEBUG_LOG(TEXT("ServerBufferInput Hold action released - %s"), *InputActionTag.ToString());
-		return;
-	}
-
-	//서버 윈도우가 열려있으면 바로 저장 가능
-	if (bServerBufferEnabled)
-	{
-		BufferInputInternal(InputActionTag, bIsReleased);
-	}
-
-	//서버 윈도우가 닫혀있으면 네트워크 지연을 고려해서 TTL 저장
-	else
-	{
-		FPendingInput Pending;
-		Pending.ActionTag    = InputActionTag;
-		Pending.bIsReleased  = bIsReleased;
-		Pending.Timestamp    = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
-		Pending.InputBehavior = InputBehavior;
-
-		PendingInputs.Add(InputActionTag, Pending);
-
-		DEBUG_LOG(TEXT("ServerBufferInput Input pending - %s Buffer disabled"),
-				  *InputActionTag.ToString());
-
-		CleanupExpiredPendingInputs();
-	}
-}
-
-void UInputBufferComponent::ProcessPendingInputs()
-{
-	if (!GetWorld())
-	{
-		return;
-	}
-
-	const float CurrentTime = GetWorld()->GetTimeSeconds();
-
-	for (const auto& Pair : PendingInputs)
-	{
-		const FPendingInput& Pending = Pair.Value;
-
-		if (CurrentTime - Pending.Timestamp <= InputGracePeriod)
-		{
-			BufferInputInternal(Pending.ActionTag, Pending.bIsReleased);
-			DEBUG_LOG(TEXT("ProcessPendingInputs Processed - %s"), *Pending.ActionTag.ToString());
-		}
-		else
-		{
-			DEBUG_LOG(TEXT("ProcessPendingInputs Expired - %s"), *Pending.ActionTag.ToString());
-		}
-	}
-
-	PendingInputs.Empty();
-}
-
-void UInputBufferComponent::CleanupExpiredPendingInputs()
-{
-	if (!GetWorld())
-	{
-		return;
-	}
-
-	const float CurrentTime = GetWorld()->GetTimeSeconds();
-
-	for (auto It = PendingInputs.CreateIterator(); It; ++It)
-	{
-		if (CurrentTime - It.Value().Timestamp > InputGracePeriod)
-		{
-			DEBUG_LOG(TEXT("CleanupExpiredPendingInputs Removed expired - %s"),
-					  *It.Key().ToString());
-			It.RemoveCurrent();
-		}
-	}
-}
-
-void UInputBufferComponent::OnRepBufferState()
-{
-	bInternalBufferEnabled = bServerBufferEnabled;
-	
-	DEBUG_LOG(TEXT("OnRepBufferState %s"), bServerBufferEnabled ? TEXT("Enabled") : TEXT("Disabled"));
 }
 
 #pragma endregion
