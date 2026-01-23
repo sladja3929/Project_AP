@@ -79,12 +79,12 @@ void AActionPracticeCharacter::BeginPlay()
 	Super::BeginPlay();
 
 	//태그 초기화
-	StateRecoveringTag = UGameplayTagsSubsystem::GetStateRecoveringTag();
+	StateRecoveringLocalTag = UGameplayTagsSubsystem::GetStateRecoveringLocalTag();
 	StateAbilitySprintingTag = UGameplayTagsSubsystem::GetStateAbilitySprintingTag();
 	StateAbilityAttackingTag = UGameplayTagsSubsystem::GetStateAbilityAttackingTag();
 	AbilityAttackTag = UGameplayTagsSubsystem::GetAbilityAttackTag();
 
-	if (!StateRecoveringTag.IsValid())
+	if (!StateRecoveringLocalTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("StateRecoveringTag is not valid"));
 	}
@@ -230,7 +230,7 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 		CancelActionForMove();
 	}
 
-	bool bIsRecovering = AbilitySystemComponent->HasMatchingGameplayTag(StateRecoveringTag);
+	bool bIsRecovering = AbilitySystemComponent->HasMatchingGameplayTag(StateRecoveringLocalTag);
 
 	if (Controller != nullptr && !bIsRecovering)
 	{
@@ -389,7 +389,7 @@ void AActionPracticeCharacter::CancelActionForMove()
 	if (bHasActiveAttackAbility)
 	{
 		//State.Recovering 태그가 없으면 어빌리티 캔슬 가능 (ActionRecoveryEnd 이후)
-		if (!AbilitySystemComponent->HasMatchingGameplayTag(StateRecoveringTag))
+		if (!AbilitySystemComponent->HasMatchingGameplayTag(StateRecoveringLocalTag))
 		{
 			//Ability.Attack 태그를 가진 어빌리티 취소
 			FGameplayTagContainer CancelTags;

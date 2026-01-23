@@ -149,7 +149,7 @@ void UAbilityTask_PlayNormalAttackMontage::PlayAttackMontage()
 
     if (AbilitySystemComponent.IsValid())
     {
-        AbilitySystemComponent->AddLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag());
+        AbilitySystemComponent->AddLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag());
     }
 
     //ASC의 PlayMontage를 사용하여 네트워크 복제 지원
@@ -253,9 +253,9 @@ void UAbilityTask_PlayNormalAttackMontage::HandleActionRecoveryEndEvent(const FG
         if (AbilitySystemComponent.IsValid())
         {
             // 모든 StateRecovering 태그 제거 (스택된 태그 모두 제거)
-            while (AbilitySystemComponent->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag()))
+            while (AbilitySystemComponent->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag()))
             {
-                AbilitySystemComponent->RemoveLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag());
+                AbilitySystemComponent->RemoveLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag());
             }
             DEBUG_LOG(TEXT("Can ABP Interrupt Attack Montage"));
         }
@@ -468,9 +468,9 @@ void UAbilityTask_PlayNormalAttackMontage::OnDestroy(bool AbilityEnded)
     // 상태 정리 - 모든 StateRecovering 태그 제거
     if (AbilitySystemComponent.IsValid())
     {
-        while (AbilitySystemComponent->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag()))
+        while (AbilitySystemComponent->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag()))
         {
-            AbilitySystemComponent->RemoveLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag());
+            AbilitySystemComponent->RemoveLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag());
         }
         DEBUG_LOG(TEXT("All StateRecovering tags removed"));
     }

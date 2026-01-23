@@ -3,10 +3,11 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
 #include "GAS/GameplayTagsSubsystem.h"
+#include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "Input/InputActionDataAsset.h"
 #include "Net/UnrealNetwork.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogInputBufferComponent, Log, All);
@@ -250,10 +251,10 @@ void UInputBufferComponent::ActivateAbilityByTag(FGameplayTag ActionTag)
 
 void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 {
-	if (!InputAction || !OwnerCharacter) return;
+	if (!InputAction || !OwnerCharacter || !CachedInputActionData) return;
 	
-	UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent();
-	if (!ASC) return;
+	UActionPracticeAbilitySystemComponent* APASC = dynamic_cast<UActionPracticeAbilitySystemComponent*>(OwnerCharacter->GetAbilitySystemComponent());
+	if (!APASC) return;
 
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = OwnerCharacter->FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
@@ -267,22 +268,22 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 		{
 			DEBUG_LOG(TEXT("Play Buffer - Play Buffer Event: %s"), *GetNameSafe(Spec->Ability->GetClass()));
 			Spec->InputPressed = true;
-
-			//현재 Spec인 어빌리티만 OnInputByBuffer가 활성화되도록 자기 자신을 EventData로 넘김
-			UGameplayAbility* Instance = Spec->GetPrimaryInstance();
-			if (!Instance) Instance = Spec->Ability;
 			
 			FGameplayEventData EventData;
-			EventData.OptionalObject = Instance;
-			//bool 값을 EventMagnitude를 통해 전달
+			
+			//타깃 어빌리티만 활성화
+			EventData.InstigatorTags.AddTag(CachedInputActionData->FindTagByInputAction(InputAction));
+			
+			//release 여부를 EventMagnitude를 통해 전달
 			EventData.EventMagnitude = bBufferedActionReleased ? 1.0f : 0.0f;
+			
 			EventData.EventTag = EventActionInputByBufferTag;
 			
-			ASC->HandleGameplayEvent(EventActionInputByBufferTag, &EventData);
+			APASC->HandleGameplayEvent_NetPredicted(EventActionInputByBufferTag, &EventData);
 		}
 		
 		//첫 실행 or bRetriggerInstancedAbility = true여서 재실행될 때
-		else if (ASC->TryActivateAbility(Spec->Handle))
+		else if (APASC->TryActivateAbility(Spec->Handle))
 		{
 			DEBUG_LOG(TEXT("Play Buffer - Activate Ability: %s"), *GetNameSafe(Spec->Ability->GetClass()));
 			Spec->InputPressed = true;

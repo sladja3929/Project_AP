@@ -36,7 +36,8 @@ public:
 	static const FGameplayTag& GetStateAbilitySprintingTag();
 	static const FGameplayTag& GetStateAbilityRollingTag();
 	static const FGameplayTag& GetStateAbilityJustRolledTag();
-	static const FGameplayTag& GetStateRecoveringTag();
+	static const FGameplayTag& GetStateRecoveringAuthTag();
+	static const FGameplayTag& GetStateRecoveringLocalTag();
 	static const FGameplayTag& GetStateStunnedTag();
 	static const FGameplayTag& GetStateInvincibleTag();
 	static const FGameplayTag& GetStateStaminaRegenBlockedTag();
@@ -93,7 +94,8 @@ private:
 	const FGameplayTag& GetStateAbilitySprintingTagInternal() const;
 	const FGameplayTag& GetStateAbilityRollingTagInternal() const;
 	const FGameplayTag& GetStateAbilityJustRolledTagInternal() const;
-	const FGameplayTag& GetStateRecoveringTagInternal() const;
+	const FGameplayTag& GetStateRecoveringAuthTagInternal() const;
+	const FGameplayTag& GetStateRecoveringLocalTagInternal() const;
 	const FGameplayTag& GetStateStunnedTagInternal() const;
 	const FGameplayTag& GetStateInvincibleTagInternal() const;
 	const FGameplayTag& GetStateStaminaRegenBlockedTagInternal() const;

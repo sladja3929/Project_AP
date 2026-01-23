@@ -7,7 +7,7 @@
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionRecoveryAbility, Log, All);
@@ -34,7 +34,8 @@ void UActionRecoveryAbility::OnGiveAbility(const FGameplayAbilityActorInfo* Acto
 	EventInputByBufferTag = UGameplayTagsSubsystem::GetEventActionInputByBufferTag();
 	EventPlayBufferTag = UGameplayTagsSubsystem::GetEventActionPlayBufferTag();
 	EventEnableBufferInputTag = UGameplayTagsSubsystem::GetEventNotifyEnableBufferInputTag();
-	StateRecoveringTag = UGameplayTagsSubsystem::GetStateRecoveringTag();
+	StateRecoveringLocalTag = UGameplayTagsSubsystem::GetStateRecoveringLocalTag();
+	StateRecoveringAuthTag = UGameplayTagsSubsystem::GetStateRecoveringAuthTag();
 
 	if (!ActionRecoveryStartTag.IsValid())
 	{
@@ -56,9 +57,13 @@ void UActionRecoveryAbility::OnGiveAbility(const FGameplayAbilityActorInfo* Acto
 	{
 		DEBUG_LOG(TEXT("EventEnableBufferInputTag is not valid"));
 	}
-	if (!StateRecoveringTag.IsValid())
+	if (!StateRecoveringLocalTag.IsValid())
 	{
-		DEBUG_LOG(TEXT("StateRecoveringTag is not valid"));
+		DEBUG_LOG(TEXT("StateRecoveringLocalTag is not valid"));
+	}
+	if (!StateRecoveringAuthTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("StateRecoveringAuthTag is not valid"));
 	}
 }
 
@@ -83,9 +88,24 @@ void UActionRecoveryAbility::AddStateRecoveringTag()
 	{
 		DEBUG_LOG(TEXT("ActionRecoveryStart: No ASC"));
 	}
+
+	ACharacter* Character = GetActionPracticeCharacterFromActorInfo();
+	if (!Character) return;
 	
-	ASC->AddLooseGameplayTag(StateRecoveringTag);
-	DEBUG_LOG(TEXT("Add State.Recovering"));
+	//서버: 권위 태그 부여
+	if (Character->HasAuthority())
+	{
+		DEBUG_LOG(TEXT("Adding State.Recovering.Auth on Authority"));
+		ASC->AddLooseGameplayTag(StateRecoveringAuthTag);
+		ASC->AddMinimalReplicationGameplayTag(StateRecoveringAuthTag);
+	}
+
+	//클라: 로컬 태그 부여 (로컬 입력 제어용)
+	if (Character->IsLocallyControlled())
+	{
+		DEBUG_LOG(TEXT("Adding State.Recovering.Local on Local"));
+		ASC->AddLooseGameplayTag(StateRecoveringLocalTag);
+	}
 }
 
 void UActionRecoveryAbility::RemoveStateRecoveringTags()
@@ -96,13 +116,29 @@ void UActionRecoveryAbility::RemoveStateRecoveringTags()
 		DEBUG_LOG(TEXT("ActionRecoveryEnd: No ASC"));
 	}
 
-	//모든 StateRecovering 태그 제거 (스택된 태그 모두 제거)
-	while (ASC->HasMatchingGameplayTag(StateRecoveringTag))
+	ACharacter* Character = GetActionPracticeCharacterFromActorInfo();
+	if (!Character) return;
+	
+	//서버: 권위 태그 삭제
+	if (Character->HasAuthority())
 	{
-		ASC->RemoveLooseGameplayTag(StateRecoveringTag);
+		while (ASC->HasMatchingGameplayTag(StateRecoveringAuthTag))
+		{
+			ASC->RemoveLooseGameplayTag(StateRecoveringAuthTag);
+			ASC->RemoveMinimalReplicationGameplayTag(StateRecoveringAuthTag);
+		}
+		DEBUG_LOG(TEXT("Remove All State.Recovering.Auth on Authority"));
 	}
 
-	DEBUG_LOG(TEXT("Remove All State.Recovering"));
+	//클라: 로컬 태그 삭제 (로컬 입력 제어용)
+	if (Character->IsLocallyControlled())
+	{
+		while (ASC->HasMatchingGameplayTag(StateRecoveringLocalTag))
+		{
+			ASC->RemoveLooseGameplayTag(StateRecoveringLocalTag);
+		}
+		DEBUG_LOG(TEXT("Remove All State.Recovering.Local on Local"));
+	}
 }
 
 bool UActionRecoveryAbility::ConsumeStamina()
@@ -137,7 +173,6 @@ bool UActionRecoveryAbility::RotateCharacter()
 void UActionRecoveryAbility::PlayAction()
 {
 	if (!ConsumeStamina()) return;
-	AddStateRecoveringTag();
 
 	bool bShouldRotate = RotateCharacter();
 
@@ -260,10 +295,7 @@ void UActionRecoveryAbility::OnCurveRisingEdgeReceived(FName CurveName)
 	else if (CurveName == CurveName_ActionRecovery)
 	{
 		//ActionRecovery 상승 에지: State.Recovering 태그 추가
-		if (GetAvatarActorFromActorInfo() && GetAvatarActorFromActorInfo()->HasAuthority())
-		{
-			AddStateRecoveringTag();
-		}
+		AddStateRecoveringTag();
 	}
 }
 

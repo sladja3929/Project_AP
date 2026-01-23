@@ -193,11 +193,20 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateAbilityJustRolledTag()
 	return FGameplayTag::EmptyTag;
 }
 
-const FGameplayTag& UGameplayTagsSubsystem::GetStateRecoveringTag()
+const FGameplayTag& UGameplayTagsSubsystem::GetStateRecoveringAuthTag()
 {
 	if (UGameplayTagsSubsystem* Subsystem = Get())
 	{
-		return Subsystem->GetStateRecoveringTagInternal();
+		return Subsystem->GetStateRecoveringAuthTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateRecoveringLocalTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateRecoveringLocalTagInternal();
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -570,11 +579,20 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateAbilityJustRolledTagInternal
 	return FGameplayTag::EmptyTag;
 }
 
-const FGameplayTag& UGameplayTagsSubsystem::GetStateRecoveringTagInternal() const
+const FGameplayTag& UGameplayTagsSubsystem::GetStateRecoveringAuthTagInternal() const
 {
 	if (GameplayTagsDataAsset)
 	{
-		return GameplayTagsDataAsset->State_Recovering;
+		return GameplayTagsDataAsset->State_Recovering_Auth;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateRecoveringLocalTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->State_Recovering_Local;
 	}
 	return FGameplayTag::EmptyTag;
 }

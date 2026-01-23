@@ -64,7 +64,8 @@ protected:
 	FGameplayTag EventInputByBufferTag;
 	FGameplayTag EventPlayBufferTag;
 	FGameplayTag EventEnableBufferInputTag;
-	FGameplayTag StateRecoveringTag;
+	FGameplayTag StateRecoveringLocalTag;
+	FGameplayTag StateRecoveringAuthTag;
 
 	//커브 폴링 관련
 	static const FName CurveName_EnableBufferInput;

@@ -158,7 +158,7 @@ protected:
 	TObjectPtr<UInputActionDataAsset> InputActionData = nullptr;
 
 	// ===== Usage Tags =====
-	FGameplayTag StateRecoveringTag;
+	FGameplayTag StateRecoveringLocalTag;
 	FGameplayTag StateAbilitySprintingTag;
 	FGameplayTag StateAbilityAttackingTag;
 	FGameplayTag AbilityAttackTag;

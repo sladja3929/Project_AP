@@ -68,10 +68,12 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
 	FGameplayTag State_Ability_JustRolled;
-	
-	//주의! 이 태그는 어빌리티의 블루프린트 소유로 넣지 말 것. 오로지 GAS 코드에서만 관리
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
-	FGameplayTag State_Recovering;
+	FGameplayTag State_Recovering_Auth;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
+	FGameplayTag State_Recovering_Local;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
 	FGameplayTag State_Stunned;

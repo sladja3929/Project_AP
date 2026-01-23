@@ -7,6 +7,7 @@
 #include "GAS/GameplayTagsSubsystem.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
+#include "Characters/ActionPracticeCharacter.h"
 #include "GAS/Abilities/Player/BaseAttackAbility.h"
 #include "GAS/Abilities/Player/WeaponAbilityStatics.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
@@ -77,7 +78,26 @@ void UChargeAttackAbility::ActivateInitSettings()
 void UChargeAttackAbility::InputPressed(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
 {
     //ActionRecoveryEnd 이후 구간에서 입력이 들어오면 콤보 실행
-    if (!GetAbilitySystemComponentFromActorInfo()->HasMatchingGameplayTag(StateRecoveringTag))
+    ACharacter* Character = GetActionPracticeCharacterFromActorInfo();
+    if (!Character) return;
+
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+    if (!ASC) return;
+
+    //서버 사이드 확인
+    bool bHasRecoveringTag = false;
+    if (Character->HasAuthority())
+    {
+        bHasRecoveringTag = ASC->HasMatchingGameplayTag(StateRecoveringAuthTag);
+    }
+
+    //클라 사이드 확인 (리슨서버는 둘 다 확인)
+    if (Character->IsLocallyControlled())
+    {
+        bHasRecoveringTag = ASC->HasMatchingGameplayTag(StateRecoveringLocalTag);
+    }
+    
+    if (!bHasRecoveringTag)
     {
         bNoCharge = false;
         PlayNextCharge();
@@ -240,7 +260,7 @@ void UChargeAttackAbility::OnCurveRisingEdgeReceived(FName CurveName)
 
 void UChargeAttackAbility::OnEventInputByBuffer(FGameplayEventData Payload)
 {
-    if (Payload.OptionalObject && Payload.OptionalObject != this) return;
+    if (!Payload.InstigatorTags.HasTag(FGameplayTag::RequestGameplayTag(FName(TEXT("Input.ChargeAttack"))))) return;
     
     bNoCharge = Payload.EventMagnitude != 0.0f;
     PlayNextCharge();

@@ -8,7 +8,7 @@
 #include "Items/WeaponDataAsset.h"
 #include "Items/AttackData.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogBaseAbilitySystemComponent, Log, All);
@@ -27,7 +27,7 @@ void UActionPracticeAbilitySystemComponent::BeginPlay()
 
 	if (AActor* Owner = GetOwner())
 	{
-		CachedAPCharacter = Cast<AActionPracticeCharacter>(Owner);
+		OwnerCharacter = Cast<AActionPracticeCharacter>(Owner);
 	}
 
 	EffectStaminaRegenBlockDurationTag = UGameplayTagsSubsystem::GetEffectStaminaRegenBlockDurationTag();
@@ -47,7 +47,7 @@ void UActionPracticeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwner
 {
 	Super::InitAbilityActorInfo(InOwnerActor, InAvatarActor);
 
-	CachedAPCharacter = Cast<AActionPracticeCharacter>(InOwnerActor);
+	OwnerCharacter = Cast<AActionPracticeCharacter>(InOwnerActor);
 }
 
 void UActionPracticeAbilitySystemComponent::AbilitySpecInputPressed(FGameplayAbilitySpec& Spec)
@@ -104,6 +104,39 @@ void UActionPracticeAbilitySystemComponent::AbilitySpecInputReleased(FGameplayAb
 	InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Spec.Handle, OriginalPredictionKey);
 }
 
+void UActionPracticeAbilitySystemComponent::HandleGameplayEvent_NetPredicted(FGameplayTag EventTag, const FGameplayEventData* Payload)
+{
+	if (!EventTag.IsValid() || !Payload || !OwnerCharacter) return;
+
+	//로컬 -> 로컬, 서버 -> 서버 각자에서는 기본 이벤트 발신
+	HandleGameplayEvent(EventTag, Payload);
+	DEBUG_LOG(TEXT("APASC: HandleGameplayEvent called - %s"), *EventTag.ToString());
+	
+	//로컬에서 서버로 RPC
+	if (!OwnerCharacter->HasAuthority())
+	{
+		FGameplayEventData_NetPredicted NetPayload;
+		NetPayload.EventTag = EventTag;
+		NetPayload.InstigatorTags = Payload->InstigatorTags;
+		NetPayload.EventMagnitude = Payload->EventMagnitude;
+	
+		Server_HandleGameplayEvent(NetPayload);
+		DEBUG_LOG(TEXT("APASC: Server HandleGameplayEvent called - %s"), *EventTag.ToString());
+	}
+}
+
+void UActionPracticeAbilitySystemComponent::Server_HandleGameplayEvent_Implementation(const FGameplayEventData_NetPredicted& Payload)
+{
+	if (!Payload.EventTag.IsValid()) return;
+
+	FGameplayEventData EventData;
+	EventData.EventTag = Payload.EventTag;
+	EventData.InstigatorTags = Payload.InstigatorTags;
+	EventData.EventMagnitude = Payload.EventMagnitude;
+	
+	HandleGameplayEvent(EventData.EventTag, &EventData);
+}
+
 const UActionPracticeAttributeSet* UActionPracticeAbilitySystemComponent::GetActionPracticeAttributeSet() const 
 {
 	return this->GetSet<UActionPracticeAttributeSet>();
@@ -113,7 +146,7 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 {
 	CheckBlockSuccess(SourceActor);
 
-	if (!CachedAPCharacter.IsValid())
+	if (!OwnerCharacter)
 	{
 		Super::CalculateAndSetAttributes(SourceActor, FinalAttackData);
 		return;
@@ -129,7 +162,7 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 	//방어성공 시 계산
 	if (bBlockedLastAttack)
 	{
-		AWeapon* LeftWeapon = CachedAPCharacter->GetLeftWeapon();
+		AWeapon* LeftWeapon = OwnerCharacter->GetLeftWeapon();
 
 		//무기의 DamageReduction 적용
 		const FBlockActionData* BlockData = LeftWeapon->GetWeaponBlockData();
@@ -173,7 +206,7 @@ void UActionPracticeAbilitySystemComponent::CheckBlockSuccess(AActor* SourceActo
 {
 	bBlockedLastAttack = false;
 
-	if (!CachedAPCharacter.IsValid() || !SourceActor)
+	if (!OwnerCharacter || !SourceActor)
 	{
 		return;
 	}
@@ -181,15 +214,15 @@ void UActionPracticeAbilitySystemComponent::CheckBlockSuccess(AActor* SourceActo
 	//방어 태그 확인
 	const bool bIsBlocking = HasMatchingGameplayTag(StateAbilityBlockingTag);
 
-	if (!bIsBlocking || !CachedAPCharacter->GetLeftWeapon())
+	if (!bIsBlocking || !OwnerCharacter->GetLeftWeapon())
 	{
 		return;
 	}
 
 	//공격자 방향 계산
-	const FVector ToSource = SourceActor->GetActorLocation() - CachedAPCharacter->GetActorLocation();
+	const FVector ToSource = SourceActor->GetActorLocation() - OwnerCharacter->GetActorLocation();
 	const FVector ToSourceNormalized = ToSource.GetSafeNormal2D();
-	const FVector Forward = CachedAPCharacter->GetActorForwardVector();
+	const FVector Forward = OwnerCharacter->GetActorForwardVector();
 
 	//캐릭터 정면과 공격 방향 사이의 각도 계산
 	const float DotProduct = FVector::DotProduct(Forward, ToSourceNormalized);
