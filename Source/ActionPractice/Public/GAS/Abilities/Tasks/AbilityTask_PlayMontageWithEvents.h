@@ -76,8 +76,8 @@ public:
     virtual void OnDestroy(bool AbilityEnded) override;
     virtual void ExternalCancel() override;
 
-    UFUNCTION()
-    void ChangeMontageAndPlay(UAnimMontage* NewMontage);
+    //UFUNCTION()
+    //void ChangeMontageAndPlay(UAnimMontage* NewMontage);
 
     //커브 폴링 활성화 - 어빌리티에서 호출
     UFUNCTION()
@@ -97,10 +97,10 @@ public:
 
     //어빌리티에서 호출하여 노티파이 이벤트 바인드/언바인드
     UFUNCTION()
-    void BindNotifyEventCallbackWithTag(FGameplayTag EventTag);
+    void BindNotifyEventTag(FGameplayTag EventTag);
 
     UFUNCTION()
-    void UnbindNotifyEventCallbackWithTag(FGameplayTag EventTag);
+    void UnbindNotifyEventTag(FGameplayTag EventTag);
     
 #pragma endregion
 
@@ -142,7 +142,7 @@ protected:
     void PlayMontage();
 
     UFUNCTION()
-    void StopPlayingMontage();
+    void StopMontage();
     
     //이벤트 핸들러
     UFUNCTION()

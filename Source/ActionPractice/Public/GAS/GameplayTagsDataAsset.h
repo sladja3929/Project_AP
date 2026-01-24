@@ -127,6 +127,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
 	FGameplayTag Event_Action_PlayBuffer;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
+	FGameplayTag Event_Action_AttackInput;
+	
 #pragma endregion
 
 #pragma region "Effect Tags"

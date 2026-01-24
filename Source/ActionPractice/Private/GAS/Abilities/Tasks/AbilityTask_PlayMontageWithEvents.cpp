@@ -58,9 +58,7 @@ void UAbilityTask_PlayMontageWithEvents::Activate()
         UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
 
         if (AnimInstance != nullptr)
-        {
-            //추후 태스크 생성에서 태그 컨테이너를 넘기면 활성화
-            //BindAllEventCallbacks();            
+        {         
             PlayMontage();
             bPlayedMontage = true;
         }
@@ -183,7 +181,7 @@ void UAbilityTask_PlayMontageWithEvents::PlayMontage()
         Character->SetAnimRootMotionTranslationScale(AnimRootMotionTranslationScale);
     }
 }
-
+/*레거시: 사용하지 않음
 void UAbilityTask_PlayMontageWithEvents::ChangeMontageAndPlay(UAnimMontage* NewMontage)
 {
     UAnimInstance* AnimInstance = Ability->GetCurrentActorInfo()->GetAnimInstance();
@@ -215,16 +213,16 @@ void UAbilityTask_PlayMontageWithEvents::ChangeMontageAndPlay(UAnimMontage* NewM
         BindMontageCallbacks();
         bStopBroadCastMontageEvents = false;
     }
-}
+}*/
 
-void UAbilityTask_PlayMontageWithEvents::StopPlayingMontage()
+void UAbilityTask_PlayMontageWithEvents::StopMontage()
 {
     if (!AbilitySystemComponent.IsValid())
     {
         return;
     }
 
-    // 내가 재생했던 몽타주가 아니면, 다른 어빌리티(예: Roll)가 막 재생한 몽타주를 끊어버릴 수 있음.
+    //내가 재생했던 몽타주만 종료
     if (!MontageToPlay)
     {
         return;
@@ -310,7 +308,7 @@ void UAbilityTask_PlayMontageWithEvents::HandleNotifyEvents(const FGameplayEvent
 #pragma endregion
 
 #pragma region "Delegate Binding Functions"
-void UAbilityTask_PlayMontageWithEvents::BindNotifyEventCallbackWithTag(FGameplayTag EventTag)
+void UAbilityTask_PlayMontageWithEvents::BindNotifyEventTag(FGameplayTag EventTag)
 {
     EventTagsToReceive.AddTag(EventTag);
 
@@ -334,7 +332,7 @@ void UAbilityTask_PlayMontageWithEvents::BindNotifyEventCallbackWithTag(FGamepla
     DEBUG_LOG(TEXT("Event Callback Bound - Tag: %s"), *EventTag.ToString());
 }
 
-void UAbilityTask_PlayMontageWithEvents::UnbindNotifyEventCallbackWithTag(FGameplayTag EventTag)
+void UAbilityTask_PlayMontageWithEvents::UnbindNotifyEventTag(FGameplayTag EventTag)
 {
     if (!AbilitySystemComponent.IsValid())
     {
@@ -456,7 +454,7 @@ void UAbilityTask_PlayMontageWithEvents::OnDestroy(bool AbilityEnded)
 
     if (bStopMontageWhenAbilityCancelled)
     {
-        StopPlayingMontage();
+        StopMontage();
     }
 
     //이벤트 콜백 해제

@@ -100,7 +100,11 @@ void AActionPracticeCharacter::BeginPlay()
 	{
 		DEBUG_LOG(TEXT("AbilityAttackTag is not valid"));
 	}
-
+	if (!EventActionAttackInputTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("EventActionAttackInputTag is not valid"));
+	}
+	
 	//InitializeAbilitySystem();
 
 	EquipWeapon(RightWeaponClass, false, false);
@@ -136,6 +140,11 @@ void AActionPracticeCharacter::BeginPlay()
 	else
 	{
 		DEBUG_LOG(TEXT("PlayerStatsWidgetClass is not set!"));
+	}
+
+	if (AbilitySystemComponent)
+	{
+		APASC = Cast<UActionPracticeAbilitySystemComponent>(AbilitySystemComponent);
 	}
 }
 
@@ -668,7 +677,7 @@ void AActionPracticeCharacter::CreateAttributeSet()
 
 void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 {
-	if (!AbilitySystemComponent || !InputAction) return;
+	if (!APASC || !InputAction) return;
 	
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
@@ -688,16 +697,22 @@ void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 			{
 				DEBUG_LOG(TEXT("GASInputPressed: Ability already active, calling Input Event - %s"), *GetNameSafe(Spec->Ability));
 				Spec->InputPressed = true;
+
+				FGameplayEventData EventData;
+				EventData.InstigatorTags.AddTag(InputActionData->FindTagByInputAction(InputAction)); //타깃 어빌리티만 활성화
+				EventData.EventMagnitude = 0.0f; //Pressed
+				EventData.EventTag = EventActionAttackInputTag;
+			
+				APASC->HandleGameplayEvent_NetPredicted(EventActionAttackInputTag, &EventData);
+				
 				//레거시: 실행 중인 어빌리티에 Pressed 전달은 Attack밖에 없기 때문에 기존 Pressed 비활성화, IA를 전달하는 이벤트 송신으로 변경
 				AbilitySystemComponent->AbilitySpecInputPressed(*Spec);
-
-				
 			}
 			//해당 어빌리티가 비활성화 상태면
 			else
 			{
 				Spec->InputPressed = true;
-				bool bSuccess = AbilitySystemComponent->TryActivateAbility(Spec->Handle);
+				bool bSuccess = APASC->TryActivateAbility(Spec->Handle);
 				DEBUG_LOG(TEXT("GASInputPressed: TryActivateAbility %s - %s"), bSuccess ? TEXT("SUCCESS") : TEXT("FAILED"), *GetNameSafe(Spec->Ability));
 			}
 		}
@@ -706,7 +721,7 @@ void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 
 void AActionPracticeCharacter::GASInputReleased(const UInputAction* InputAction)
 {
-	if (!AbilitySystemComponent || !InputAction) return;
+	if (!APASC || !InputAction) return;
 	
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
@@ -718,7 +733,7 @@ void AActionPracticeCharacter::GASInputReleased(const UInputAction* InputAction)
 			continue;
 
 		Spec->InputPressed = false;
-		AbilitySystemComponent->AbilitySpecInputReleased(*Spec);
+		APASC->AbilitySpecInputReleased(*Spec);
 	}
 
 	//릴리즈 버퍼링

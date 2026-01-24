@@ -165,7 +165,7 @@ void UChargeAttackAbility::ExecuteMontageTask()
 
     else //태스크 중간에 몽타주 바꾸기
     {
-        PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
+        //PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
     }
 }
 
@@ -178,7 +178,7 @@ void UChargeAttackAbility::BindEventsAndReadyMontageTask()
     }
 
     //ResetCombo 노티파이 이벤트 바인딩
-    PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(EventNotifyResetComboTag);
+    PlayMontageWithEventsTask->BindNotifyEventTag(EventNotifyResetComboTag);
 
     //Super 먼저 호출 (부모의 커브 폴링 설정 + 에지 바인딩)
     Super::BindEventsAndReadyMontageTask();

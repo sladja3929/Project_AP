@@ -121,7 +121,7 @@ void UNormalAttackAbility::ExecuteMontageTask()
 
     else //태스크 중간에 몽타주 바꾸기
     {
-        PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
+        //PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
     }
 }
 
@@ -134,7 +134,7 @@ void UNormalAttackAbility::BindEventsAndReadyMontageTask()
     }
 
     //ResetCombo 노티파이 이벤트 바인딩
-    PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(EventNotifyResetComboTag);
+    PlayMontageWithEventsTask->BindNotifyEventTag(EventNotifyResetComboTag);
     
     Super::BindEventsAndReadyMontageTask();
 }

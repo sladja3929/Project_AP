@@ -200,7 +200,7 @@ void UEnemyAttackAbility::ExecuteMontageTask()
 	}
 	else //태스크 중간에 몽타주 바꾸기
 	{
-		PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
+		//PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
 	}
 }
 
@@ -228,8 +228,8 @@ void UEnemyAttackAbility::BindEventsAndReadyMontageTask()
 	PlayMontageWithEventsTask->OnCurveFallingEdge.AddDynamic(this, &UEnemyAttackAbility::OnCurveFallingEdgeReceived);
 
 	//노티파이 이벤트 바인딩 (RotateToTarget, CheckCondition만 유지)
-	PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(EventNotifyRotateToTargetTag);
-	PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(EventNotifyCheckConditionTag);
+	PlayMontageWithEventsTask->BindNotifyEventTag(EventNotifyRotateToTargetTag);
+	PlayMontageWithEventsTask->BindNotifyEventTag(EventNotifyCheckConditionTag);
 
 	//태스크 활성화
 	PlayMontageWithEventsTask->ReadyForActivation();

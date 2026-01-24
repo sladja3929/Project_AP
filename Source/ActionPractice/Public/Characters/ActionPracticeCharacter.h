@@ -6,6 +6,7 @@
 #include "Logging/LogMacros.h"
 #include "ActionPracticeCharacter.generated.h"
 
+class UActionPracticeAbilitySystemComponent;
 class UInputActionDataAsset;
 class IHitDetectionInterface;
 class USpringArmComponent;
@@ -162,6 +163,7 @@ protected:
 	FGameplayTag StateAbilitySprintingTag;
 	FGameplayTag StateAbilityAttackingTag;
 	FGameplayTag AbilityAttackTag;
+	FGameplayTag EventActionAttackInputTag;
 	
 	// ===== State Variables =====
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State", Replicated)
@@ -242,7 +244,9 @@ protected:
 private:
 #pragma region "Private Variables"
 
-
+	UPROPERTY()
+	TObjectPtr<UActionPracticeAbilitySystemComponent> APASC = nullptr;
+	
 #pragma endregion
 
 #pragma region "Private Functions"

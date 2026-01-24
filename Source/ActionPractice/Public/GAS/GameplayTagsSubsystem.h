@@ -57,6 +57,7 @@ public:
 	static const FGameplayTag& GetEventNotifyAddComboTag();
 	static const FGameplayTag& GetEventActionInputByBufferTag();
 	static const FGameplayTag& GetEventActionPlayBufferTag();
+	static const FGameplayTag& GetEventActionAttackInputTag();
 #pragma endregion
 
 #pragma region "Static Effect Tags"
@@ -115,6 +116,7 @@ private:
 	const FGameplayTag& GetEventNotifyAddComboTagInternal() const;
 	const FGameplayTag& GetEventActionInputByBufferTagInternal() const;
 	const FGameplayTag& GetEventActionPlayBufferTagInternal() const;
+	const FGameplayTag& GetEventActionAttackInputTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal Effect Tags"

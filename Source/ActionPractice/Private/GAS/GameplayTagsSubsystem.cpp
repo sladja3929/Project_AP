@@ -356,6 +356,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEventActionPlayBufferTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventActionAttackInputTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEventActionAttackInputTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Static Effect Tags"
@@ -739,6 +748,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEventActionPlayBufferTagInternal(
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Event_Action_PlayBuffer;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventActionAttackInputTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Event_Action_AttackInput;
 	}
 	return FGameplayTag::EmptyTag;
 }

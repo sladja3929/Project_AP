@@ -153,7 +153,7 @@ bool UActionRecoveryAbility::ConsumeStamina()
 	return true;
 }
 
-bool UActionRecoveryAbility::RotateCharacter()
+bool UActionRecoveryAbility:: RotateCharacter()
 {
 	if (!bRotateBeforeAction)
 	{
@@ -296,6 +296,7 @@ void UActionRecoveryAbility::OnCurveRisingEdgeReceived(FName CurveName)
 	{
 		//ActionRecovery 상승 에지: State.Recovering 태그 추가
 		AddStateRecoveringTag();
+		bActionRecoveryEnded = false;
 	}
 }
 

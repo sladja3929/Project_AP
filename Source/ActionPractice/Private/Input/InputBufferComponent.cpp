@@ -253,7 +253,7 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 {
 	if (!InputAction || !OwnerCharacter || !CachedInputActionData) return;
 	
-	UActionPracticeAbilitySystemComponent* APASC = dynamic_cast<UActionPracticeAbilitySystemComponent*>(OwnerCharacter->GetAbilitySystemComponent());
+	UActionPracticeAbilitySystemComponent* APASC = Cast<UActionPracticeAbilitySystemComponent>(OwnerCharacter->GetAbilitySystemComponent());
 	if (!APASC) return;
 
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = OwnerCharacter->FindAbilitySpecsWithInputAction(InputAction);
@@ -270,13 +270,8 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 			Spec->InputPressed = true;
 			
 			FGameplayEventData EventData;
-			
-			//타깃 어빌리티만 활성화
-			EventData.InstigatorTags.AddTag(CachedInputActionData->FindTagByInputAction(InputAction));
-			
-			//release 여부를 EventMagnitude를 통해 전달
-			EventData.EventMagnitude = bBufferedActionReleased ? 1.0f : 0.0f;
-			
+			EventData.InstigatorTags.AddTag(CachedInputActionData->FindTagByInputAction(InputAction)); //타깃 어빌리티만 활성화
+			EventData.EventMagnitude = bBufferedActionReleased ? 1.0f : 0.0f; //release 여부를 EventMagnitude를 통해 전달
 			EventData.EventTag = EventActionInputByBufferTag;
 			
 			APASC->HandleGameplayEvent_NetPredicted(EventActionInputByBufferTag, &EventData);

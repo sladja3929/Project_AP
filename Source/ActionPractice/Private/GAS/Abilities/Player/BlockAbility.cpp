@@ -121,7 +121,7 @@ void UBlockAbility::ExecuteMontageTask()
 
 	else //태스크 중간에 몽타주 바꾸기
 	{
-		PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
+		//PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
 	}
 }
 
