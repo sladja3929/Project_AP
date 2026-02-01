@@ -13,7 +13,7 @@
 #include "AbilitySystemComponent.h"
 #include "GAS/Abilities/HitDetectionSetter.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackSequenceAbility, Log, All);
@@ -228,6 +228,13 @@ void UAttackSequenceAbility::AddOrRemoveGameplayTag(const FGameplayTag Auth, con
 
 void UAttackSequenceAbility::SetHitDetectionConfig()
 {
+	//HitDetectionSetter가 바인딩되지 않았으면 재시도
+	if (!HitDetectionSetter.IsValid())
+	{
+		DEBUG_LOG(TEXT("HitDetectionSetter not bound, retrying..."));
+		BindHitDetectionSetter();
+	}
+
 	//PrepareHitDetection 호출
 	if (!HitDetectionSetter.PrepareHitDetection(CurrentAttackTags, ComboCounter))
 	{
@@ -623,24 +630,31 @@ void UAttackSequenceAbility::CancelAbility(const FGameplayAbilitySpecHandle Hand
 
 void UAttackSequenceAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	//디버그: EndAbility 호출 추적
+	DEBUG_LOG(TEXT("AttackSequenceAbility::EndAbility called - bWasCancelled: %s, bReplicateEndAbility: %s, ActivationInfo.ActivationMode: %d, PredictionKey: %s"),
+		bWasCancelled ? TEXT("true") : TEXT("false"),
+		bReplicateEndAbility ? TEXT("true") : TEXT("false"),
+		static_cast<int32>(ActivationInfo.ActivationMode),
+		*ActivationInfo.GetActivationPredictionKey().ToString());
+
 	//태스크 초기화
 	StopMontageAndEndTask();
 	END_ABILITY_TASK(WaitAttackInputEventTask);
 	END_ABILITY_TASK(WaitInputByBufferEventTask);
 	END_ABILITY_TASK(WaitResetComboEventTask);
 	END_ABILITY_TASK(WaitCancelAttackEventTask);
-	
+
 	//HitDetectionSetter 언바인딩
 	HitDetectionSetter.UnBind();
-	
+
 	//상태 초기화
 	CurrentState = EAttackSequenceState::Idle;
 	CurrentChargeProgress = EChargeProgress::NoCharge;
-	
+
 	CurrentAttackType = EAttackType::None;
 	PreviousAttackType = EAttackType::None;
 	CurrentAttackTags.Reset();
-	
+
 	ComboCounter = 0;
 	MaxComboCount = 0;
 	CurrentAttackData = nullptr;

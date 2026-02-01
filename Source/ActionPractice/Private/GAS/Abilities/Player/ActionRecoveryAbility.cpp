@@ -83,7 +83,7 @@ bool UActionRecoveryAbility::RotateCharacter()
 {
 	if (AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo())
 	{
-		DEBUG_LOG(TEXT("Rotating Character"));
+		DEBUG_LOG(TEXT("Rotating Character - bIgnoreLockOn: %s"), bIgnoreLockOn ? TEXT("true") : TEXT("false"));
 		Character->RotateCharacterToInputDirection(RotateTime, bIgnoreLockOn);
 		return true;
 	}

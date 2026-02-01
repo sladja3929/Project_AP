@@ -11,7 +11,7 @@
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAttackAbility, Log, All);
@@ -34,59 +34,72 @@ void UEnemyAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 {
 	Super::OnGiveAbility(ActorInfo, Spec);
 
-	EventNotifyRotateToTargetTag = UGameplayTagsSubsystem::GetEventNotifyRotateToTargetTag();
-	EventNotifyCheckConditionTag = UGameplayTagsSubsystem::GetEventNotifyCheckConditionTag();
-
-	if (!EventNotifyRotateToTargetTag.IsValid())
-	{
-		DEBUG_LOG(TEXT("EventNotifyRotateToTargetTag is not valid"));
-	}
-
-	if (!EventNotifyCheckConditionTag.IsValid())
-	{
-		DEBUG_LOG(TEXT("EventNotifyCheckConditionTag is not valid"));
-	}
+	CacheGameplayTags();
 }
 
 void UEnemyAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
+	DEBUG_LOG(TEXT("EnemyAttackAbility Activated"));
+
+	ExecuteAttack();
+}
+
+#pragma region "Activate Initialization Functions"
+
+void UEnemyAttackAbility::ActivateInitSettings()
+{
+	Super::ActivateInitSettings();
+
+	//보스 데이터 캐싱
+	CacheBossData();
+
+	//HitDetectionSetter 바인딩
+	BindHitDetectionSetter();
+
+	//콤보 상태 초기화
+	ComboCounter = 0;
+	bPerformNextCombo = false;
+}
+
+void UEnemyAttackAbility::CacheGameplayTags()
+{
+	//이벤트 태그
+	EventNotifyRotateToTargetTag = UGameplayTagsSubsystem::GetEventNotifyRotateToTargetTag();
+	EventNotifyCheckConditionTag = UGameplayTagsSubsystem::GetEventNotifyCheckConditionTag();
+
+	//태그 유효성 검사
+	if (!EventNotifyRotateToTargetTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("EventNotifyRotateToTargetTag is not valid"));
+	}
+	if (!EventNotifyCheckConditionTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("EventNotifyCheckConditionTag is not valid"));
+	}
+}
+
+void UEnemyAttackAbility::CacheBossData()
+{
 	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
 	if (!BossCharacter)
 	{
-		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - BossCharacter is nullptr. Ability=%s"), *GetName());
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-		return;
-	}
-
-	if (!HitDetectionSetter.Init(BossCharacter->GetHitDetectionInterface()))
-	{
-		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - HitDetectionSetter.Init failed. Ability=%s"), *GetName());
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-		return;
-	}
-
-	if (!HitDetectionSetter.Bind(this))
-	{
-		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - HitDetectionSetter.Bind failed. Ability=%s"), *GetName());
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		DEBUG_LOG(TEXT("CacheBossData: BossCharacter is nullptr. Ability=%s"), *GetName());
 		return;
 	}
 
 	const UEnemyDataAsset* EnemyData = BossCharacter->GetEnemyData();
 	if (!EnemyData)
 	{
-		DEBUG_LOG(TEXT("EnemyAttackAbility::ActivateAbility FAIL - EnemyData is nullptr. Ability=%s"), *GetName());
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		DEBUG_LOG(TEXT("CacheBossData: EnemyData is nullptr. Ability=%s"), *GetName());
 		return;
 	}
 
 	EnemyAttackData = EnemyData->NamedAttackData.Find(AttackName);
 	if (!EnemyAttackData || EnemyAttackData->ComboSequence.Num() == 0)
 	{
-		DEBUG_LOG(TEXT("ActivateAbility: Attack data not found for name: %s"), *AttackName.ToString());
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		DEBUG_LOG(TEXT("CacheBossData: Attack data not found for name: %s"), *AttackName.ToString());
 		return;
 	}
 
@@ -99,16 +112,57 @@ void UEnemyAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		CachedTargetInfo = AIController->GetCurrentTarget();
 	}
 
-	ComboCounter = 0;
-	bPerformNextCombo = true;
-	bCreateTask = true;
-	
+	DEBUG_LOG(TEXT("CacheBossData: Cached AttackName=%s, MaxComboCount=%d"), *AttackName.ToString(), MaxComboCount);
+}
+
+void UEnemyAttackAbility::BindHitDetectionSetter()
+{
+	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
+	if (!BossCharacter)
+	{
+		DEBUG_LOG(TEXT("BindHitDetectionSetter: No BossCharacter"));
+		return;
+	}
+
+	//HitDetectionSetter 초기화
+	if (!HitDetectionSetter.Init(BossCharacter->GetHitDetectionInterface()))
+	{
+		DEBUG_LOG(TEXT("BindHitDetectionSetter: Failed to init HitDetectionSetter"));
+		return;
+	}
+
+	//HitDetectionSetter 바인딩
+	if (!HitDetectionSetter.Bind(this))
+	{
+		DEBUG_LOG(TEXT("BindHitDetectionSetter: Failed to bind HitDetectionSetter"));
+		return;
+	}
+}
+
+#pragma endregion
+
+#pragma region "Execute Logic"
+
+void UEnemyAttackAbility::ExecuteAttack()
+{
+	//데이터 검증
+	if (!EnemyAttackData || EnemyAttackData->ComboSequence.Num() == 0)
+	{
+		DEBUG_LOG(TEXT("ExecuteAttack: No valid EnemyAttackData"));
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return;
+	}
+
 	SetHitDetectionConfig();
 
-	START_WAIT_EVENT_TASK(WaitRotateToTargetEventTask, EventNotifyRotateToTargetTag, OnEventRotateToTarget, nullptr, false, true);
-	START_WAIT_EVENT_TASK(WaitCheckConditionEventTask, EventNotifyCheckConditionTag, OnEventCheckCondition, nullptr, false, true);
+	START_WAIT_EVENT_TASK(WaitRotateToTargetEventTask, EventNotifyRotateToTargetTag, OnEventRotateToTarget, nullptr, true, true);
+	START_WAIT_EVENT_TASK(WaitCheckConditionEventTask, EventNotifyCheckConditionTag, OnEventCheckCondition, nullptr, true, true);
 	StartMontageWithEventsTask();
 }
+
+#pragma endregion
+
+#pragma region "Hit Detection"
 
 void UEnemyAttackAbility::SetHitDetectionConfig()
 {
@@ -147,6 +201,10 @@ void UEnemyAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& HitR
 	}
 }
 
+#pragma endregion
+
+#pragma region "Task Functions"
+
 UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 {
 	if (!EnemyAttackData)
@@ -155,9 +213,13 @@ UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 		return nullptr;
 	}
 
-	if (ComboCounter < 0)
+	if (ComboCounter < 0) ComboCounter = 0;
+	
+	if (ComboCounter >= MaxComboCount)
 	{
-		ComboCounter = 0;
+		DEBUG_LOG(TEXT("SetMontageToPlayTask: ComboCounter out of range. ComboCounter=%d, MaxComboCount=%d"), ComboCounter, MaxComboCount);
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return nullptr;
 	}
 
 	//소프트 레퍼런스를 실제 오브젝트로 로드
@@ -178,28 +240,33 @@ void UEnemyAttackAbility::StartMontageWithEventsTask()
 	UAnimMontage* MontageToPlay = SetMontageToPlayTask();
 	if (!MontageToPlay)
 	{
-		DEBUG_LOG(TEXT("EnemyAttackAbility::ExecuteMontageTask FAIL - MontageToPlay is nullptr. Ability=%s"), *GetName());
+		DEBUG_LOG(TEXT("No Montage to Play"));
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}
 
-	if (bCreateTask) //커스텀 태스크 생성
+	//기존 태스크가 존재하면
+	if (PlayMontageWithEventsTask)
 	{
-		PlayMontageWithEventsTask = UAbilityTask_PlayMontageWithEvents::CreatePlayMontageWithEventsProxy(
-			this,
-			NAME_None,
-			MontageToPlay,
-			1.0f,
-			NAME_None,
-			1.0f
-		);
+		PlayMontageWithEventsTask->StopMontage();
+		PlayMontageWithEventsTask->EndTask();
+		PlayMontageWithEventsTask = nullptr;
+	}
+	
+	//커스텀 태스크 생성
+	PlayMontageWithEventsTask = UAbilityTask_PlayMontageWithEvents::CreatePlayMontageWithEventsProxy(
+		this,
+		NAME_None,
+		MontageToPlay,
+		1.0f,
+		NAME_None,
+		1.0f
+	);
+    
+	SetUpPlayMontageWithEventsTask();
 
-		SetUpPlayMontageWithEventsTask();
-	}
-	else //태스크 중간에 몽타주 바꾸기
-	{
-		//PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
-	}
+	//태스크 활성화
+	PlayMontageWithEventsTask->ReadyForActivation();
 }
 
 void UEnemyAttackAbility::SetUpPlayMontageWithEventsTask()
@@ -225,6 +292,10 @@ void UEnemyAttackAbility::SetUpPlayMontageWithEventsTask()
 	//태스크 활성화
 	PlayMontageWithEventsTask->ReadyForActivation();
 }
+
+#pragma endregion
+
+#pragma region "Handler Functions"
 
 void UEnemyAttackAbility::OnTaskMontageCompleted()
 {
@@ -267,7 +338,7 @@ void UEnemyAttackAbility::OnEventRotateToTarget(FGameplayEventData Payload)
 }
 
 void UEnemyAttackAbility::OnEventCheckCondition(FGameplayEventData Payload)
-{
+{	
 	AEnemyAIController* AIController = GetEnemyAIControllerFromActorInfo();
 	if (!AIController)
 	{
@@ -299,11 +370,13 @@ void UEnemyAttackAbility::OnEventCheckCondition(FGameplayEventData Payload)
 		bPerformNextCombo = false;
 		return;
 	}
-
+	
+	//해당 노티파이가 존재해야 다음 콤보 진행 가능
+	bPerformNextCombo = true;
+	ComboCounter++;
 	DEBUG_LOG(TEXT("OnEventCheckCondition: Passed - Distance: %.2f, Angle: %.2f"), CurrentTargetInfo.Distance, CurrentTargetInfo.AngleToTarget);
 }
 
-#pragma region "Curve Edge Handlers"
 void UEnemyAttackAbility::OnCurveRisingEdgeReceived(FName CurveName)
 {
 	DEBUG_LOG(TEXT("Curve Rising Edge: %s"), *CurveName.ToString());
@@ -317,52 +390,30 @@ void UEnemyAttackAbility::OnCurveFallingEdgeReceived(FName CurveName)
 
 	if (CurveName == CurveName_ActionRecovery)
 	{
-		//ActionRecovery 하강 에지: 콤보 판정
 		OnActionRecoveryEnd();
 	}
 }
 
 void UEnemyAttackAbility::OnActionRecoveryEnd()
 {
-	DEBUG_LOG(TEXT("OnActionRecoveryEnd: bPerformNextCombo=%s"),
-		bPerformNextCombo ? TEXT("true") : TEXT("false"));
+	DEBUG_LOG(TEXT("OnActionRecoveryEnd: bPerformNextCombo=%s"), bPerformNextCombo ? TEXT("true") : TEXT("false"));
 
 	if (bPerformNextCombo)
 	{
 		DEBUG_LOG(TEXT("OnActionRecoveryEnd: Performing Next Combo"));
-		PlayNextCombo();
-	}
-	else
-	{
-		DEBUG_LOG(TEXT("OnActionRecoveryEnd: Combo Cancelled"));
+		ExecuteAttack();
 	}
 }
+
 #pragma endregion
-
-void UEnemyAttackAbility::PlayNextCombo()
-{
-	++ComboCounter;
-	DEBUG_LOG(TEXT("PlayNextCombo: ComboCounter=%d / MaxComboCount=%d"),
-		ComboCounter, MaxComboCount);
-
-	//콤보 카운터가 콤보 시퀀스를 벗어나면 종료
-	if (ComboCounter >= MaxComboCount)
-	{
-		DEBUG_LOG(TEXT("PlayNextCombo: Combo Finished - ComboCounter: %d"), ComboCounter);
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-		return;
-	}
-
-	bPerformNextCombo = true;
-	bCreateTask = false;
-	SetHitDetectionConfig();
-	StartMontageWithEventsTask();
-}
 
 void UEnemyAttackAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
 	DEBUG_LOG(TEXT("EndAbility %d"), bWasCancelled);
 
+	ComboCounter = 0;
+	bPerformNextCombo = false;
+	
 	if (IsEndAbilityValid(Handle, ActorInfo))
 	{
 		//HitDetectionSetter 언바인딩

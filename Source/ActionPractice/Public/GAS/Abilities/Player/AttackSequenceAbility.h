@@ -163,8 +163,6 @@ protected:
 	// ===== 상태 관리 =====
 	void ChangeAttackType(const EAttackType NewType);
 	void ChangeState(const EAttackSequenceState NewState);
-	
-	// ===== 실행 로직 =====
 	virtual bool ConsumeStamina() override;
 	
 	// ===== 몽타주 태스크 =====

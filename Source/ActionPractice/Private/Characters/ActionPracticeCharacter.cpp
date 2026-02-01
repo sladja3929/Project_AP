@@ -25,7 +25,7 @@
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionPracticeCharacter, Log, All);
@@ -81,6 +81,7 @@ void AActionPracticeCharacter::BeginPlay()
 	//태그 초기화
 	StateRecoveringLocalTag = UGameplayTagsSubsystem::GetStateRecoveringLocalTag();
 	StateAbilitySprintingTag = UGameplayTagsSubsystem::GetStateAbilitySprintingTag();
+	StateAbilityRollingTag = UGameplayTagsSubsystem::GetStateAbilityRollingTag();
 	StateAbilityAttackingLocalTag = UGameplayTagsSubsystem::GetStateAbilityAttackingLocalTag();
 	AbilityAttackTag = UGameplayTagsSubsystem::GetAbilityAttackTag();
 	EventActionAttackInputTag = UGameplayTagsSubsystem::GetEventActionAttackInputTag();
@@ -93,6 +94,10 @@ void AActionPracticeCharacter::BeginPlay()
 	if (!StateAbilitySprintingTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("StateAbilitySprintingTag is not valid"));
+	}
+	if (!StateAbilityRollingTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("StateAbilityRollingTag is not valid"));
 	}
 	if (!StateAbilityAttackingLocalTag.IsValid())
 	{
@@ -148,7 +153,7 @@ void AActionPracticeCharacter::BeginPlay()
 		DEBUG_LOG(TEXT("PlayerStatsWidgetClass is not set!"));
 	}
 
-	if (AbilitySystemComponent)
+	if (!this->IsLocallyControlled() && AbilitySystemComponent)
 	{
 		APASC = Cast<UActionPracticeAbilitySystemComponent>(AbilitySystemComponent);
 
@@ -265,10 +270,11 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 
 	if (Controller != nullptr && !bIsRecovering)
 	{
-		bool bIsSprinting = AbilitySystemComponent->HasMatchingGameplayTag(StateAbilitySprintingTag);
+		bool bIgnoreLockOnState = AbilitySystemComponent->HasMatchingGameplayTag(StateAbilitySprintingTag)
+			|| AbilitySystemComponent->HasMatchingGameplayTag(StateAbilityRollingTag);
 
-		//락온 상태에서 걸을 때: Strafe 이동
-		if(!bIsSprinting && bIsLockOn && LockedOnTarget)
+		//락온 상태에서 걸을 때: Strafe 이동 (Sprint, Roll 중에는 제외)
+		if(!bIgnoreLockOnState && bIsLockOn && LockedOnTarget)
 		{
 			//Strafe 이동 설정
 			GetCharacterMovement()->bOrientRotationToMovement = false;
@@ -349,31 +355,36 @@ bool AActionPracticeCharacter::IsBlockInputPressed() const
 
 void AActionPracticeCharacter::RotateCharacterToInputDirection(float RotateTime, bool bIgnoreLockOn)
 {
+	float DesiredYaw = 0.0f;
+
 	//락온 상태면 락온 대상 방향으로
 	if (!bIgnoreLockOn && bIsLockOn)
 	{
 		if (!LockedOnTarget) return;
-
-		//BaseCharacter의 RotateToPosition 호출
-		RotateToPosition(LockedOnTarget->GetActorLocation(), RotateTime);
-		return;
+		DEBUG_LOG(TEXT("APCharacter - Rotate Character To Lock On Target"));
+		
+		//락온 타겟 방향으로 Yaw 계산
+		const FVector DirectionToTarget = (LockedOnTarget->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+		DesiredYaw = DirectionToTarget.Rotation().Yaw;
 	}
-
+	
 	//아니면 입력 방향으로
-	float DesiredYaw = 0.0f;
-	if (!CalculateYawFromMovementInput(DesiredYaw))
+	else
 	{
-		return;
+		if (!CalculateYawFromMovementInput(DesiredYaw)) return;
+		DEBUG_LOG(TEXT("APCharacter - Rotate Character To Movement Input Direction"));
 	}
 
 	const FRotator TargetRotation(0.0f, DesiredYaw, 0.0f);
 
 	//로컬 회전
+	DEBUG_LOG(TEXT("APCharacter - RotateToRotation called. HasAuthority: %s"), HasAuthority() ? TEXT("true") : TEXT("false"));
 	RotateToRotation(TargetRotation, RotateTime);
-
+	
 	//서버 회전 RPC
 	if (!HasAuthority())
 	{
+		DEBUG_LOG(TEXT("APCharacter - Server_RequestRotateToYaw RPC called"));
 		Server_RequestRotateToYaw(DesiredYaw, RotateTime);
 	}
 }
@@ -531,6 +542,7 @@ void AActionPracticeCharacter::UpdateLockOnCamera()
 
 TScriptInterface<IHitDetectionInterface> AActionPracticeCharacter::GetHitDetectionInterface() const
 {
+	if (!RightWeapon) return nullptr;
 	return RightWeapon->GetHitDetectionComponent();
 }
 

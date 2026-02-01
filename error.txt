@@ -1,34 +1,41 @@
-UBaseAttackAbility::ConsumeStamina() BaseAttackAbility.cpp:118
-UActionRecoveryAbility::PlayAction() ActionRecoveryAbility.cpp:139
-UBaseAttackAbility::PlayAction() BaseAttackAbility.cpp:127
-UChargeAttackAbility::TransitionToAttack(bool, bool) ChargeAttackAbility.cpp:193
-UChargeAttackAbility::OnTaskMontageCompleted() ChargeAttackAbility.cpp:225
+AWeapon::GetHitDetectionComponent() Weapon.cpp:121
+AActionPracticeCharacter::GetHitDetectionInterface() ActionPracticeCharacter.cpp:545
+[인라인화] UAttackSequenceAbility::BindHitDetectionSetter() AttackSequenceAbility.cpp:190
+UAttackSequenceAbility::ActivateInitSettings() AttackSequenceAbility.cpp:64
+UBaseAbility::ActivateAbility(FGameplayAbilitySpecHandle, const FGameplayAbilityActorInfo *, FGameplayAbilityActivationInfo, const FGameplayEventData *) BaseAbility.cpp:75
+UActionPracticeAbility::ActivateAbility(FGameplayAbilitySpecHandle, const FGameplayAbilityActorInfo *, FGameplayAbilityActivationInfo, const FGameplayEventData *) ActionPracticeAbility.cpp:30
+UActionRecoveryAbility::ActivateAbility(FGameplayAbilitySpecHandle, const FGameplayAbilityActorInfo *, FGameplayAbilityActivationInfo, const FGameplayEventData *) ActionRecoveryAbility.cpp:72
+UAttackSequenceAbility::ActivateAbility(FGameplayAbilitySpecHandle, const FGameplayAbilityActorInfo *, FGameplayAbilityActivationInfo, const FGameplayEventData *) AttackSequenceAbility.cpp:46
+UGameplayAbility::CallActivateAbility(FGameplayAbilitySpecHandle, const FGameplayAbilityActorInfo *, FGameplayAbilityActivationInfo, TDelegate<…> *, const FGameplayEventData *) GameplayAbility.cpp:1016
+UAbilitySystemComponent::InternalTryActivateAbility(FGameplayAbilitySpecHandle, FPredictionKey, UGameplayAbility **, TDelegate<…> *, const FGameplayEventData *) AbilitySystemComponent_Abilities.cpp:1951
+UAbilitySystemComponent::TryActivateAbility(FGameplayAbilitySpecHandle, bool) AbilitySystemComponent_Abilities.cpp:1655
+AActionPracticeCharacter::BeginPlay() ActionPracticeCharacter.cpp:172
+AActor::DispatchBeginPlay(bool) Actor.cpp:4723
+AWorldSettings::NotifyBeginPlay() WorldSettings.cpp:364
+AGameStateBase::OnRep_ReplicatedHasBegunPlay() GameStateBase.cpp:200
 UFunction::Invoke(UObject *, FFrame &, void *const) Class.cpp:7540
 UObject::ProcessEvent(UFunction *, void *) ScriptCore.cpp:2191
 [블루프린트] BP 함수 세부 정보를 확인하려면 RiderLink 플러그인을 설치하세요
-TScriptDelegate::ProcessDelegate<…>(void *) ScriptDelegates.h:458
-TMulticastScriptDelegate::ProcessMulticastDelegate<…>(void *) ScriptDelegates.h:934
-UAbilityTask_PlayMontageWithEvents::OnMontageEnded(UAnimMontage *, bool) AbilityTask_PlayMontageWithEvents.cpp:287
-TBaseUObjectMethodDelegateInstance::ExecuteIfSafe(UAnimMontage *, bool) DelegateInstancesImpl.h:688
-[인라인화] TDelegate::ExecuteIfBound(UAnimMontage *, bool) DelegateSignatureImpl.inl:629
-UAnimInstance::TriggerMontageEndedEvent(const FQueuedMontageEndedEvent &) AnimInstance.cpp:2215
-UAnimInstance::TriggerQueuedMontageEvents() AnimInstance.cpp:2262
-UAnimInstance::DispatchQueuedAnimEvents() AnimInstance.cpp:786
-USkeletalMeshComponent::ConditionallyDispatchQueuedAnimEvents() SkeletalMeshComponent.cpp:1950
-USkeletalMeshComponent::FinalizeBoneTransform() SkeletalMeshComponent.cpp:4838
-USkeletalMeshComponent::FinalizeAnimationUpdate() PhysAnim.cpp:473
-USkeletalMeshComponent::PostAnimEvaluation(FAnimationEvaluationContext &) SkeletalMeshComponent.cpp:3091
-USkeletalMeshComponent::CompleteParallelAnimationEvaluation(bool) SkeletalMeshComponent.cpp:4677
-FParallelAnimationCompletionTask::DoTask(Type, const TRefCountPtr<…> &) SkeletalMeshComponent.cpp:419
-TGraphTask::ExecuteTask() TaskGraphInterfaces.h:696
-UE::Tasks::Private::FTaskBase::TryExecuteTask() TaskPrivate.h:518
-[인라인화] FBaseGraphTask::Execute(TArray<…> &, Type, bool) TaskGraphInterfaces.h:495
-FNamedTaskThread::ProcessTasksNamedThread(int, bool) TaskGraph.cpp:791
-FNamedTaskThread::ProcessTasksUntilIdle(int) TaskGraph.cpp:690
-FTickTaskSequencer::ReleaseTickGroup(ETickingGroup, bool, TArray<…> &) TickTaskManager.cpp:1059
-FTickTaskManager::RunTickGroup(ETickingGroup, bool) TickTaskManager.cpp:2128
-[인라인화] UWorld::RunTickGroup(ETickingGroup, bool) LevelTick.cpp:784
-UWorld::Tick(ELevelTick, float) LevelTick.cpp:1736
+AActor::ProcessEvent(UFunction *, void *) Actor.cpp:1482
+FRepLayout::CallRepNotifies(FReceivingRepState *, UObject *) RepLayout.cpp:4704
+FObjectReplicator::CallRepNotifies(bool) DataReplication.cpp:2448
+UActorChannel::ProcessBunchInternal(FInBunch &) DataChannel.cpp:3485
+[인라인화] UActorChannel::ProcessBunch(FInBunch &) DataChannel.cpp:3521
+UActorChannel::ReceivedBunch(FInBunch &) DataChannel.cpp:3236
+UChannel::ReceivedSequencedBunch(FInBunch &) DataChannel.cpp:575
+UChannel::ReceivedNextBunch(FInBunch &, bool &) DataChannel.cpp:1080
+UChannel::ReceivedRawBunch(FInBunch &, bool &) DataChannel.cpp:696
+UNetConnection::DispatchPacket(FBitReader &, int, bool &, bool &) NetConnection.cpp:4065
+UNetConnection::ReceivedPacket(FBitReader &, bool, bool) NetConnection.cpp:3430
+UNetConnection::ReceivedRawPacket(void *, int) NetConnection.cpp:2187
+UIpNetDriver::TickDispatch(float) IpNetDriver.cpp:1293
+UNetDriver::InternalTickDispatch(float) NetDriver.cpp:2363
+[인라인화] Invoke(void (UNetDriver::*)(float), UNetDriver *&, float &&) Invoke.h:66
+[인라인화] UE::Core::Private::Tuple::TTupleBase::ApplyAfter(void (UNetDriver::*&)(float), UNetDriver *&, float &&) Tuple.h:299
+TBaseUObjectMethodDelegateInstance::ExecuteIfSafe(float) DelegateInstancesImpl.h:688
+[인라인화] TMulticastDelegateBase::Broadcast(float) MulticastDelegateBase.h:258
+TMulticastDelegate::Broadcast(float) DelegateSignatureImpl.inl:1074
+UWorld::Tick(ELevelTick, float) LevelTick.cpp:1545
 UEditorEngine::Tick(float, bool) EditorEngine.cpp:2155
 UUnrealEdEngine::Tick(float, bool) UnrealEdEngine.cpp:527
 FEngineLoop::Tick() LaunchEngineLoop.cpp:5848

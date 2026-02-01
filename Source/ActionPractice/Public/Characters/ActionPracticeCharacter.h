@@ -161,6 +161,7 @@ protected:
 	// ===== Usage Tags =====
 	FGameplayTag StateRecoveringLocalTag;
 	FGameplayTag StateAbilitySprintingTag;
+	FGameplayTag StateAbilityRollingTag;
 	FGameplayTag StateAbilityAttackingLocalTag;
 	FGameplayTag AbilityAttackTag;
 	FGameplayTag EventActionAttackInputTag;

@@ -243,6 +243,7 @@ void UAbilityTask_PlayMontageWithEvents::StopMontage()
 #pragma region "Event Calling Functions"
 void UAbilityTask_PlayMontageWithEvents::OnMontageBlendingOut(UAnimMontage* Montage, bool bInterrupted)
 {
+    //몽타주를 직접 Stop 후 새로운 몽타주 재생 시에는 BlendingOut 호출 O
     DEBUG_LOG(TEXT("OnMontageBlendingOut Called - Montage: %s, Interrupted: %s"), 
            Montage ? *Montage->GetName() : TEXT("None"), 
            bInterrupted ? TEXT("True") : TEXT("False"));
@@ -271,6 +272,7 @@ void UAbilityTask_PlayMontageWithEvents::OnMontageBlendingOut(UAnimMontage* Mont
 
 void UAbilityTask_PlayMontageWithEvents::OnMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
+    //몽타주를 직접 Stop 후 새로운 몽타주 재생 시 Ended 호출 X
     DEBUG_LOG(TEXT("OnMontageEnded Called - Montage: %s, Interrupted: %s"), 
            Montage ? *Montage->GetName() : TEXT("None"), 
            bInterrupted ? TEXT("True") : TEXT("False"));

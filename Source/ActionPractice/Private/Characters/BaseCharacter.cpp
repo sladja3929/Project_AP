@@ -75,6 +75,9 @@ void ABaseCharacter::GiveAbility(TSubclassOf<UGameplayAbility> AbilityClass)
 
 void ABaseCharacter::GrantStartupAbilities()
 {
+	//서버에서만 어빌리티 부여 (클라이언트에는 복제됨)
+	if (!HasAuthority()) return;
+
 	for (const auto& StartAbility : StartAbilities)
 	{
 		GiveAbility(StartAbility);
@@ -83,6 +86,9 @@ void ABaseCharacter::GrantStartupAbilities()
 
 void ABaseCharacter::ApplyStartupEffects()
 {
+	//서버에서만 시작 효과 적용 (클라이언트에는 ActiveGameplayEffect로 복제됨)
+	if (!HasAuthority()) return;
+
 	FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
 	EffectContext.AddSourceObject(this);
 
