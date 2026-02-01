@@ -47,7 +47,14 @@ public:
 
 	//HandleGameplayEvent 계열 태스크용 이벤트 브릿지
 	void HandleGameplayEvent_NetPredicted(FGameplayTag EventTag, const FGameplayEventData* Payload);
-	
+
+	// ===== 태그 관리 =====
+	// 서버: AuthTag를 MinimalReplication으로 추가, 클라: LocalTag를 LooseTag로 추가
+	void AddTag_NetPredicted(FGameplayTag AuthTag, FGameplayTag LocalTag);
+
+	// 서버: AuthTag 전부 제거, 클라: LocalTag 전부 제거
+	void RemoveTags_NetPredicted(FGameplayTag AuthTag, FGameplayTag LocalTag);
+
 	//===== Defense Policy Override =====
 	virtual void CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
 	virtual void PrepareHitReactionEventData(FGameplayEventData& OutEventData, const FFinalAttackData& FinalAttackData) override;

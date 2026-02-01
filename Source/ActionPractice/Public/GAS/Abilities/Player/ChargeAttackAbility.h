@@ -84,8 +84,8 @@ protected:
 	virtual void SetStaminaCost(float InStaminaCost) override;
 	virtual bool RotateCharacter() override;
 	virtual UAnimMontage* SetMontageToPlayTask() override;
-	virtual void ExecuteMontageTask() override;
-	virtual void BindEventsAndReadyMontageTask() override;
+	virtual void StartMontageWithEventsTask() override;
+	virtual void SetUpPlayMontageWithEventsTask() override;
 	
 	UFUNCTION()
 	void PlayNextCharge();
@@ -102,7 +102,7 @@ protected:
 
 	virtual void OnCurveRisingEdgeReceived(FName CurveName) override;
 
-	virtual void HandleWaitInputReleased(float TimeHeld) override;
+	virtual void OnWaitInputRelease(float TimeHeld) override;
 	
 #pragma endregion
 

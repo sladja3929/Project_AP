@@ -3,6 +3,7 @@
 #include "GAS/Abilities/Player/ActionPracticeAbility.h"
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
+#include "GameplayTagContainer.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -38,61 +39,27 @@ const UWeaponDataAsset* FWeaponAbilityStatics::GetWeaponDataAssetFromAbility(con
 	return WeaponDataAsset;
 }
 
-const TArray<FTaggedAttackData>* FWeaponAbilityStatics::GetAllAttackDataFromAbility(const UGameplayAbility* Ability, bool bIsLeft)
+const FTaggedAttackData* FWeaponAbilityStatics::GetAttackDataByTags(const UWeaponDataAsset* WeaponDataAsset, const FGameplayTagContainer& AttackTags)
 {
-	const UWeaponDataAsset* WeaponDataAsset = GetWeaponDataAssetFromAbility(Ability, bIsLeft);
-	if (!WeaponDataAsset)
+	if (!WeaponDataAsset || !AttackTags.IsValid())
 	{
-		return nullptr;
-	}
-
-	if (WeaponDataAsset->TaggedAttackData.IsEmpty())
-	{
-		DEBUG_LOG(TEXT("GetAllAttackDataFromAbility: TaggedAttackData is empty"));
-		return nullptr;
-	}
-
-	return &WeaponDataAsset->TaggedAttackData;
-}
-
-const FTaggedAttackData* FWeaponAbilityStatics::GetAttackDataByTag(const UWeaponDataAsset* WeaponDataAsset, const FGameplayTag& AttackTypeTag)
-{
-	if (!WeaponDataAsset || !AttackTypeTag.IsValid())
-	{
-		DEBUG_LOG(TEXT("GetAttackDataByTag: Invalid parameters"));
+		DEBUG_LOG(TEXT("GetAttackDataByTagsFromList: Invalid parameters"));
 		return nullptr;
 	}
 
 	for (const FTaggedAttackData& AttackData : WeaponDataAsset->TaggedAttackData)
 	{
-		if (AttackData.AttackTags.HasTag(AttackTypeTag))
+		if (AttackData.AttackTags.HasAllExact(AttackTags))
 		{
 			return &AttackData;
 		}
 	}
 
-	DEBUG_LOG(TEXT("GetAttackDataByTag: No matching AttackData for tag %s"), *AttackTypeTag.ToString());
+	//DEBUG_LOG(TEXT("GetAttackDataByTagsFromList: No matching AttackData for tag %s"), *AttackTags.ToString());
 	return nullptr;
 }
 
-const FTaggedAttackData* FWeaponAbilityStatics::GetAttackDataByIndex(const UWeaponDataAsset* WeaponDataAsset, int32 Index)
-{
-	if (!WeaponDataAsset)
-	{
-		DEBUG_LOG(TEXT("GetAttackDataByIndex: No WeaponDataAsset"));
-		return nullptr;
-	}
-
-	if (!WeaponDataAsset->TaggedAttackData.IsValidIndex(Index))
-	{
-		DEBUG_LOG(TEXT("GetAttackDataByIndex: Invalid index %d (Array size: %d)"), Index, WeaponDataAsset->TaggedAttackData.Num());
-		return nullptr;
-	}
-
-	return &WeaponDataAsset->TaggedAttackData[Index];
-}
-
-const FTaggedAttackData* FWeaponAbilityStatics::GetAttackDataFromAbility(const UGameplayAbility* Ability)
+const FTaggedAttackData* FWeaponAbilityStatics::GetAttackDataByTagsFromAbility(const UGameplayAbility* Ability)
 {
 	AWeapon* Weapon = GetWeaponFromAbility(Ability, false);
 	if (!Weapon)

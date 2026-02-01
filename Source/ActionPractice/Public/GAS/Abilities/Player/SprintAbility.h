@@ -76,10 +76,10 @@ protected:
 	virtual bool StartStaminaDrainEffect();
 	virtual void StopStaminaDrainEffect();
 
-	virtual void HandleWaitInputReleased(float TimeHeld) override;
+	virtual void OnWaitInputRelease(float TimeHeld) override;
 	
 	void CheckSprintConditions();
-	//
+
 	bool ShouldRunSprintChecks() const;
 	
 #pragma endregion

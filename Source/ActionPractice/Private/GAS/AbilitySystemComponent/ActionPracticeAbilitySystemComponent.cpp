@@ -8,7 +8,7 @@
 #include "Items/WeaponDataAsset.h"
 #include "Items/AttackData.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogBaseAbilitySystemComponent, Log, All);
@@ -133,8 +133,54 @@ void UActionPracticeAbilitySystemComponent::Server_HandleGameplayEvent_Implement
 	EventData.EventTag = Payload.EventTag;
 	EventData.InstigatorTags = Payload.InstigatorTags;
 	EventData.EventMagnitude = Payload.EventMagnitude;
-	
+
 	HandleGameplayEvent(EventData.EventTag, &EventData);
+}
+
+void UActionPracticeAbilitySystemComponent::AddTag_NetPredicted(FGameplayTag AuthTag, FGameplayTag LocalTag)
+{
+	if (!OwnerCharacter) return;
+
+	//서버: 권위 태그 부여
+	if (OwnerCharacter->HasAuthority() && AuthTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("Adding %s on Authority"), *AuthTag.ToString());
+		AddLooseGameplayTag(AuthTag);
+		AddMinimalReplicationGameplayTag(AuthTag);
+	}
+
+	//클라: 로컬 태그 부여 (로컬 입력 제어용)
+	if (OwnerCharacter->IsLocallyControlled() && LocalTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("Adding %s on Local"), *LocalTag.ToString());
+		AddLooseGameplayTag(LocalTag);
+	}
+}
+
+void UActionPracticeAbilitySystemComponent::RemoveTags_NetPredicted(FGameplayTag AuthTag, FGameplayTag LocalTag)
+{
+	if (!OwnerCharacter) return;
+
+	//서버: 권위 태그 삭제
+	if (OwnerCharacter->HasAuthority() && AuthTag.IsValid())
+	{
+		while (HasMatchingGameplayTag(AuthTag))
+		{
+			RemoveLooseGameplayTag(AuthTag);
+			RemoveMinimalReplicationGameplayTag(AuthTag);
+		}
+		DEBUG_LOG(TEXT("Remove All %s on Authority"), *AuthTag.ToString());
+	}
+
+	//클라: 로컬 태그 삭제 (로컬 입력 제어용)
+	if (OwnerCharacter->IsLocallyControlled() && LocalTag.IsValid())
+	{
+		while (HasMatchingGameplayTag(LocalTag))
+		{
+			RemoveLooseGameplayTag(LocalTag);
+		}
+		DEBUG_LOG(TEXT("Remove All %s on Local"), *LocalTag.ToString());
+	}
 }
 
 const UActionPracticeAttributeSet* UActionPracticeAbilitySystemComponent::GetActionPracticeAttributeSet() const 

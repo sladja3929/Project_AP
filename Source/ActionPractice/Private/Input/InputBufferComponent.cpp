@@ -7,7 +7,7 @@
 #include "Input/InputActionDataAsset.h"
 #include "Net/UnrealNetwork.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogInputBufferComponent, Log, All);
@@ -156,29 +156,30 @@ void UInputBufferComponent::BufferInputInternal(FGameplayTag InputActionTag, boo
 			BufferedHoldActionTags.Add(InputActionTag);
 			DEBUG_LOG(TEXT("BufferInputInternal Hold action added - %s"), *InputActionTag.ToString());
 		}
+		return;
 	}
 
-	//Tap 또는 Both 액션일 경우 우선순위 비교 후 저장
-	else
+	//Tap 또는 Both 액션 Pressed일 경우 우선순위 비교 후 저장
+	if (!bIsReleased)
 	{
-		if (NewActionPriority >= BufferPriority)
+		if (NewActionPriority < BufferPriority)
 		{
-			BufferedActionTag = InputActionTag;
-			BufferPriority = NewActionPriority;
-			//Both 액션이면서 Released일 경우 저장
-			bBufferedActionReleased = bIsReleased;
-
-			DEBUG_LOG(TEXT("BufferInputInternal Action buffered - %s Priority: %d Released: %s"),
-					  *InputActionTag.ToString(),
-					  NewActionPriority,
-					  bIsReleased ? TEXT("true") : TEXT("false"));
+			DEBUG_LOG(TEXT("BufferInputInternal Action ignored - Lower priority %d vs %d"), NewActionPriority, BufferPriority);
+			return;
 		}
 
-		else
-		{
-			DEBUG_LOG(TEXT("BufferInputInternal Action ignored - Lower priority %d vs %d"),
-					  NewActionPriority, BufferPriority);
-		}
+		BufferedActionTag = InputActionTag;
+		BufferPriority = NewActionPriority;
+			
+		DEBUG_LOG(TEXT("BufferInputInternal Action buffered - %s Priority: %d"), *InputActionTag.ToString(), NewActionPriority);
+		return;
+	}	
+	
+	//현재 저장된 Both 액션의 Released일 경우 단발로 확정 (플래그 설정)
+	if (BufferedActionTag == InputActionTag) 
+	{
+		bBufferedActionReleased = true;
+		DEBUG_LOG(TEXT("BufferInputInternal Buffered action released - %s"), *InputActionTag.ToString());
 	}
 }
 

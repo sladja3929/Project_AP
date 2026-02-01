@@ -28,6 +28,18 @@ void FMontageCurvePoller::Initialize(const TArray<FName>& InCurveNames)
 	DEBUG_LOG(TEXT("MontageCurvePoller Initialized with %d curves"), CurveNames.Num());
 }
 
+void FMontageCurvePoller::AddCurve(const FName InCurveName)
+{
+	if (!CurveNames.Contains(InCurveName))
+	{
+		CurveNames.Add(InCurveName);
+		ActiveStates.Add(InCurveName, false);
+		CurrentValues.Add(InCurveName, 0.0f);
+	}
+	
+	DEBUG_LOG(TEXT("MontageCurvePoller Add Curve to Polling: %s"), *InCurveName.ToString());
+}
+
 void FMontageCurvePoller::Poll(UAnimInstance* AnimInstance)
 {
 	if (!AnimInstance)

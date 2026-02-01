@@ -161,9 +161,10 @@ protected:
 	// ===== Usage Tags =====
 	FGameplayTag StateRecoveringLocalTag;
 	FGameplayTag StateAbilitySprintingTag;
-	FGameplayTag StateAbilityAttackingTag;
+	FGameplayTag StateAbilityAttackingLocalTag;
 	FGameplayTag AbilityAttackTag;
 	FGameplayTag EventActionAttackInputTag;
+	FGameplayTag EventActionCancelAttackTag;
 	
 	// ===== State Variables =====
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State", Replicated)

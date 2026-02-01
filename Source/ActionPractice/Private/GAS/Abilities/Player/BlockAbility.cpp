@@ -32,7 +32,7 @@ void UBlockAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, con
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	
-	PlayAction();
+	StartMontageWithEventsTask();
 
 	StartWaitInputReleaseTask(true);
 }
@@ -48,12 +48,6 @@ void UBlockAbility::ActivateInitSettings()
 	}
 	
 	bCreateTask = true;
-}
-
-void UBlockAbility::PlayAction()
-{
-	
-	ExecuteMontageTask();
 }
 
 UAnimMontage* UBlockAbility::SetMontageToPlayTask()
@@ -75,12 +69,12 @@ UAnimMontage* UBlockAbility::SetMontageToPlayTask()
 	return Montage;
 }
 
-void UBlockAbility::BindEventsAndReadyMontageTask()
+void UBlockAbility::SetUpPlayMontageWithEventsTask()
 {
 	
 }
 
-void UBlockAbility::ExecuteMontageTask()
+void UBlockAbility::StartMontageWithEventsTask()
 {
 	UAnimMontage* MontageToPlay = SetMontageToPlayTask();
 	
@@ -138,7 +132,7 @@ void UBlockAbility::OnTaskMontageInterrupted()
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
-void UBlockAbility::HandleWaitInputReleased(float TimeHeld)
+void UBlockAbility::OnWaitInputRelease(float TimeHeld)
 {
 	DEBUG_LOG(TEXT("Block WaitInputRelease - End Ability (TimeHeld: %.3f)"), TimeHeld);
 

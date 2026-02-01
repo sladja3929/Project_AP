@@ -252,3 +252,17 @@ void UBaseAbility::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const 
 	//자기 자신에게 적용
 	ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
 }
+
+UAbilityTask_WaitGameplayEvent* UBaseAbility::CreateWaitGameplayEventTask(
+	const FGameplayTag& EventTag,
+	AActor* OptionalExternalTarget,
+	bool bOnlyTriggerOnce,
+	bool bOnlyMatchExact)
+{
+	return UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+		this,
+		EventTag,
+		OptionalExternalTarget,
+		bOnlyTriggerOnce,
+		bOnlyMatchExact);
+}

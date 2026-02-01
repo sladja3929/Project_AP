@@ -25,6 +25,8 @@ UBaseAttackAbility::UBaseAttackAbility()
 
 void UBaseAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+    
     AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
     if (!Character)
     {
@@ -49,7 +51,8 @@ void UBaseAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle
         return;
     }
     
-    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+    if (!ConsumeStamina()) return;
+    StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 }
 
 void UBaseAttackAbility::SetHitDetectionConfig()
@@ -102,7 +105,7 @@ void UBaseAttackAbility::ActivateInitSettings()
 {
     Super::ActivateInitSettings();
     
-    WeaponAttackData = FWeaponAbilityStatics::GetAttackDataFromAbility(this);
+    WeaponAttackData = FWeaponAbilityStatics::GetAttackDataByTagsFromAbility(this);
     if (!WeaponAttackData)
     {
         DEBUG_LOG(TEXT("Cannot Load Base Attack Data"));
@@ -117,14 +120,21 @@ bool UBaseAttackAbility::ConsumeStamina()
 {
     SetStaminaCost(WeaponAttackData->ComboSequence[ComboCounter].AttackData.StaminaCost);
 
-    return Super::ConsumeStamina();
+    if (!ApplyStaminaCost())
+    {
+        DEBUG_LOG(TEXT("No Stamina"));
+        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+        return false;
+    }
+
+    return true;
 }
 
-void UBaseAttackAbility::PlayAction()
+void UBaseAttackAbility::StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask()
 {
     SetHitDetectionConfig();
 
-    Super::PlayAction();
+    Super::StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 }
 
 UAnimMontage* UBaseAttackAbility::SetMontageToPlayTask()
@@ -150,6 +160,18 @@ UAnimMontage* UBaseAttackAbility::SetMontageToPlayTask()
     }
 
     return Montage;
+}
+
+void UBaseAttackAbility::OnTaskMontageCompleted()
+{
+    DEBUG_LOG(TEXT("Montage Task Completed"));
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+void UBaseAttackAbility::OnTaskMontageInterrupted()
+{
+    DEBUG_LOG(TEXT("Montage Task Interrupted"));
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void UBaseAttackAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)

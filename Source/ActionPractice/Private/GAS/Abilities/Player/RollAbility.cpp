@@ -3,7 +3,6 @@
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
 #include "GAS/GameplayTagsSubsystem.h"
-#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "GameplayEffect.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
@@ -48,12 +47,33 @@ void URollAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, con
 	}
 }
 
+void URollAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+{
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	if (!ConsumeStamina()) return;
+	StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
+	START_WAIT_EVENT_TASK(WaitInvincibleStartEventTask, EventNotifyInvincibleStartTag, OnEventInvincibleStart, nullptr, true, true);
+}
+
+bool URollAbility::ConsumeStamina()
+{
+	if (!ApplyStaminaCost())
+	{
+		DEBUG_LOG(TEXT("No Stamina"));
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return false;
+	}
+
+	return true;
+}
+
 UAnimMontage* URollAbility::SetMontageToPlayTask()
 {
 	return RollMontage;
 }
 
-void URollAbility::BindEventsAndReadyMontageTask()
+void URollAbility::SetUpPlayMontageWithEventsTask()
 {
 	if (!PlayMontageWithEventsTask)
 	{
@@ -61,10 +81,19 @@ void URollAbility::BindEventsAndReadyMontageTask()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 	}
 
-	//Invincibility 노티파이 이벤트 바인딩
-	PlayMontageWithEventsTask->BindNotifyEventTag(EventNotifyInvincibleStartTag);
-	
-	Super::BindEventsAndReadyMontageTask();
+	Super::SetUpPlayMontageWithEventsTask();
+}
+
+void URollAbility::OnTaskMontageCompleted()
+{
+	DEBUG_LOG(TEXT("Montage Task Completed"));
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+void URollAbility::OnTaskMontageInterrupted()
+{
+	DEBUG_LOG(TEXT("Montage Task Interrupted"));
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void URollAbility::ApplyInvincibilityEffect()
@@ -98,28 +127,21 @@ void URollAbility::ApplyInvincibilityEffect()
 	DEBUG_LOG(TEXT("Invincibility Effect Applied with Duration: %f"), InvincibilityDuration)
 }
 
-void URollAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)
-{
-	Super::OnTaskNotifyEventsReceived(Payload);
-	
-	if (Payload.EventTag == EventNotifyInvincibleStartTag) OnNotifyInvincibleStart(Payload);
-}
-
-void URollAbility::OnActionRecoveryEnd()
+void URollAbility::ProcessActionRecoveryEnd()
 {
 	//JustRolled 태그 부여
 	UActionPracticeAbilitySystemComponent* APASC = GetActionPracticeAbilitySystemComponentFromActorInfo();
 	if (!APASC)
 	{
 		DEBUG_LOG(TEXT("No APASC"));
-		Super::OnActionRecoveryEnd();
+		Super::ProcessActionRecoveryEnd();
 		return;
 	}
 
 	if (!JustRolledWindowEffect)
 	{
 		DEBUG_LOG(TEXT("No JustRolledWindowEffect"));
-		Super::OnActionRecoveryEnd();
+		Super::ProcessActionRecoveryEnd();
 		return;
 	}
 
@@ -129,7 +151,7 @@ void URollAbility::OnActionRecoveryEnd()
 	if (!EffectSpec.IsValid())
 	{
 		DEBUG_LOG(TEXT("Failed to create JustRolled Effect Spec"));
-		Super::OnActionRecoveryEnd();
+		Super::ProcessActionRecoveryEnd();
 		return;
 	}
 
@@ -137,10 +159,10 @@ void URollAbility::OnActionRecoveryEnd()
 	APASC->ApplyGameplayEffectSpecToSelf(*EffectSpec.Data.Get());
 	DEBUG_LOG(TEXT("JustRolled EffectWindow Attached"));
 
-	Super::OnActionRecoveryEnd();
+	Super::ProcessActionRecoveryEnd();
 }
 
-void URollAbility::OnNotifyInvincibleStart(FGameplayEventData Payload)
+void URollAbility::OnEventInvincibleStart(FGameplayEventData Payload)
 {
 	DEBUG_LOG(TEXT("Invincible Start - Event Received"));
 	ApplyInvincibilityEffect();

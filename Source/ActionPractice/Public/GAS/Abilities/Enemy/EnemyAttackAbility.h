@@ -42,7 +42,13 @@ protected:
 
 	//PlayMontageWithEvents 태스크
 	UPROPERTY()
-	TObjectPtr<UAbilityTask_PlayMontageWithEvents> PlayMontageWithEventsTask;
+	TObjectPtr<UAbilityTask_PlayMontageWithEvents> PlayMontageWithEventsTask = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitRotateToTargetEventTask = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitCheckConditionEventTask = nullptr;
 
 	//HitDetection 관련
 	UPROPERTY()
@@ -80,7 +86,7 @@ protected:
 	FGameplayTag EventNotifyRotateToTargetTag;
 	FGameplayTag EventNotifyCheckConditionTag;
 
-	//커브 폴링 관련
+	//커브 이름
 	static const FName CurveName_ActionRecovery;
 
 #pragma endregion
@@ -93,15 +99,12 @@ protected:
 
 	//IMontageAbilityInterface 인터페이스 구현
 	UFUNCTION()
-	virtual void PlayAction() override;
-
-	UFUNCTION()
 	virtual UAnimMontage* SetMontageToPlayTask() override;
 
 	UFUNCTION()
-	virtual void ExecuteMontageTask() override;
+	virtual void StartMontageWithEventsTask() override;
 	
-	virtual void BindEventsAndReadyMontageTask() override;
+	virtual void SetUpPlayMontageWithEventsTask() override;
 
 	UFUNCTION()
 	virtual void OnTaskMontageCompleted() override;
@@ -109,15 +112,11 @@ protected:
 	UFUNCTION()
 	virtual void OnTaskMontageInterrupted() override;
 
-	//노티파이 이벤트를 전부 수신하는 콜백 함수
-	UFUNCTION()
-	virtual void OnTaskNotifyEventsReceived(FGameplayEventData Payload);
-
-	//RotateToTarget 노티파이 콜백 함수
+	//RotateToTarget 콜백 함수
 	UFUNCTION()
 	virtual void OnEventRotateToTarget(FGameplayEventData Payload);
 
-	//CheckCondition 노티파이 콜백 함수
+	//CheckCondition 콜백 함수
 	UFUNCTION()
 	virtual void OnEventCheckCondition(FGameplayEventData Payload);
 

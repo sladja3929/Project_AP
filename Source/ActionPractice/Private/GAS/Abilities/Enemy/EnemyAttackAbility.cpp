@@ -11,7 +11,7 @@
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAttackAbility, Log, All);
@@ -102,7 +102,12 @@ void UEnemyAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	ComboCounter = 0;
 	bPerformNextCombo = true;
 	bCreateTask = true;
-	PlayAction();
+	
+	SetHitDetectionConfig();
+
+	START_WAIT_EVENT_TASK(WaitRotateToTargetEventTask, EventNotifyRotateToTargetTag, OnEventRotateToTarget, nullptr, false, true);
+	START_WAIT_EVENT_TASK(WaitCheckConditionEventTask, EventNotifyCheckConditionTag, OnEventCheckCondition, nullptr, false, true);
+	StartMontageWithEventsTask();
 }
 
 void UEnemyAttackAbility::SetHitDetectionConfig()
@@ -142,13 +147,6 @@ void UEnemyAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& HitR
 	}
 }
 
-void UEnemyAttackAbility::PlayAction()
-{
-	SetHitDetectionConfig();
-
-	ExecuteMontageTask();
-}
-
 UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 {
 	if (!EnemyAttackData)
@@ -175,7 +173,7 @@ UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 	return Montage;
 }
 
-void UEnemyAttackAbility::ExecuteMontageTask()
+void UEnemyAttackAbility::StartMontageWithEventsTask()
 {
 	UAnimMontage* MontageToPlay = SetMontageToPlayTask();
 	if (!MontageToPlay)
@@ -196,7 +194,7 @@ void UEnemyAttackAbility::ExecuteMontageTask()
 			1.0f
 		);
 
-		BindEventsAndReadyMontageTask();
+		SetUpPlayMontageWithEventsTask();
 	}
 	else //태스크 중간에 몽타주 바꾸기
 	{
@@ -204,7 +202,7 @@ void UEnemyAttackAbility::ExecuteMontageTask()
 	}
 }
 
-void UEnemyAttackAbility::BindEventsAndReadyMontageTask()
+void UEnemyAttackAbility::SetUpPlayMontageWithEventsTask()
 {
 	if (!PlayMontageWithEventsTask)
 	{
@@ -216,20 +214,13 @@ void UEnemyAttackAbility::BindEventsAndReadyMontageTask()
 	//커스텀 몽타주 태스크 델리게이트 바인딩
 	PlayMontageWithEventsTask->OnMontageCompleted.AddDynamic(this, &UEnemyAttackAbility::OnTaskMontageCompleted);
 	PlayMontageWithEventsTask->OnMontageInterrupted.AddDynamic(this, &UEnemyAttackAbility::OnTaskMontageInterrupted);
-	PlayMontageWithEventsTask->OnNotifyEventsReceived.AddDynamic(this, &UEnemyAttackAbility::OnTaskNotifyEventsReceived);
 
 	//=== 커브 폴링 활성화 (ActionRecovery 노티파이 대체) ===
-	TArray<FName> CurveNames;
-	CurveNames.Add(CurveName_ActionRecovery);
-	PlayMontageWithEventsTask->EnableCurvePolling(CurveNames);
+	PlayMontageWithEventsTask->EnableCurvePolling(CurveName_ActionRecovery);
 
 	//커브 에지 델리게이트 바인딩
 	PlayMontageWithEventsTask->OnCurveRisingEdge.AddDynamic(this, &UEnemyAttackAbility::OnCurveRisingEdgeReceived);
 	PlayMontageWithEventsTask->OnCurveFallingEdge.AddDynamic(this, &UEnemyAttackAbility::OnCurveFallingEdgeReceived);
-
-	//노티파이 이벤트 바인딩 (RotateToTarget, CheckCondition만 유지)
-	PlayMontageWithEventsTask->BindNotifyEventTag(EventNotifyRotateToTargetTag);
-	PlayMontageWithEventsTask->BindNotifyEventTag(EventNotifyCheckConditionTag);
 
 	//태스크 활성화
 	PlayMontageWithEventsTask->ReadyForActivation();
@@ -245,19 +236,6 @@ void UEnemyAttackAbility::OnTaskMontageInterrupted()
 {
 	DEBUG_LOG(TEXT("Montage Task Interrupted"));
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-}
-
-void UEnemyAttackAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)
-{
-	//★ ActionRecoveryEnd 노티파이는 커브 폴링으로 대체됨
-	if (Payload.EventTag == EventNotifyRotateToTargetTag)
-	{
-		OnEventRotateToTarget(Payload);
-	}
-	else if (Payload.EventTag == EventNotifyCheckConditionTag)
-	{
-		OnEventCheckCondition(Payload);
-	}
 }
 
 void UEnemyAttackAbility::OnEventRotateToTarget(FGameplayEventData Payload)
@@ -377,7 +355,8 @@ void UEnemyAttackAbility::PlayNextCombo()
 
 	bPerformNextCombo = true;
 	bCreateTask = false;
-	PlayAction();
+	SetHitDetectionConfig();
+	StartMontageWithEventsTask();
 }
 
 void UEnemyAttackAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)

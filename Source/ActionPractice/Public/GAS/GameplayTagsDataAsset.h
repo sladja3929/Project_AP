@@ -13,8 +13,18 @@ class ACTIONPRACTICE_API UGameplayTagsDataAsset : public UDataAsset
 	GENERATED_BODY()
 
 public:
+#pragma region "Input Tags"
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input Tags")
+	FGameplayTag Input_Attack;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input Tags")
+	FGameplayTag Input_ChargeAttack;
+
+#pragma endregion
+
 #pragma region "Ability Tags"
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
 	FGameplayTag Ability_Attack;
 	
@@ -52,7 +62,10 @@ public:
 #pragma region "State Tags"
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
-	FGameplayTag State_Ability_Attacking;
+	FGameplayTag State_Ability_Attacking_Local;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
+	FGameplayTag State_Ability_Attacking_Auth;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
 	FGameplayTag State_Ability_Blocking;
@@ -129,6 +142,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
 	FGameplayTag Event_Action_AttackInput;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
+	FGameplayTag Event_Action_CancelAttack;
 	
 #pragma endregion
 

@@ -43,7 +43,7 @@ void UNormalAttackAbility::ActivateInitSettings()
 {
     Super::ActivateInitSettings();
 
-    ReadyInputByBufferTask();
+    START_WAIT_EVENT_TASK(WaitInputByBufferEventTask, EventInputByBufferTag, OnEventInputByBuffer, nullptr, false, true);
 
     //무기 데이터 적용
     MaxComboCount = WeaponAttackData->ComboSequence.Num();
@@ -92,10 +92,10 @@ void UNormalAttackAbility::PlayNextAttack()
     DEBUG_LOG(TEXT("NextAttack - ComboCounter: %d"),ComboCounter);
 
     bCreateTask = false;
-    PlayAction();
+    StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 }
 
-void UNormalAttackAbility::ExecuteMontageTask()
+void UNormalAttackAbility::StartMontageWithEventsTask()
 {
     UAnimMontage* MontageToPlay = SetMontageToPlayTask();
     if (!MontageToPlay)
@@ -116,7 +116,7 @@ void UNormalAttackAbility::ExecuteMontageTask()
             1.0f
         );
 
-        BindEventsAndReadyMontageTask();
+        SetUpPlayMontageWithEventsTask();
     }
 
     else //태스크 중간에 몽타주 바꾸기
@@ -125,7 +125,7 @@ void UNormalAttackAbility::ExecuteMontageTask()
     }
 }
 
-void UNormalAttackAbility::BindEventsAndReadyMontageTask()
+void UNormalAttackAbility::SetUpPlayMontageWithEventsTask()
 {
     if (!PlayMontageWithEventsTask)
     {
@@ -136,7 +136,7 @@ void UNormalAttackAbility::BindEventsAndReadyMontageTask()
     //ResetCombo 노티파이 이벤트 바인딩
     PlayMontageWithEventsTask->BindNotifyEventTag(EventNotifyResetComboTag);
     
-    Super::BindEventsAndReadyMontageTask();
+    Super::SetUpPlayMontageWithEventsTask();
 }
 
 void UNormalAttackAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)

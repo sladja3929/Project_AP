@@ -50,8 +50,11 @@ protected:
 
 	virtual void ActivateInitSettings() override;
 	virtual bool ConsumeStamina() override;
-	virtual void PlayAction() override;
+	virtual void StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask() override;
 	virtual UAnimMontage* SetMontageToPlayTask() override;
+
+	virtual void OnTaskMontageCompleted() override;
+	virtual void OnTaskMontageInterrupted() override;
 
 #pragma endregion
 

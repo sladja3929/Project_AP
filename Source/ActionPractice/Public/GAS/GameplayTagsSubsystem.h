@@ -15,6 +15,11 @@ class ACTIONPRACTICE_API UGameplayTagsSubsystem : public UGameInstanceSubsystem
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 
+#pragma region "Static Input Tags"
+	static const FGameplayTag& GetInputAttackTag();
+	static const FGameplayTag& GetInputChargeAttackTag();
+#pragma endregion
+
 #pragma region "Static Ability Tags"
 	static const FGameplayTag& GetAbilityAttackTag();
 	static const FGameplayTag& GetAbilityAttackNormalTag();
@@ -30,7 +35,8 @@ public:
 #pragma endregion
 
 #pragma region "Static State Tags"
-	static const FGameplayTag& GetStateAbilityAttackingTag();
+	static const FGameplayTag& GetStateAbilityAttackingLocalTag();
+	static const FGameplayTag& GetStateAbilityAttackingAuthTag();
 	static const FGameplayTag& GetStateAbilityBlockingTag();
 	static const FGameplayTag& GetStateAbilityJumpingTag();
 	static const FGameplayTag& GetStateAbilitySprintingTag();
@@ -58,6 +64,7 @@ public:
 	static const FGameplayTag& GetEventActionInputByBufferTag();
 	static const FGameplayTag& GetEventActionPlayBufferTag();
 	static const FGameplayTag& GetEventActionAttackInputTag();
+	static const FGameplayTag& GetEventActionCancelAttackTag();
 #pragma endregion
 
 #pragma region "Static Effect Tags"
@@ -74,6 +81,11 @@ private:
 	// Internal helper function
 	static UGameplayTagsSubsystem* Get();
 
+#pragma region "Internal Input Tags"
+	const FGameplayTag& GetInputAttackTagInternal() const;
+	const FGameplayTag& GetInputChargeAttackTagInternal() const;
+#pragma endregion
+
 #pragma region "Internal Ability Tags"
 	const FGameplayTag& GetAbilityAttackTagInternal() const;
 	const FGameplayTag& GetAbilityAttackNormalTagInternal() const;
@@ -89,7 +101,8 @@ private:
 #pragma endregion
 
 #pragma region "Internal State Tags"
-	const FGameplayTag& GetStateAbilityAttackingTagInternal() const;
+	const FGameplayTag& GetStateAbilityAttackingLocalTagInternal() const;
+	const FGameplayTag& GetStateAbilityAttackingAuthTagInternal() const;
 	const FGameplayTag& GetStateAbilityBlockingTagInternal() const;
 	const FGameplayTag& GetStateAbilityJumpingTagInternal() const;
 	const FGameplayTag& GetStateAbilitySprintingTagInternal() const;
@@ -117,6 +130,7 @@ private:
 	const FGameplayTag& GetEventActionInputByBufferTagInternal() const;
 	const FGameplayTag& GetEventActionPlayBufferTagInternal() const;
 	const FGameplayTag& GetEventActionAttackInputTagInternal() const;
+	const FGameplayTag& GetEventActionCancelAttackTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal Effect Tags"

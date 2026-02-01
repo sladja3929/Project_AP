@@ -44,8 +44,8 @@ protected:
 #pragma region "Protected Functions" //================================================
 
 	virtual void ActivateInitSettings() override;
-	virtual void ExecuteMontageTask() override;
-	virtual void BindEventsAndReadyMontageTask() override;
+	virtual void StartMontageWithEventsTask() override;
+	virtual void SetUpPlayMontageWithEventsTask() override;
 	
 	UFUNCTION()
 	void PlayNextAttack();

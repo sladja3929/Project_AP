@@ -60,8 +60,8 @@ void UChargeAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 void UChargeAttackAbility::ActivateInitSettings()
 {
     Super::ActivateInitSettings();
-    
-    ReadyInputByBufferTask();
+
+    START_WAIT_EVENT_TASK(WaitInputByBufferEventTask, EventInputByBufferTag, OnEventInputByBuffer, nullptr, false, true);
 
     //무기 데이터 적용, SubAttack: 차지 몽타주, Attack: 공격 실행 몽타주
     MaxComboCount = WeaponAttackData->ComboSequence.Num();
@@ -138,7 +138,7 @@ UAnimMontage* UChargeAttackAbility::SetMontageToPlayTask()
     return Super::SetMontageToPlayTask();
 }
 
-void UChargeAttackAbility::ExecuteMontageTask()
+void UChargeAttackAbility::StartMontageWithEventsTask()
 {
     UAnimMontage* MontageToPlay = SetMontageToPlayTask();
         
@@ -160,7 +160,7 @@ void UChargeAttackAbility::ExecuteMontageTask()
             1.0f
         );
     
-        BindEventsAndReadyMontageTask();
+        SetUpPlayMontageWithEventsTask();
     }
 
     else //태스크 중간에 몽타주 바꾸기
@@ -169,7 +169,7 @@ void UChargeAttackAbility::ExecuteMontageTask()
     }
 }
 
-void UChargeAttackAbility::BindEventsAndReadyMontageTask()
+void UChargeAttackAbility::SetUpPlayMontageWithEventsTask()
 {
     if (!PlayMontageWithEventsTask)
     {
@@ -181,10 +181,10 @@ void UChargeAttackAbility::BindEventsAndReadyMontageTask()
     PlayMontageWithEventsTask->BindNotifyEventTag(EventNotifyResetComboTag);
 
     //Super 먼저 호출 (부모의 커브 폴링 설정 + 에지 바인딩)
-    Super::BindEventsAndReadyMontageTask();
+    Super::SetUpPlayMontageWithEventsTask();
 
     //ChargeStart 커브를 기존 폴링 목록에 추가 (커브 에지는 가상 함수로 오버라이드됨)
-    PlayMontageWithEventsTask->AddCurveToPolling(CurveName_ChargeStart);
+    PlayMontageWithEventsTask->EnableCurvePolling(CurveName_ChargeStart);
 }
 
 void UChargeAttackAbility::PlayNextCharge()
@@ -200,7 +200,7 @@ void UChargeAttackAbility::PlayNextCharge()
     
     bCreateTask = false;
     bIsAttackMontage = false;
-    PlayAction();
+    StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 }
 
 void UChargeAttackAbility::OnTaskMontageCompleted()
@@ -213,7 +213,7 @@ void UChargeAttackAbility::OnTaskMontageCompleted()
         DEBUG_LOG(TEXT("Montage Completed - Max Charge"));
         bCreateTask = true;
         bIsAttackMontage = true;
-        PlayAction();  
+        StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();  
         
         bIsChargingMontage = false;
     }
@@ -250,7 +250,7 @@ void UChargeAttackAbility::OnCurveRisingEdgeReceived(FName CurveName)
         {
             bCreateTask = false;
             bIsAttackMontage = true;
-            PlayAction();
+            StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 
             bIsChargingMontage = false;
             bNoCharge = false;
@@ -274,14 +274,14 @@ void UChargeAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& Hit
     Super::OnHitDetected(HitActor, HitResult, AttackData);
 }
 
-void UChargeAttackAbility::HandleWaitInputReleased(float TimeHeld)
+void UChargeAttackAbility::OnWaitInputRelease(float TimeHeld)
 {
     //차지를 멈췄을 때
     if (bIsChargingMontage) //차지중이라면
     {
         bCreateTask = false;
         bIsAttackMontage = true;
-        PlayAction();
+        StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 
         bIsChargingMontage = false;
     }

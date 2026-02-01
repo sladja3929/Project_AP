@@ -103,11 +103,6 @@ void UActionPracticeAbility::StartWaitInputReleaseTask(bool bTestAlreadyReleased
 
 void UActionPracticeAbility::OnWaitInputRelease(float TimeHeld)
 {
-	HandleWaitInputReleased(TimeHeld);
-}
-
-void UActionPracticeAbility::HandleWaitInputReleased(float TimeHeld)
-{
 	//Base는 기본 동작 없음 (각 Ability에서 override)
 }
 

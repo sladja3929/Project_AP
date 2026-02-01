@@ -81,9 +81,11 @@ void AActionPracticeCharacter::BeginPlay()
 	//태그 초기화
 	StateRecoveringLocalTag = UGameplayTagsSubsystem::GetStateRecoveringLocalTag();
 	StateAbilitySprintingTag = UGameplayTagsSubsystem::GetStateAbilitySprintingTag();
-	StateAbilityAttackingTag = UGameplayTagsSubsystem::GetStateAbilityAttackingTag();
+	StateAbilityAttackingLocalTag = UGameplayTagsSubsystem::GetStateAbilityAttackingLocalTag();
 	AbilityAttackTag = UGameplayTagsSubsystem::GetAbilityAttackTag();
-
+	EventActionAttackInputTag = UGameplayTagsSubsystem::GetEventActionAttackInputTag();
+	EventActionCancelAttackTag = UGameplayTagsSubsystem::GetEventActionCancelAttackTag();
+	
 	if (!StateRecoveringLocalTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("StateRecoveringTag is not valid"));
@@ -92,9 +94,9 @@ void AActionPracticeCharacter::BeginPlay()
 	{
 		DEBUG_LOG(TEXT("StateAbilitySprintingTag is not valid"));
 	}
-	if (!StateAbilityAttackingTag.IsValid())
+	if (!StateAbilityAttackingLocalTag.IsValid())
 	{
-		DEBUG_LOG(TEXT("StateAbilityAttackingTag is not valid"));
+		DEBUG_LOG(TEXT("StateAbilityAttackingLocalTag is not valid"));
 	}
 	if (!AbilityAttackTag.IsValid())
 	{
@@ -103,6 +105,10 @@ void AActionPracticeCharacter::BeginPlay()
 	if (!EventActionAttackInputTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("EventActionAttackInputTag is not valid"));
+	}
+	if (!EventActionCancelAttackTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("EventActionCancelAttackTag is not valid"));
 	}
 	
 	//InitializeAbilitySystem();
@@ -145,6 +151,22 @@ void AActionPracticeCharacter::BeginPlay()
 	if (AbilitySystemComponent)
 	{
 		APASC = Cast<UActionPracticeAbilitySystemComponent>(AbilitySystemComponent);
+
+		//AttackSequenceAbility 활성화
+		FGameplayTag AbilityAttackNormalTag = UGameplayTagsSubsystem::GetAbilityAttackNormalTag();
+		FGameplayTag AbilityAttackChargeTag = UGameplayTagsSubsystem::GetAbilityAttackChargeTag();
+
+		for (FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
+		{
+			if (!Spec.Ability) continue;
+
+			const FGameplayTagContainer& AssetTags = Spec.Ability->GetAssetTags();
+
+			if (AssetTags.HasTag(AbilityAttackNormalTag) && AssetTags.HasTag(AbilityAttackChargeTag))
+			{
+				AbilitySystemComponent->TryActivateAbility(Spec.Handle);
+			}
+		}
 	}
 }
 
@@ -394,21 +416,22 @@ void AActionPracticeCharacter::CancelActionForMove()
 	}
 	
 	//Attack 어빌리티가 활성화되어 있는지 확인
-	bool bHasActiveAttackAbility = AbilitySystemComponent->HasMatchingGameplayTag(StateAbilityAttackingTag);
+	bool bHasActiveAttackAbility = AbilitySystemComponent->HasMatchingGameplayTag(StateAbilityAttackingLocalTag);
 	if (bHasActiveAttackAbility)
 	{
-		//State.Recovering 태그가 없으면 어빌리티 캔슬 가능 (ActionRecoveryEnd 이후)
+		//State.Recovering.Local 태그가 없으면 어빌리티 캔슬 가능 (ActionRecoveryEnd 이후)
 		if (!AbilitySystemComponent->HasMatchingGameplayTag(StateRecoveringLocalTag))
 		{
-			//Ability.Attack 태그를 가진 어빌리티 취소
-			FGameplayTagContainer CancelTags;
-			CancelTags.AddTag(AbilityAttackTag);
-			AbilitySystemComponent->CancelAbilities(&CancelTags);
-			DEBUG_LOG(TEXT("Attack Ability Cancelled by Move Input"));
+			//공격 취소 이벤트 전송
+			FGameplayEventData EventData;
+			EventData.EventTag = EventActionCancelAttackTag;
+			
+			APASC->HandleGameplayEvent_NetPredicted(EventActionCancelAttackTag, &EventData);
+			DEBUG_LOG(TEXT("Attack Montage Cancelled by Move Input"));
 		}
 		else
 		{
-			DEBUG_LOG(TEXT("Attack Ability is in Recovering state - cannot cancel"));
+			DEBUG_LOG(TEXT("Attack is in Recovering state - cannot cancel"));
 		}
 	}
 }
@@ -706,7 +729,7 @@ void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 				APASC->HandleGameplayEvent_NetPredicted(EventActionAttackInputTag, &EventData);
 				
 				//레거시: 실행 중인 어빌리티에 Pressed 전달은 Attack밖에 없기 때문에 기존 Pressed 비활성화, IA를 전달하는 이벤트 송신으로 변경
-				AbilitySystemComponent->AbilitySpecInputPressed(*Spec);
+				//AbilitySystemComponent->AbilitySpecInputPressed(*Spec);
 			}
 			//해당 어빌리티가 비활성화 상태면
 			else

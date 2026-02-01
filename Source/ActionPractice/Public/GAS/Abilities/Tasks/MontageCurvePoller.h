@@ -44,6 +44,9 @@ public:
 	//커브 폴러 초기화
 	void Initialize(const TArray<FName>& InCurveNames);
 
+	//커브 추가
+	void AddCurve(const FName InCurveName);
+	
 	//폴링 실행 - TickTask에서 호출
 	void Poll(UAnimInstance* AnimInstance);
 

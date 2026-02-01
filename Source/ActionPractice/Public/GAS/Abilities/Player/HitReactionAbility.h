@@ -49,7 +49,12 @@ protected:
 
 #pragma region "Protected Functions"
 
+	virtual bool ConsumeStamina() override;
+
 	virtual UAnimMontage* SetMontageToPlayTask() override;
+
+	virtual void OnTaskMontageCompleted() override;
+	virtual void OnTaskMontageInterrupted() override;
 
 #pragma endregion
 

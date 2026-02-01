@@ -331,7 +331,7 @@ void USprintAbility::StopStaminaDrainEffect()
 	}
 }
 
-void USprintAbility::HandleWaitInputReleased(float TimeHeld)
+void USprintAbility::OnWaitInputRelease(float TimeHeld)
 {
 	DEBUG_LOG(TEXT("Sprint WaitInputRelease - End Ability (TimeHeld: %.3f)"), TimeHeld);
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);

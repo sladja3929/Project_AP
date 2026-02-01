@@ -71,10 +71,7 @@ protected:
 
 	//태스크 콜백
 	UFUNCTION()
-	void OnWaitInputRelease(float TimeHeld);
-
-	//실제 처리(각 어빌리티가 override)
-	virtual void HandleWaitInputReleased(float TimeHeld);
+	virtual void OnWaitInputRelease(float TimeHeld);
 	
 #pragma endregion
 };

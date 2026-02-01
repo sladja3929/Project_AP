@@ -76,16 +76,19 @@ public:
     virtual void OnDestroy(bool AbilityEnded) override;
     virtual void ExternalCancel() override;
 
+    UFUNCTION()
+    void StopMontage();
+    
     //UFUNCTION()
     //void ChangeMontageAndPlay(UAnimMontage* NewMontage);
 
-    //커브 폴링 활성화 - 어빌리티에서 호출
+    //풀링할 커브 여러개 추가
     UFUNCTION()
-    void EnableCurvePolling(const TArray<FName>& CurveNames);
+    void EnableCurvePollingArray(const TArray<FName>& CurveNames);
 
-    //기존 커브 폴링 목록에 커브 추가
+    //풀링할 커브 한개 추가
     UFUNCTION()
-    void AddCurveToPolling(FName CurveName);
+    void EnableCurvePolling(const FName CurveName);
 
     //커브 폴링 비활성화
     UFUNCTION()
@@ -140,9 +143,6 @@ protected:
     
     UFUNCTION()
     void PlayMontage();
-
-    UFUNCTION()
-    void StopMontage();
     
     //이벤트 핸들러
     UFUNCTION()

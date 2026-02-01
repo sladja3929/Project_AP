@@ -58,15 +58,12 @@ protected:
 #pragma region "Protected Functions"
 
 	UFUNCTION()
-	virtual void PlayAction() override;
-
-	UFUNCTION()
 	virtual UAnimMontage* SetMontageToPlayTask() override;
 	
-	virtual void BindEventsAndReadyMontageTask() override;
+	virtual void SetUpPlayMontageWithEventsTask() override;
 
 	UFUNCTION()
-	virtual void ExecuteMontageTask() override;
+	virtual void StartMontageWithEventsTask() override;
 
 	//Idle일 때는 호출되지 않음, 오로지 Reaction일때만
 	UFUNCTION()
@@ -75,7 +72,7 @@ protected:
 	UFUNCTION()
 	virtual void OnTaskMontageInterrupted() override;
 
-	virtual void HandleWaitInputReleased(float TimeHeld) override;
+	virtual void OnWaitInputRelease(float TimeHeld) override;
 	
 #pragma endregion
 

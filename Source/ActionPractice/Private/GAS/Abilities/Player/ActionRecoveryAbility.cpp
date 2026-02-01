@@ -3,11 +3,11 @@
 #include "Characters/ActionPracticeCharacter.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_WaitDelay.h"
-#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
+#include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionRecoveryAbility, Log, All);
@@ -70,8 +70,6 @@ void UActionRecoveryAbility::OnGiveAbility(const FGameplayAbilityActorInfo* Acto
 void UActionRecoveryAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
-	PlayAction();
 }
 
 void UActionRecoveryAbility::ActivateInitSettings()
@@ -81,85 +79,8 @@ void UActionRecoveryAbility::ActivateInitSettings()
 	bActionRecoveryEnded = false;
 }
 
-void UActionRecoveryAbility::AddStateRecoveringTag()
+bool UActionRecoveryAbility::RotateCharacter()
 {
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
-	if (!ASC)
-	{
-		DEBUG_LOG(TEXT("ActionRecoveryStart: No ASC"));
-	}
-
-	ACharacter* Character = GetActionPracticeCharacterFromActorInfo();
-	if (!Character) return;
-	
-	//서버: 권위 태그 부여
-	if (Character->HasAuthority())
-	{
-		DEBUG_LOG(TEXT("Adding State.Recovering.Auth on Authority"));
-		ASC->AddLooseGameplayTag(StateRecoveringAuthTag);
-		ASC->AddMinimalReplicationGameplayTag(StateRecoveringAuthTag);
-	}
-
-	//클라: 로컬 태그 부여 (로컬 입력 제어용)
-	if (Character->IsLocallyControlled())
-	{
-		DEBUG_LOG(TEXT("Adding State.Recovering.Local on Local"));
-		ASC->AddLooseGameplayTag(StateRecoveringLocalTag);
-	}
-}
-
-void UActionRecoveryAbility::RemoveStateRecoveringTags()
-{
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
-	if (!ASC)
-	{
-		DEBUG_LOG(TEXT("ActionRecoveryEnd: No ASC"));
-	}
-
-	ACharacter* Character = GetActionPracticeCharacterFromActorInfo();
-	if (!Character) return;
-	
-	//서버: 권위 태그 삭제
-	if (Character->HasAuthority())
-	{
-		while (ASC->HasMatchingGameplayTag(StateRecoveringAuthTag))
-		{
-			ASC->RemoveLooseGameplayTag(StateRecoveringAuthTag);
-			ASC->RemoveMinimalReplicationGameplayTag(StateRecoveringAuthTag);
-		}
-		DEBUG_LOG(TEXT("Remove All State.Recovering.Auth on Authority"));
-	}
-
-	//클라: 로컬 태그 삭제 (로컬 입력 제어용)
-	if (Character->IsLocallyControlled())
-	{
-		while (ASC->HasMatchingGameplayTag(StateRecoveringLocalTag))
-		{
-			ASC->RemoveLooseGameplayTag(StateRecoveringLocalTag);
-		}
-		DEBUG_LOG(TEXT("Remove All State.Recovering.Local on Local"));
-	}
-}
-
-bool UActionRecoveryAbility::ConsumeStamina()
-{
-	if (!ApplyStaminaCost())
-	{
-		DEBUG_LOG(TEXT("No Stamina"));
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-		return false;
-	}
-
-	return true;
-}
-
-bool UActionRecoveryAbility:: RotateCharacter()
-{
-	if (!bRotateBeforeAction)
-	{
-		return false;
-	}
-
 	if (AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo())
 	{
 		DEBUG_LOG(TEXT("Rotating Character"));
@@ -170,10 +91,8 @@ bool UActionRecoveryAbility:: RotateCharacter()
 	return false;
 }
 
-void UActionRecoveryAbility::PlayAction()
+void UActionRecoveryAbility::StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask()
 {
-	if (!ConsumeStamina()) return;
-
 	bool bShouldRotate = RotateCharacter();
 
 	//캐릭터가 회전을 마칠 때까지 기다린 후에 몽타주 태스크 실행
@@ -182,12 +101,12 @@ void UActionRecoveryAbility::PlayAction()
 	WaitDelayTask = UAbilityTask_WaitDelay::WaitDelay(this, DelayTime);
 	if (WaitDelayTask)
 	{
-		WaitDelayTask->OnFinish.AddDynamic(this, &UActionRecoveryAbility::ExecuteMontageTask);
+		WaitDelayTask->OnFinish.AddDynamic(this, &UActionRecoveryAbility::StartMontageWithEventsTask);
 		WaitDelayTask->ReadyForActivation();
 	}
 }
 
-void UActionRecoveryAbility::ExecuteMontageTask()
+void UActionRecoveryAbility::StartMontageWithEventsTask()
 {
 	UAnimMontage* MontageToPlay = SetMontageToPlayTask();
 	if (!MontageToPlay)
@@ -196,8 +115,16 @@ void UActionRecoveryAbility::ExecuteMontageTask()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}
-    
-	// 커스텀 태스크 생성
+
+	//기존 태스크가 존재하면
+	if (PlayMontageWithEventsTask)
+	{
+		PlayMontageWithEventsTask->StopMontage();
+		PlayMontageWithEventsTask->EndTask();
+		PlayMontageWithEventsTask = nullptr;
+	}
+	
+	//커스텀 태스크 생성
 	PlayMontageWithEventsTask = UAbilityTask_PlayMontageWithEvents::CreatePlayMontageWithEventsProxy(
 		this,
 		NAME_None,
@@ -207,10 +134,13 @@ void UActionRecoveryAbility::ExecuteMontageTask()
 		1.0f
 	);
     
-	BindEventsAndReadyMontageTask();
+	SetUpPlayMontageWithEventsTask();
+
+	//태스크 활성화
+	PlayMontageWithEventsTask->ReadyForActivation();
 }
 
-void UActionRecoveryAbility::BindEventsAndReadyMontageTask()
+void UActionRecoveryAbility::SetUpPlayMontageWithEventsTask()
 {
 	if (!PlayMontageWithEventsTask)
 	{
@@ -219,49 +149,18 @@ void UActionRecoveryAbility::BindEventsAndReadyMontageTask()
 		return;
 	}
 
-	//커스텀 몽타주 태스크 델리게이트 바인딩
+	//몽타주 델리게이트 바인딩
 	PlayMontageWithEventsTask->OnMontageCompleted.AddDynamic(this, &UActionRecoveryAbility::OnTaskMontageCompleted);
 	PlayMontageWithEventsTask->OnMontageInterrupted.AddDynamic(this, &UActionRecoveryAbility::OnTaskMontageInterrupted);
 	PlayMontageWithEventsTask->OnNotifyEventsReceived.AddDynamic(this, &UActionRecoveryAbility::OnTaskNotifyEventsReceived);
 
-	//=== 커브 폴링 활성화 (노티파이 대체) ===
-	TArray<FName> CurveNames;
-	CurveNames.Add(CurveName_EnableBufferInput);
-	CurveNames.Add(CurveName_ActionRecovery);
-	PlayMontageWithEventsTask->EnableCurvePolling(CurveNames);
-
+	//커브 폴링 활성화 (노티파이 대체)
+	PlayMontageWithEventsTask->EnableCurvePolling(CurveName_EnableBufferInput);
+	PlayMontageWithEventsTask->EnableCurvePolling(CurveName_ActionRecovery);
+	
 	//커브 에지 델리게이트 바인딩
 	PlayMontageWithEventsTask->OnCurveRisingEdge.AddDynamic(this, &UActionRecoveryAbility::OnCurveRisingEdgeReceived);
 	PlayMontageWithEventsTask->OnCurveFallingEdge.AddDynamic(this, &UActionRecoveryAbility::OnCurveFallingEdgeReceived);
-
-	//노티파이 이벤트 바인딩 - ActionRecovery는 커브로 대체, 자식 클래스의 노티파이(HitDetection 등)는 자식에서 바인딩
-	//기존 노티파이 바인딩 제거됨 (ActionRecoveryStart/End)
-
-	//태스크 활성화
-	PlayMontageWithEventsTask->ReadyForActivation();
-}
-	
-void UActionRecoveryAbility::ReadyInputByBufferTask()
-{
-	//이벤트 태스크 실행
-	WaitInputByBufferEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
-		this, EventInputByBufferTag, nullptr, false, true);
-	
-	WaitInputByBufferEventTask->EventReceived.AddDynamic(this, &UActionRecoveryAbility::OnEventInputByBuffer);
-	
-	WaitInputByBufferEventTask->ReadyForActivation();
-}
-
-void UActionRecoveryAbility::OnTaskMontageCompleted()
-{
-	DEBUG_LOG(TEXT("Montage Task Completed"));
-	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-}
-
-void UActionRecoveryAbility::OnTaskMontageInterrupted()
-{
-	DEBUG_LOG(TEXT("Montage Task Interrupted"));
-	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void UActionRecoveryAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)
@@ -295,7 +194,10 @@ void UActionRecoveryAbility::OnCurveRisingEdgeReceived(FName CurveName)
 	else if (CurveName == CurveName_ActionRecovery)
 	{
 		//ActionRecovery 상승 에지: State.Recovering 태그 추가
-		AddStateRecoveringTag();
+		if (UActionPracticeAbilitySystemComponent* APASC = GetActionPracticeAbilitySystemComponentFromActorInfo())
+		{
+			APASC->AddTag_NetPredicted(StateRecoveringAuthTag, StateRecoveringLocalTag);
+		}
 		bActionRecoveryEnded = false;
 	}
 }
@@ -311,7 +213,7 @@ void UActionRecoveryAbility::OnCurveFallingEdgeReceived(FName CurveName)
 	else if (CurveName == CurveName_ActionRecovery)
 	{
 		//ActionRecovery 하강 에지: 리커버리 종료
-		OnActionRecoveryEnd();
+		ProcessActionRecoveryEnd();
 	}
 }
 
@@ -341,12 +243,15 @@ void UActionRecoveryAbility::ExecuteBuffer()
 	DEBUG_LOG(TEXT("ExecuteBuffer: Buffer Executed"));
 }
 
-void UActionRecoveryAbility::OnActionRecoveryEnd() 
+void UActionRecoveryAbility::ProcessActionRecoveryEnd()
 {
 	DEBUG_LOG(TEXT("OnActionRecoveryEnd: State.Recovering removed"));
 
 	bActionRecoveryEnded = true;
-	RemoveStateRecoveringTags();
+	if (UActionPracticeAbilitySystemComponent* APASC = GetActionPracticeAbilitySystemComponentFromActorInfo())
+	{
+		APASC->RemoveTags_NetPredicted(StateRecoveringAuthTag, StateRecoveringLocalTag);
+	}
 	ExecuteBuffer();
 }
 #pragma endregion
@@ -356,5 +261,5 @@ void UActionRecoveryAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 	
 	//커브 엣지 누락 대비 리커버리 종료 로직 활성화
-	if (!bActionRecoveryEnded) OnActionRecoveryEnd();
+	if (!bActionRecoveryEnded) ProcessActionRecoveryEnd();
 }

@@ -108,7 +108,7 @@ void UAbilityTask_PlayMontageWithEvents::TickTask(float DeltaTime)
 }
 
 #pragma region "Curve Polling Functions"
-void UAbilityTask_PlayMontageWithEvents::EnableCurvePolling(const TArray<FName>& CurveNames)
+void UAbilityTask_PlayMontageWithEvents::EnableCurvePollingArray(const TArray<FName>& CurveNames)
 {
     CurvePoller.Initialize(CurveNames);
     bUseCurvePolling = true;
@@ -116,15 +116,12 @@ void UAbilityTask_PlayMontageWithEvents::EnableCurvePolling(const TArray<FName>&
     DEBUG_LOG(TEXT("Curve Polling Enabled with %d curves"), CurveNames.Num());
 }
 
-void UAbilityTask_PlayMontageWithEvents::AddCurveToPolling(FName CurveName)
+void UAbilityTask_PlayMontageWithEvents::EnableCurvePolling(const FName CurveName)
 {
-    if (!CurvePoller.CurveNames.Contains(CurveName))
-    {
-        CurvePoller.CurveNames.Add(CurveName);
-        CurvePoller.ActiveStates.Add(CurveName, false);
-        CurvePoller.CurrentValues.Add(CurveName, 0.0f);
-        DEBUG_LOG(TEXT("Curve Added to Polling: %s"), *CurveName.ToString());
-    }
+    CurvePoller.AddCurve(CurveName);
+    bUseCurvePolling = true;
+    bTickingTask = true;
+    DEBUG_LOG(TEXT("Curve Polling Enabled with Curve: %s"), *CurveName.ToString());
 }
 
 void UAbilityTask_PlayMontageWithEvents::DisableCurvePolling()
