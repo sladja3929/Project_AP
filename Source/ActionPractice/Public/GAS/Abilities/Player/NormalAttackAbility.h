@@ -5,6 +5,10 @@
 #include "Engine/Engine.h"
 #include "NormalAttackAbility.generated.h"
 
+/***
+* 레거시 클래스: 사용하지 않음, AttackSequenceAbility로 대체
+*/
+
 /*** 일반공격 트리거/액션 설명
  * 1. TryActivate로 어빌리티 실행
  * 2. PlayBuffer: ActionRecovery 사이에 입력이 들어옴. 연계 공격 수행

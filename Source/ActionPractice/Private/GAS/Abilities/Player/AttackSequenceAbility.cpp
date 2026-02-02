@@ -47,8 +47,9 @@ void UAttackSequenceAbility::ActivateAbility(const FGameplayAbilitySpecHandle Ha
 
 	DEBUG_LOG(TEXT("AttackSequenceAbility Activated"));
 
-	//입력 이벤트 태스크 시작: 항상 대기
+	//항상 대기: 입력 이벤트, 버퍼 이벤트
 	START_WAIT_EVENT_TASK(WaitAttackInputEventTask, EventActionAttackInputTag, OnEventAttackInput, nullptr, false, true);
+	START_WAIT_EVENT_TASK(WaitInputByBufferEventTask, EventInputByBufferTag, OnEventInputByBuffer, nullptr, false, true);
 }
 
 #pragma region "Activate Initialization Functions"
@@ -62,6 +63,16 @@ void UAttackSequenceAbility::ActivateInitSettings()
 
 	//HitDetectionSetter 바인딩
 	BindHitDetectionSetter();
+
+	if (!CachedWeaponDataAsset || !HitDetectionSetter.IsValid())
+	{
+		DEBUG_LOG(TEXT("AttackSequence prerequisites not ready. EndAbility. WeaponData=%s HitDetectionValid=%s"),
+			CachedWeaponDataAsset ? TEXT("true") : TEXT("false"),
+			HitDetectionSetter.IsValid() ? TEXT("true") : TEXT("false"));
+
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return;
+	}
 
 	//타입 초기화
 	CurrentAttackType = EAttackType::None;
@@ -340,7 +351,6 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 		break;
 		
 	case EAttackSequenceState::AfterRecovery:
-		END_ABILITY_TASK(WaitInputByBufferEventTask);
 		END_ABILITY_TASK(WaitResetComboEventTask);
 		END_ABILITY_TASK(WaitCancelAttackEventTask);
 		break;
@@ -378,8 +388,8 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 		//리커버리 종료 -> 콤보 카운터 중가 -> InputByBuffer 또는 AttackInput-> 다른 공격이면 콤보 초기화 / 같은 공격이면 다음 콤보 실행
 		ComboCounter++;
 		if (ComboCounter >= MaxComboCount) ComboCounter = 0;
-		
-		START_WAIT_EVENT_TASK(WaitInputByBufferEventTask, EventInputByBufferTag, OnEventInputByBuffer, nullptr, true, true);
+
+		//콤보 리셋 이벤트
 		START_WAIT_EVENT_TASK(WaitResetComboEventTask, EventNotifyResetComboTag, OnEventResetCombo, nullptr, true, true);
 		
 		//이동으로 인한 후딜 취소 이벤트
@@ -474,7 +484,7 @@ void UAttackSequenceAbility::ProcessNormalAttackInput()
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
 	if (!ASC) return;
-
+	
 	//Roll Attack
 	if (ASC->HasMatchingGameplayTag(StateJustRolledTag) || ASC->HasMatchingGameplayTag(StateRollingTag))
 	{

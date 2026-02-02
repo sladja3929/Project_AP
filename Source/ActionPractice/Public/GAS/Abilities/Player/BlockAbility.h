@@ -49,9 +49,6 @@ protected:
 
 	UPROPERTY()
 	bool bIsBlocking = false;
-
-	//ExecuteMontageTask 파라미터
-	bool bCreateTask = false;
 	
 #pragma endregion
 

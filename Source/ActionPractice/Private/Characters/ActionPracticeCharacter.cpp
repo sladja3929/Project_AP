@@ -21,11 +21,12 @@
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
 #include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionPracticeCharacter, Log, All);
@@ -153,26 +154,7 @@ void AActionPracticeCharacter::BeginPlay()
 		DEBUG_LOG(TEXT("PlayerStatsWidgetClass is not set!"));
 	}
 
-	if (!this->IsLocallyControlled() && AbilitySystemComponent)
-	{
-		APASC = Cast<UActionPracticeAbilitySystemComponent>(AbilitySystemComponent);
-
-		//AttackSequenceAbility 활성화
-		FGameplayTag AbilityAttackNormalTag = UGameplayTagsSubsystem::GetAbilityAttackNormalTag();
-		FGameplayTag AbilityAttackChargeTag = UGameplayTagsSubsystem::GetAbilityAttackChargeTag();
-
-		for (FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
-		{
-			if (!Spec.Ability) continue;
-
-			const FGameplayTagContainer& AssetTags = Spec.Ability->GetAssetTags();
-
-			if (AssetTags.HasTag(AbilityAttackNormalTag) && AssetTags.HasTag(AbilityAttackChargeTag))
-			{
-				AbilitySystemComponent->TryActivateAbility(Spec.Handle);
-			}
-		}
-	}
+	TryAutoActivateAttackSequenceAbility();
 }
 
 void AActionPracticeCharacter::Tick(float DeltaSeconds)
@@ -703,6 +685,7 @@ void AActionPracticeCharacter::InitializeAbilitySystem()
 void AActionPracticeCharacter::CreateAbilitySystemComponent()
 {
 	AbilitySystemComponent = CreateDefaultSubobject<UActionPracticeAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	APASC = Cast<UActionPracticeAbilitySystemComponent>(AbilitySystemComponent);
 }
 
 void AActionPracticeCharacter::CreateAttributeSet()
@@ -854,6 +837,8 @@ void AActionPracticeCharacter::OnRep_LeftWeapon()
 			DEBUG_LOG(TEXT("OnRep_LeftWeapon: Attached to %s"), *SocketString);
 		}
 	}
+
+	TryAutoActivateAttackSequenceAbility();
 }
 
 void AActionPracticeCharacter::OnRep_RightWeapon()
@@ -886,5 +871,122 @@ void AActionPracticeCharacter::OnRep_RightWeapon()
 			DEBUG_LOG(TEXT("OnRep_RightWeapon: Attached to %s"), *SocketString);
 		}
 	}
+
+	TryAutoActivateAttackSequenceAbility();
+}
+
+bool AActionPracticeCharacter::IsAttackSequenceAutoActivateReady() const
+{
+	// 로컬 입력을 처리할 인스턴스에서만(Standalone/ListenHost/AutonomousProxy)
+	if (!IsLocallyControlled())
+	{
+		return false;
+	}
+
+	// ASC 필요
+	if (!AbilitySystemComponent)
+	{
+		return false;
+	}
+
+	// AttackSequenceAbility는 현재 구현상 RightWeapon 기반(히트디텍션/DA) 의존이 강함
+	if (!RightWeapon)
+	{
+		return false;
+	}
+
+	// WeaponDataAsset 준비 확인 (DA가 없으면 Ability 내부 CacheWeaponData도 실패)
+	if (!RightWeapon->GetWeaponData())
+	{
+		return false;
+	}
+
+	// HitDetection 인터페이스 준비 확인
+	if (!RightWeapon->GetHitDetectionComponent())
+	{
+		return false;
+	}
+
+	return true;
+}
+
+void AActionPracticeCharacter::TryAutoActivateAttackSequenceAbility()
+{
+	// 이미 성공했으면 중복 시도 방지
+	if (bAttackSequenceAutoActivated)
+	{
+		return;
+	}
+
+	// 준비 안 됐으면 약간 딜레이 후 재시도 (복제/OnRep 타이밍 흡수)
+	if (!IsAttackSequenceAutoActivateReady())
+	{
+		// 무한 루프 방지 (필요하면 값 조정)
+		constexpr int32 MaxRetry = 120; // 0.05s * 120 = 6초
+		if (AttackSequenceAutoActivateRetryCount++ >= MaxRetry)
+		{
+			DEBUG_LOG(TEXT("AttackSequence auto-activate failed: retry limit reached. RightWeapon=%s"),
+				*GetNameSafe(RightWeapon.Get()));
+			return;
+		}
+
+		if (GetWorld())
+		{
+			GetWorldTimerManager().SetTimer(
+				AttackSequenceAutoActivateTimer,
+				this,
+				&AActionPracticeCharacter::TryAutoActivateAttackSequenceAbility,
+				0.05f,
+				false
+			);
+		}
+		return;
+	}
+
+	// 이제부터 실제 활성화 시도
+	GetWorldTimerManager().ClearTimer(AttackSequenceAutoActivateTimer);
+
+	UAbilitySystemComponent* ASC = AbilitySystemComponent.Get();
+	if (!ASC)
+	{
+		return;
+	}
+
+	// 기존 BeginPlay 로직과 동일한 방식: AssetTags로 AttackSequenceAbility 식별 후 TryActivate
+	const FGameplayTag AbilityAttackNormalTag = UGameplayTagsSubsystem::GetAbilityAttackNormalTag();
+	const FGameplayTag AbilityAttackChargeTag = UGameplayTagsSubsystem::GetAbilityAttackChargeTag();
+
+	for (FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		if (!Spec.Ability)
+		{
+			continue;
+		}
+
+		const FGameplayTagContainer AssetTags = Spec.Ability->GetAssetTags();
+		if (!AssetTags.HasTag(AbilityAttackNormalTag) && !AssetTags.HasTag(AbilityAttackChargeTag))
+		{
+			continue;
+		}
+
+		// 이미 활성 상태면 성공 처리
+		if (Spec.IsActive())
+		{
+			bAttackSequenceAutoActivated = true;
+			DEBUG_LOG(TEXT("AttackSequence already active - auto-activate complete."));
+			return;
+		}
+
+		const bool bSuccess = ASC->TryActivateAbility(Spec.Handle, true);
+		DEBUG_LOG(TEXT("AttackSequence auto-activate: %s"), bSuccess ? TEXT("SUCCESS") : TEXT("FAILED"));
+
+		if (bSuccess)
+		{
+			bAttackSequenceAutoActivated = true;
+		}
+		return;
+	}
+
+	DEBUG_LOG(TEXT("AttackSequence auto-activate: no matching ability spec found."));
 }
 #pragma endregion

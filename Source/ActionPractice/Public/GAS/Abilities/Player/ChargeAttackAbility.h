@@ -13,6 +13,10 @@ enum class EAPChargePhase : uint8
 	Attack
 };
 
+/***
+* 레거시 클래스: 사용하지 않음, AttackSequenceAbility로 대체
+*/
+
 /*** 차지공격 트리거/액션 설명
  * - Release: WaitInputReleaseTask에서 릴리즈 감지
  * - ChargeStart: 차지 몽타주 초기에 ChargeStart 수신

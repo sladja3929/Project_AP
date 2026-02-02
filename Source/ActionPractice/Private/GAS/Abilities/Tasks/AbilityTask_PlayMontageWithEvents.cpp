@@ -6,7 +6,7 @@
 #include "AbilitySystemGlobals.h"
 #include "GAS/GameplayTagsSubsystem.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAbilityTask_PlayMontageWithEvents, Log, All);

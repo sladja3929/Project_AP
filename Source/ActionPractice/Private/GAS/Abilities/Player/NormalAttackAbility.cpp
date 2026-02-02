@@ -18,6 +18,10 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+/***
+* 레거시 클래스: 사용하지 않음, AttackSequenceAbility로 대체
+*/
+
 UNormalAttackAbility::UNormalAttackAbility()
 {
 	//클라이언트 예측 실행 (콤보 입력 버퍼링을 위해 클라이언트에서도 태스크 필요)

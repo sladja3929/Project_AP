@@ -211,7 +211,6 @@ void UInputBufferComponent::ExecuteBuffer()
 		BufferedActionTag = FGameplayTag();
 		BufferPriority = -1;
 		bBufferedActionReleased = false;
-
 		DEBUG_LOG(TEXT("ExecuteBuffer: Normal buffer executed"));
 	}
 

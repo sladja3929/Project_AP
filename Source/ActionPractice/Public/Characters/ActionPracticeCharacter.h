@@ -177,7 +177,12 @@ protected:
 	// ===== LockOn =====
 	UPROPERTY(BlueprintReadOnly, Category = "Combat", Replicated)
 	TObjectPtr<AActor> LockedOnTarget = nullptr;
-	
+
+	// AttackSequenceAbility auto-activation gate
+	bool bAttackSequenceAutoActivated = false;
+	int32 AttackSequenceAutoActivateRetryCount = 0;
+	FTimerHandle AttackSequenceAutoActivateTimer;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -202,6 +207,9 @@ protected:
 	
 	UFUNCTION(BlueprintCallable, Category = "GAS")
 	void GASInputReleased(const UInputAction* InputAction);
+
+	void TryAutoActivateAttackSequenceAbility();
+	bool IsAttackSequenceAutoActivateReady() const;
 	
 	// ===== Input Handler Functions =====
 	void Move(const FInputActionValue& Value);
@@ -239,7 +247,7 @@ protected:
 	void OnRep_LeftWeapon();
 
 	UFUNCTION()
-	void OnRep_RightWeapon();
+	void OnRep_RightWeapon();	
 
 #pragma endregion
 

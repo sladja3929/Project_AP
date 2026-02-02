@@ -21,6 +21,10 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+/***
+* 레거시 클래스: 사용하지 않음, AttackSequenceAbility로 대체
+*/
+
 //커브 이름 상수 정의
 const FName UChargeAttackAbility::CurveName_ChargeStart = TEXT("ChargeStart");
 
