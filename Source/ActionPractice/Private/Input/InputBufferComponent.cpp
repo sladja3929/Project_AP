@@ -170,7 +170,10 @@ void UInputBufferComponent::BufferInputInternal(FGameplayTag InputActionTag, boo
 
 		BufferedActionTag = InputActionTag;
 		BufferPriority = NewActionPriority;
-			
+
+		//버퍼 저장 시점의 상태 태그 캡처
+		CaptureCurrentStateTags();
+
 		DEBUG_LOG(TEXT("BufferInputInternal Action buffered - %s Priority: %d"), *InputActionTag.ToString(), NewActionPriority);
 		return;
 	}	
@@ -268,12 +271,16 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 		{
 			DEBUG_LOG(TEXT("Play Buffer - Play Buffer Event: %s"), *GetNameSafe(Spec->Ability->GetClass()));
 			Spec->InputPressed = true;
-			
+
 			FGameplayEventData EventData;
 			EventData.InstigatorTags.AddTag(CachedInputActionData->FindTagByInputAction(InputAction)); //타깃 어빌리티만 활성화
+
+			//버퍼 저장 시점의 상태 태그 추가
+			EventData.InstigatorTags.AppendTags(BufferedStateTags);
+
 			EventData.EventMagnitude = bBufferedActionReleased ? 1.0f : 0.0f; //release 여부를 EventMagnitude를 통해 전달
 			EventData.EventTag = EventActionInputByBufferTag;
-			
+
 			APASC->HandleGameplayEvent_NetPredicted(EventActionInputByBufferTag, &EventData);
 		}
 		
@@ -287,6 +294,38 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 		//다 아닐때
 		else DEBUG_LOG(TEXT("Play Buffer Activate Failed: %s"), *GetNameSafe(Spec->Ability->GetClass()));
 	}
+}
+
+void UInputBufferComponent::CaptureCurrentStateTags()
+{
+	BufferedStateTags.Reset();
+
+	if (!OwnerCharacter)
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent();
+	if (!ASC)
+	{
+		return;
+	}
+
+	//현재 ASC의 모든 태그 가져오기
+	FGameplayTagContainer CurrentTags;
+	ASC->GetOwnedGameplayTags(CurrentTags);
+
+	//State 태그만 필터링하여 저장
+	static const FGameplayTag StateParentTag = FGameplayTag::RequestGameplayTag(FName("State"));
+	for (const FGameplayTag& Tag : CurrentTags)
+	{
+		if (Tag.MatchesTag(StateParentTag))
+		{
+			BufferedStateTags.AddTag(Tag);
+		}
+	}
+
+	DEBUG_LOG(TEXT("CaptureCurrentStateTags: %s"), *BufferedStateTags.ToString());
 }
 
 void UInputBufferComponent::EnableBufferInput(bool bEnabled)

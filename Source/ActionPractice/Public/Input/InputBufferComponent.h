@@ -64,6 +64,10 @@ public:
 protected:
 #pragma region "Protected Variables"
 
+    //버퍼 저장 시점의 상태 태그 (Roll, Sprint 등 판정용)
+    UPROPERTY()
+    FGameplayTagContainer BufferedStateTags;
+
     FDelegateHandle EnableBufferInputHandle;
     FDelegateHandle PlayBufferHandle;
 
@@ -79,8 +83,10 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	void BufferInputInternal(FGameplayTag InputActionTag, bool bIsReleased);
-	
+
     void ActivateAbilityByTag(FGameplayTag ActionTag);
+
+    void CaptureCurrentStateTags();
 
 #pragma endregion
 

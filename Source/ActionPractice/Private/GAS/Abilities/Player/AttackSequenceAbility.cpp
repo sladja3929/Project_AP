@@ -391,9 +391,15 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 
 		//콤보 리셋 이벤트
 		START_WAIT_EVENT_TASK(WaitResetComboEventTask, EventNotifyResetComboTag, OnEventResetCombo, nullptr, true, true);
-		
+
 		//이동으로 인한 후딜 취소 이벤트
 		START_WAIT_EVENT_TASK(WaitCancelAttackEventTask, EventActionCancelAttackTag, OnEventCancelAttack, nullptr, true, true);
+
+		//서버: 예약된 버퍼 입력이 있으면 즉시 소비
+		if (GetAvatarActorFromActorInfo()->HasAuthority())
+		{
+			ConsumePendingBufferInput();
+		}
 		break;
 
 	default:
@@ -465,11 +471,11 @@ void UAttackSequenceAbility::SetUpPlayMontageWithEventsTask()
 void UAttackSequenceAbility::OnEventAttackInput(FGameplayEventData Payload)
 {
 	DEBUG_LOG(TEXT("AttackSequenceAbility - AttackInput Received"));
-	
+
 	//Normal Attack 입력
 	if (Payload.InstigatorTags.HasTag(InputAttackTag))
 	{
-		ProcessNormalAttackInput();
+		ProcessNormalAttackInput(Payload);
 	}
 
 	//Charge Attack 입력
@@ -480,24 +486,17 @@ void UAttackSequenceAbility::OnEventAttackInput(FGameplayEventData Payload)
 	}
 }
 
-void UAttackSequenceAbility::ProcessNormalAttackInput()
+void UAttackSequenceAbility::ProcessNormalAttackInput(const FGameplayEventData& Payload)
 {
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
-	if (!ASC) return;
-	
-	//Roll Attack
-	if (ASC->HasMatchingGameplayTag(StateJustRolledTag) || ASC->HasMatchingGameplayTag(StateRollingTag))
+	//Payload의 태그로 공격 타입 판정 (버퍼 저장 시점 기준)
+	if (Payload.InstigatorTags.HasTag(StateJustRolledTag) || Payload.InstigatorTags.HasTag(StateRollingTag))
 	{
 		ChangeAttackType(EAttackType::Roll);
 	}
-
-	//Sprint Attack
-	else if (ASC->HasMatchingGameplayTag(StateSprintingTag))
+	else if (Payload.InstigatorTags.HasTag(StateSprintingTag))
 	{
 		ChangeAttackType(EAttackType::Sprint);
 	}
-
-	//Normal Attack
 	else
 	{
 		ChangeAttackType(EAttackType::Normal);
@@ -532,32 +531,77 @@ void UAttackSequenceAbility::OnWaitInputRelease(float TimeHeld)
 
 void UAttackSequenceAbility::OnEventInputByBuffer(FGameplayEventData Payload)
 {
-	DEBUG_LOG(TEXT("AttackSequenceAbility - InputByBuffer Received"));
-	
-	//Normal Attack 버퍼
-	if (Payload.InstigatorTags.HasTag(InputAttackTag))
+	DEBUG_LOG(TEXT("InputByBuffer Received - CurrentState: %s"),
+		*UEnum::GetValueAsName(CurrentState).ToString());
+
+	//서버에서 Attacking 상태일 때 → 예약만 하고 return
+	AActor* AvatarActor = GetAvatarActorFromActorInfo();
+	if (AvatarActor && AvatarActor->HasAuthority())
 	{
-		ProcessNormalAttackInput();
+		if (CurrentState == EAttackSequenceState::Attacking)
+		{
+			DEBUG_LOG(TEXT("Server - Buffering InputByBuffer (State: Attacking)"));
+			bHasPendingBufferInput = true;
+			PendingBufferPayload = Payload;
+			return;
+		}
 	}
 
-	//Charge Attack 버퍼
+	//기존 로직 (클라이언트 예측 또는 서버 AfterRecovery 상태)
+	if (Payload.InstigatorTags.HasTag(InputAttackTag))
+	{
+		ProcessNormalAttackInput(Payload);
+	}
 	else if (Payload.InstigatorTags.HasTag(InputChargeAttackTag))
 	{
-		//단발 입력: 차지하지 않는 공격
 		if (Payload.EventMagnitude != 0.0f)
 		{
 			DEBUG_LOG(TEXT("Input By Buffer - No Charge true"));
 			CurrentChargeProgress = EChargeProgress::NoCharge;
 		}
-
-		//홀드 중인 입력: 차지 공격
 		else
 		{
 			CurrentChargeProgress = EChargeProgress::WindUp;
 		}
-		
+
 		ProcessChargeAttackInput();
 	}
+}
+
+void UAttackSequenceAbility::ConsumePendingBufferInput()
+{
+	if (!bHasPendingBufferInput)
+	{
+		return;
+	}
+
+	DEBUG_LOG(TEXT("ConsumePendingBufferInput - Processing Buffered Input"));
+
+	bHasPendingBufferInput = false;
+
+	//예약된 Payload로 기존 로직 실행
+	const FGameplayEventData& Payload = PendingBufferPayload;
+
+	if (Payload.InstigatorTags.HasTag(InputAttackTag))
+	{
+		ProcessNormalAttackInput(Payload);
+	}
+	else if (Payload.InstigatorTags.HasTag(InputChargeAttackTag))
+	{
+		if (Payload.EventMagnitude != 0.0f)
+		{
+			CurrentChargeProgress = EChargeProgress::NoCharge;
+		}
+		else
+		{
+			CurrentChargeProgress = EChargeProgress::WindUp;
+		}
+
+		ProcessChargeAttackInput();
+	}
+
+	//Payload 초기화
+	PendingBufferPayload = FGameplayEventData();
 }
 
 void UAttackSequenceAbility::OnEventCancelAttack(FGameplayEventData Payload)

@@ -677,6 +677,30 @@ void AActionPracticeCharacter::OnChargeAttackReleased()
 #pragma endregion
 
 #pragma region "GAS Functions"
+FGameplayTagContainer AActionPracticeCharacter::CaptureCurrentStateTags() const
+{
+	FGameplayTagContainer StateTags;
+
+	if (!APASC)
+	{
+		return StateTags;
+	}
+
+	FGameplayTagContainer CurrentTags;
+	APASC->GetOwnedGameplayTags(CurrentTags);
+
+	static const FGameplayTag StateParentTag = FGameplayTag::RequestGameplayTag(FName("State"));
+	for (const FGameplayTag& Tag : CurrentTags)
+	{
+		if (Tag.MatchesTag(StateParentTag))
+		{
+			StateTags.AddTag(Tag);
+		}
+	}
+
+	return StateTags;
+}
+
 void AActionPracticeCharacter::InitializeAbilitySystem()
 {
 	Super::InitializeAbilitySystem();
@@ -718,11 +742,15 @@ void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 
 				FGameplayEventData EventData;
 				EventData.InstigatorTags.AddTag(InputActionData->FindTagByInputAction(InputAction)); //타깃 어빌리티만 활성화
+
+				//현재 상태 태그 추가
+				EventData.InstigatorTags.AppendTags(CaptureCurrentStateTags());
+
 				EventData.EventMagnitude = 0.0f; //Pressed
 				EventData.EventTag = EventActionAttackInputTag;
-			
+
 				APASC->HandleGameplayEvent_NetPredicted(EventActionAttackInputTag, &EventData);
-				
+
 				//레거시: 실행 중인 어빌리티에 Pressed 전달은 Attack밖에 없기 때문에 기존 Pressed 비활성화, IA를 전달하는 이벤트 송신으로 변경
 				//AbilitySystemComponent->AbilitySpecInputPressed(*Spec);
 			}

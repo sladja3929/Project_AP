@@ -186,7 +186,10 @@ protected:
 #pragma endregion
 
 #pragma region "Protected Functions"
-	
+
+	//현재 상태 태그를 캡처하여 반환
+	FGameplayTagContainer CaptureCurrentStateTags() const;
+
 	// ===== Weapon Functions =====
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	TSubclassOf<AWeapon> LoadWeaponClassByName(const FString& WeaponName);

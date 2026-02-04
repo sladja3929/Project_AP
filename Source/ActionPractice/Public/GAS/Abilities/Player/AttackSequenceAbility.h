@@ -96,6 +96,14 @@ protected:
 	UPROPERTY()
 	int32 MaxComboCount = 0;
 
+	// ===== 버퍼 입력 큐 (서버용) =====
+	//서버에서 Attacking 상태일 때 도착한 InputByBuffer를 예약
+	UPROPERTY()
+	bool bHasPendingBufferInput = false;
+
+	UPROPERTY()
+	FGameplayEventData PendingBufferPayload;
+
 	// ===== 무기 데이터 =====
 	UPROPERTY()
 	TObjectPtr<const UWeaponDataAsset> CachedWeaponDataAsset = nullptr;
@@ -178,11 +186,14 @@ protected:
 	UFUNCTION()
 	void OnEventAttackInput(FGameplayEventData Payload); //InputPressed 대체 이벤트, IA_Attack과 IA_ChargeAttack 모두 수신
 
-	void ProcessNormalAttackInput();
+	void ProcessNormalAttackInput(const FGameplayEventData& Payload);
 	void ProcessChargeAttackInput();
 
 	virtual void OnWaitInputRelease(float TimeHeld) override; 
 	virtual void OnEventInputByBuffer(FGameplayEventData Payload) override;
+
+	//예약된 버퍼 입력 소비 (AfterRecovery 진입 시 호출)
+	void ConsumePendingBufferInput();
 
 	UFUNCTION()
 	void OnEventCancelAttack(FGameplayEventData Payload);
