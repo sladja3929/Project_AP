@@ -36,6 +36,9 @@ public:
 	//===== Hit Detection Interface =====
 	virtual TScriptInterface<IHitDetectionInterface> GetHitDetectionInterface() const PURE_VIRTUAL(ABaseCharacter::GetHitDetectionInterface, return nullptr;);
 
+	//===== Replication =====
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 #pragma endregion
 
 protected:

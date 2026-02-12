@@ -32,7 +32,8 @@ void UBlockAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, con
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	
-	PlayAction();
+	StartMontageWithEventsTask();
+	StartWaitInputReleaseTask(true);
 }
 
 void UBlockAbility::ActivateInitSettings()
@@ -44,14 +45,6 @@ void UBlockAbility::ActivateInitSettings()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
-	
-	bCreateTask = true;
-}
-
-void UBlockAbility::PlayAction()
-{
-	
-	ExecuteMontageTask();
 }
 
 UAnimMontage* UBlockAbility::SetMontageToPlayTask()
@@ -73,54 +66,43 @@ UAnimMontage* UBlockAbility::SetMontageToPlayTask()
 	return Montage;
 }
 
-void UBlockAbility::BindEventsAndReadyMontageTask()
+void UBlockAbility::SetUpPlayMontageWithEventsTask()
 {
 	
 }
 
-void UBlockAbility::ExecuteMontageTask()
+void UBlockAbility::StartMontageWithEventsTask()
 {
 	UAnimMontage* MontageToPlay = SetMontageToPlayTask();
-	
 	if (!MontageToPlay)
 	{
 		DEBUG_LOG(TEXT("No Montage to Play"));
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}
-    
-	if (bCreateTask) // 커스텀 태스크 생성
-	{        
-		PlayMontageWithEventsTask = UAbilityTask_PlayMontageWithEvents::CreatePlayMontageWithEventsProxy(
-			this,
-			NAME_None,
-			MontageToPlay,
-			1.0f,
-			NAME_None,
-			1.0f
-		);
-		
-		if (PlayMontageWithEventsTask)
-		{        
-			// 델리게이트 바인딩 - 사용하지 않는 델리게이트도 있음
-			PlayMontageWithEventsTask->OnMontageCompleted.AddDynamic(this, &UBlockAbility::OnTaskMontageCompleted);
-			PlayMontageWithEventsTask->OnMontageInterrupted.AddDynamic(this, &UBlockAbility::OnTaskMontageInterrupted);
 
-			// 태스크 활성화
-			PlayMontageWithEventsTask->ReadyForActivation();
-		}
-    
-		else
-		{
-			DEBUG_LOG(TEXT("No Montage Task"));
-			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-		}
-	}
-
-	else //태스크 중간에 몽타주 바꾸기
+	//기존 태스크가 존재하면
+	if (PlayMontageWithEventsTask)
 	{
-		PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
+		PlayMontageWithEventsTask->StopMontage();
+		PlayMontageWithEventsTask->EndTask();
+		PlayMontageWithEventsTask = nullptr;
 	}
+	
+	//커스텀 태스크 생성
+	PlayMontageWithEventsTask = UAbilityTask_PlayMontageWithEvents::CreatePlayMontageWithEventsProxy(
+		this,
+		NAME_None,
+		MontageToPlay,
+		1.0f,
+		NAME_None,
+		1.0f
+	);
+    
+	SetUpPlayMontageWithEventsTask();
+
+	//태스크 활성화
+	PlayMontageWithEventsTask->ReadyForActivation();
 }
 
 void UBlockAbility::OnTaskMontageCompleted()
@@ -136,11 +118,11 @@ void UBlockAbility::OnTaskMontageInterrupted()
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
-
-void UBlockAbility::InputReleased(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
+void UBlockAbility::OnWaitInputRelease(float TimeHeld)
 {
-	DEBUG_LOG(TEXT("Block Input Released - End Ability"));
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+	DEBUG_LOG(TEXT("Block WaitInputRelease - End Ability (TimeHeld: %.3f)"), TimeHeld);
+
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void UBlockAbility::CancelAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,	const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateCancelAbility)
@@ -150,9 +132,7 @@ void UBlockAbility::CancelAbility(const FGameplayAbilitySpecHandle Handle, const
 }
 
 void UBlockAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
-{
-	bCreateTask = false;
-	
+{	
 	if (IsEndAbilityValid(Handle, ActorInfo))
 	{
 		if (PlayMontageWithEventsTask)

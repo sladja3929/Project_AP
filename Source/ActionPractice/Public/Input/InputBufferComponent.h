@@ -3,12 +3,14 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Components/ActorComponent.h"
+#include "Input/InputActionDataAsset.h"
 #include "InputBufferComponent.generated.h"
 
 class AActionPracticeCharacter;
 class UInputAction;
 class UActionPracticeAbility;
 class UGameplayAbility;
+class UInputActionDataAsset;
 struct FGameplayEventData;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -19,83 +21,91 @@ class ACTIONPRACTICE_API UInputBufferComponent : public UActorComponent
 public:
 #pragma region "Public Variables"
 
-	bool bCanBufferInput = false;
-	bool bBufferActionReleased = false;
-	
+	//버퍼 오픈 여부, Character의 입력 저장 진입에 사용
+    UPROPERTY(BlueprintReadOnly, Category="Input Buffer")
+    bool bBufferWindowOpened = false; 
+
+    //한 번에 하나만 버퍼되는 단발 액션 (Both + Release 포함)
+    UPROPERTY(VisibleInstanceOnly, Category="Input Buffer")
+    FGameplayTag BufferedActionTag;
+
+    //BufferedActionTag의 우선순위
+    UPROPERTY(VisibleInstanceOnly, Category="Input Buffer")
+    int32 BufferPriority = -1;
+
+    //BufferedActionTag가 Release 이벤트인지 여부
+    UPROPERTY(VisibleInstanceOnly, Category="Input Buffer")
+    bool bBufferedActionReleased = false;
+    
+    //동시에 여러 개 버퍼될 수 있는 홀드 액션들
+    UPROPERTY(VisibleInstanceOnly, Category="Input Buffer")
+    TSet<FGameplayTag> BufferedHoldActionTags;
+
 #pragma endregion
-	
+
 #pragma region "Public Functions"
 
-	UInputBufferComponent();
+    UInputBufferComponent();
 
-	//다음 액션 저장
-	UFUNCTION()
-	void BufferNextAction(const UInputAction* InputedAction);
+    //서버/클라 분류용, 외부에서는 이 함수만 호출
+    UFUNCTION()
+	void BufferInput(const UInputAction* InputAction, bool bIsReleased);
 
-	//저장된 홀드액션 키가 떨어지면 버퍼에서 제거
-	UFUNCTION()
-	void UnBufferHoldAction(const UInputAction* InputedAction);
+    UFUNCTION()
+    bool IsBufferWaiting();
 
-	//버퍼 대기중인지
-	UFUNCTION()
-	bool IsBufferWaiting();
+    //버퍼 실행
+    void ExecuteBuffer();
+
+    void EnableBufferInput(bool bEnabled);
 
 #pragma endregion
 
 protected:
 #pragma region "Protected Variables"
 
-	UPROPERTY()
-	const UInputAction* BufferedAction = nullptr;
+    //버퍼 저장 시점의 상태 태그 (Roll, Sprint 등 판정용)
+    UPROPERTY()
+    FGameplayTagContainer BufferedStateTags;
 
-	int32 CurrentBufferPriority = -1;
+    FDelegateHandle EnableBufferInputHandle;
+    FDelegateHandle PlayBufferHandle;
 
-	UPROPERTY()
-	TSet<const UInputAction*> BufferedHoldAction;
-
-	FDelegateHandle EnableBufferInputHandle;
-	FDelegateHandle PlayBufferHandle;
-
-	//사용되는 태그들
-	FGameplayTag EventNotifyEnableBufferInputTag;
-	FGameplayTag EventActionInputByBufferTag;
-	FGameplayTag EventActionPlayBufferTag;
+    FGameplayTag EventNotifyEnableBufferInputTag;
+    FGameplayTag EventActionInputByBufferTag;
+    FGameplayTag EventActionPlayBufferTag;
 
 #pragma endregion
 
 #pragma region "Protected Functions"
 
-	virtual void BeginPlay() override;
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	
-	UFUNCTION()
-	void ActivateBufferAction();
-	
-	//노티파이를 부착하거나, 어빌리티 몽타주 Start에서 이벤트 호출
-	UFUNCTION()
-	void OnEnableBufferInput(const FGameplayEventData& EventData);
+	void BufferInputInternal(FGameplayTag InputActionTag, bool bIsReleased);
 
-	//ActionRecovery 어빌리티에서 이벤트 호출
-	UFUNCTION()
-	void OnPlayBuffer(const FGameplayEventData& EventData);
-	
+    void ActivateAbilityByTag(FGameplayTag ActionTag);
+
+    void CaptureCurrentStateTags();
+
 #pragma endregion
 
 private:
 #pragma region "Private Variables"
-	
-	UPROPERTY()
-	TObjectPtr<AActionPracticeCharacter> OwnerCharacter = nullptr;
-	
-#pragma endregion
-	
-#pragma region "Private Functions"
-	
-	// 인풋액션으로 해당 어빌리티의 버퍼 가능 여부와 우선순위 확인
-	bool CanBufferAction(const UInputAction* InputAction, int32& OutPriority, bool& bIsHoldAction) const;
-	void ActivateAbility(const UInputAction* InputAction);
-	
+
+    UPROPERTY()
+    TObjectPtr<AActionPracticeCharacter> OwnerCharacter = nullptr;
+
+    UPROPERTY()
+    TObjectPtr<const UInputActionDataAsset> CachedInputActionData = nullptr;
+
 #pragma endregion
 
+#pragma region "Private Functions"
+
+    bool CheckActionRule(FGameplayTag ActionTag, int32& OutPriority, EInputBehavior& OutInputBehavior) const;
+
+    void ActivateAbility(const UInputAction* InputAction);
+
+#pragma endregion
 };

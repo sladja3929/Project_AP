@@ -16,6 +16,7 @@ public:
 	URollAbility();
 
 	virtual void OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 #pragma endregion
 
@@ -39,21 +40,32 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Roll")
 	float JustRolledWindowDuration = 0.1f;
 
+	//이벤트 대기 태스크
+	UPROPERTY()
+	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitInvincibleStartEventTask;
+	
 	//사용되는 태그들
 	FGameplayTag EventNotifyInvincibleStartTag;
 	FGameplayTag EffectInvincibilityDurationTag;
 	FGameplayTag EffectJustRolledDurationTag;
+	
 #pragma endregion
 
 #pragma region "Protected Functions"
 
+	virtual bool ConsumeStamina() override;
+
 	virtual UAnimMontage* SetMontageToPlayTask() override;
-	virtual void BindEventsAndReadyMontageTask() override;
-	virtual void OnTaskNotifyEventsReceived(FGameplayEventData Payload) override;
-	virtual void OnEventActionRecoveryEnd(FGameplayEventData Payload) override;
-	
+	virtual void SetUpPlayMontageWithEventsTask() override;
+
+	virtual void OnTaskMontageCompleted() override;
+	virtual void OnTaskMontageInterrupted() override;
+
+	//커브 기반 ActionRecovery 종료 처리
+	virtual void ProcessActionRecoveryEnd() override;
+
 	UFUNCTION()
-	virtual void OnNotifyInvincibleStart(FGameplayEventData Payload);
+	virtual void OnEventInvincibleStart(FGameplayEventData Payload);
 	
 	UFUNCTION(BlueprintCallable, Category = "Roll")
 	virtual void ApplyInvincibilityEffect();

@@ -3,7 +3,9 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
 #include "GAS/GameplayTagsSubsystem.h"
+#include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "Input/InputActionDataAsset.h"
+#include "Net/UnrealNetwork.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -13,6 +15,7 @@
 #else
 #define DEBUG_LOG(Format, ...)
 #endif
+
 
 UInputBufferComponent::UInputBufferComponent()
 {
@@ -28,6 +31,9 @@ void UInputBufferComponent::BeginPlay()
 	{
 		return;
 	}
+
+	//InputActionData 캐싱
+	CachedInputActionData = OwnerCharacter->GetInputActionData();
 
 	//태그 초기화
 	EventNotifyEnableBufferInputTag = UGameplayTagsSubsystem::GetEventNotifyEnableBufferInputTag();
@@ -47,138 +53,242 @@ void UInputBufferComponent::BeginPlay()
 		DEBUG_LOG(TEXT("EventActionPlayBufferTag is not valid"));
 	}
 
-	if (UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent())
-	{
-		EnableBufferInputHandle = ASC->GenericGameplayEventCallbacks
-		.FindOrAdd(EventNotifyEnableBufferInputTag)
-		.AddLambda([this](const FGameplayEventData* EventData)
-			{
-				if (IsValid(this) && EventData)
-				{
-					OnEnableBufferInput(*EventData);
-				}
-			});
-
-		PlayBufferHandle = ASC->GenericGameplayEventCallbacks
-		.FindOrAdd(EventActionPlayBufferTag)
-		.AddLambda([this](const FGameplayEventData* EventData)
-			{
-				if (IsValid(this) && EventData)
-				{
-					OnPlayBuffer(*EventData);
-				}
-			});
-	}
-
-	else DEBUG_LOG(TEXT("No ASC"));
-	
 	Super::BeginPlay();
 }
 
-bool UInputBufferComponent::CanBufferAction(const UInputAction* InputAction, int32& OutPriority, bool& bIsHoldAction) const
+#pragma region "Buffer Action Functions"
+bool UInputBufferComponent::CheckActionRule(FGameplayTag ActionTag, int32& OutPriority, EInputBehavior& OutInputBehavior) const
 {
-	if (!InputAction || !OwnerCharacter)
+	if (!ActionTag.IsValid() || !OwnerCharacter || !CachedInputActionData)
 	{
-		OutPriority = -1;
-		bIsHoldAction = false;
+		DEBUG_LOG(TEXT("CheckActionRule: No Character or Data Asset"));
+		OutInputBehavior = EInputBehavior::Tap;
 		return false;
 	}
 
-	const UInputActionDataAsset* InputActionData = OwnerCharacter->GetInputActionData();
-	if (!InputActionData)
+	const UInputAction* InputAction = CachedInputActionData->FindInputActionByTag(ActionTag);
+	if (!InputAction)
 	{
+		DEBUG_LOG(TEXT("CheckActionRule: No IA - %s"), *ActionTag.ToString());
 		OutPriority = -1;
-		bIsHoldAction = false;
+		OutInputBehavior = EInputBehavior::Tap;
 		return false;
 	}
-	
-	const FInputActionAbilityRule* InputActionRule = InputActionData->FindRuleByAction(InputAction);
+
+	const FInputActionAbilityRule* InputActionRule = CachedInputActionData->FindRuleByAction(InputAction);
 	if (!InputActionRule)
 	{
+		DEBUG_LOG(TEXT("CheckActionRule: No Rule - %s"), *ActionTag.ToString());
 		OutPriority = -1;
-		bIsHoldAction = false;
+		OutInputBehavior = EInputBehavior::Tap;
 		return false;
 	}
-	
+
 	OutPriority = InputActionRule->BufferPriority;
-	bIsHoldAction = InputActionRule->bIsHoldAction;
+	OutInputBehavior = InputActionRule->InputBehavior;
 	return InputActionRule->bCanBuffered;
 }
 
-void UInputBufferComponent::BufferNextAction(const UInputAction* InputedAction)
+void UInputBufferComponent::BufferInput(const UInputAction* InputAction, bool bIsReleased)
 {
-	if (!bCanBufferInput) return;
-
-	int32 NewActionPriority;
-	bool bIsHoldAction;
-	if (!CanBufferAction(InputedAction, NewActionPriority, bIsHoldAction))
+	if (!InputAction || !OwnerCharacter || !CachedInputActionData)
 	{
-		DEBUG_LOG(TEXT("Cannot buffer action, bCanBuffered is false - Action: %s"), *InputedAction->GetName());
 		return;
 	}
 
-	if (bIsHoldAction)
+	//버퍼 윈도우가 닫혀있으면 아무것도 하지 않음
+	if (!bBufferWindowOpened)
 	{
-		BufferedHoldAction.Add(InputedAction);
-		DEBUG_LOG(TEXT("Buffered hold action added - Action: %s"), *InputedAction->GetName());
+		return;
+	}
+
+	const FGameplayTag InputTag = CachedInputActionData->FindTagByInputAction(InputAction);
+	if (!InputTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("BufferInput - No tag for action %s"), *GetNameSafe(InputAction));
+		return;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor)
+	{
+		return;
+	}
+
+	//소유 클라이언트 확인
+	if (!OwnerCharacter->IsLocallyControlled())
+	{
+		return;
 	}
 	
-	else if (NewActionPriority >= CurrentBufferPriority)
+	BufferInputInternal(InputTag, bIsReleased);
+}
+
+void UInputBufferComponent::BufferInputInternal(FGameplayTag InputActionTag, bool bIsReleased)
+{
+	int32 NewActionPriority = -1;
+	EInputBehavior InputBehavior = EInputBehavior::Tap;
+
+	if (!CheckActionRule(InputActionTag, NewActionPriority, InputBehavior))
 	{
-		bBufferActionReleased = false;
-		BufferedAction = InputedAction;
-		CurrentBufferPriority = NewActionPriority;
-		DEBUG_LOG(TEXT("Buffered action updated - Action: %s"), *InputedAction->GetName());
+		DEBUG_LOG(TEXT("BufferInputInternal Cannot buffer - %s"), *InputActionTag.ToString());
+		return;
 	}
-	else
+
+	//Tap 액션 Released는 무시
+	if (bIsReleased && InputBehavior == EInputBehavior::Tap)
 	{
-		DEBUG_LOG(TEXT("Buffer action ignored - Lower priority: %d vs %d"), NewActionPriority, CurrentBufferPriority);
+		DEBUG_LOG(TEXT("BufferInputInternal Ignored - Tap released %s"), *InputActionTag.ToString());
+		return;
+	}
+
+	//Hold 액션일 경우 목록에 추가/제거
+	if (InputBehavior == EInputBehavior::Hold)
+	{
+		if (bIsReleased)
+		{
+			BufferedHoldActionTags.Remove(InputActionTag);
+			DEBUG_LOG(TEXT("BufferInputInternal Hold action removed - %s"), *InputActionTag.ToString());
+		}
+
+		else
+		{
+			BufferedHoldActionTags.Add(InputActionTag);
+			DEBUG_LOG(TEXT("BufferInputInternal Hold action added - %s"), *InputActionTag.ToString());
+		}
+		return;
+	}
+
+	//Tap 또는 Both 액션 Pressed일 경우 우선순위 비교 후 저장
+	if (!bIsReleased)
+	{
+		if (NewActionPriority < BufferPriority)
+		{
+			DEBUG_LOG(TEXT("BufferInputInternal Action ignored - Lower priority %d vs %d"), NewActionPriority, BufferPriority);
+			return;
+		}
+
+		BufferedActionTag = InputActionTag;
+		BufferPriority = NewActionPriority;
+
+		//버퍼 저장 시점의 상태 태그 캡처
+		CaptureCurrentStateTags();
+
+		DEBUG_LOG(TEXT("BufferInputInternal Action buffered - %s Priority: %d"), *InputActionTag.ToString(), NewActionPriority);
+		return;
+	}	
+	
+	//현재 저장된 Both 액션의 Released일 경우 단발로 확정 (플래그 설정)
+	if (BufferedActionTag == InputActionTag) 
+	{
+		bBufferedActionReleased = true;
+		DEBUG_LOG(TEXT("BufferInputInternal Buffered action released - %s"), *InputActionTag.ToString());
 	}
 }
 
-void UInputBufferComponent::UnBufferHoldAction(const UInputAction* InputedAction)
+bool UInputBufferComponent::IsBufferWaiting()
 {
-	bBufferActionReleased = true;
-	BufferedHoldAction.Remove(InputedAction);
-	DEBUG_LOG(TEXT("Buffered hold action removed - Action: %s"), *InputedAction->GetName());
+	return BufferedActionTag.IsValid() || (BufferedHoldActionTags.Num() > 0);
+}
+
+void UInputBufferComponent::ExecuteBuffer()
+{
+	if (!OwnerCharacter) return;
+
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor) return;
+
+	//프록시는 저장된 버퍼 실행에 관여하지 못함
+	if (!OwnerCharacter->IsLocallyControlled()) return;
+
+	//윈도우 닫기
+	bBufferWindowOpened = false;
+	
+	DEBUG_LOG(TEXT("ExecuteBuffer called"));
+
+	//저장된 단발 액션 실행
+	if (BufferedActionTag.IsValid())
+	{
+		ActivateAbilityByTag(BufferedActionTag);
+
+		BufferedActionTag = FGameplayTag();
+		BufferPriority = -1;
+		bBufferedActionReleased = false;
+		DEBUG_LOG(TEXT("ExecuteBuffer: Normal buffer executed"));
+	}
+
+	//저장된 모든 홀드 액션 실행
+	else if (BufferedHoldActionTags.Num() > 0)
+	{
+		for (const FGameplayTag& Tag : BufferedHoldActionTags)
+		{
+			ActivateAbilityByTag(Tag);
+		}
+
+		BufferedHoldActionTags.Empty();
+		DEBUG_LOG(TEXT("ExecuteBuffer: Hold buffers executed"));
+	}
+	
+	else
+	{
+		DEBUG_LOG(TEXT("ExecuteBuffer: No buffered action"));
+	}
+}
+
+void UInputBufferComponent::ActivateAbilityByTag(FGameplayTag ActionTag)
+{
+	if (!ActionTag.IsValid() || !OwnerCharacter || !CachedInputActionData)
+	{
+		return;
+	}
+
+	const UInputAction* InputAction = CachedInputActionData->FindInputActionByTag(ActionTag);
+	if (!InputAction)
+	{
+		DEBUG_LOG(TEXT("ActivateAbilityByTag InputAction not found for tag %s"), *ActionTag.ToString());
+		return;
+	}
+
+	ActivateAbility(InputAction);
 }
 
 void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 {
-	if (!InputAction || !OwnerCharacter) return;
+	if (!InputAction || !OwnerCharacter || !CachedInputActionData) return;
 	
-	UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent();
-	if (!ASC) return;
+	UActionPracticeAbilitySystemComponent* APASC = Cast<UActionPracticeAbilitySystemComponent>(OwnerCharacter->GetAbilitySystemComponent());
+	if (!APASC) return;
 
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = OwnerCharacter->FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
-
+	
 	for (auto& Spec : TryActivateSpecs)
 	{
-		//첫 실행이거나, bRetriggerInstancedAbility = true여서 재실행될 때
-		if (ASC->TryActivateAbility(Spec->Handle))
-		{
-			DEBUG_LOG(TEXT("Play Buffer - Activate Ability: %s"), *GetNameSafe(Spec->Ability->GetClass()));
-			Spec->InputPressed = true;
-		}
+		DEBUG_LOG(TEXT("CurrSpecNum: %s"), *Spec->Handle.ToString());
 
-		//어빌리티가 이미 실행중 / bRetriggerInstancedAbility = false여서 Try를 실패했을 때 (콤보 공격)
-		else if (Spec->IsActive()) //CanActivateAbility 실패로 활성화하지 못했을 때를 거르기 위해 실행 중 체크
+		//어빌리티가 이미 실행중 or bRetriggerInstancedAbility = false여서 Try를 실패했을 때 (콤보 공격)
+		if (Spec->IsActive()) //CanActivateAbility 실패로 활성화하지 못했을 때를 거르기 위해 실행 중 체크
 		{
 			DEBUG_LOG(TEXT("Play Buffer - Play Buffer Event: %s"), *GetNameSafe(Spec->Ability->GetClass()));
 			Spec->InputPressed = true;
 
-			//현재 Spec인 어빌리티만 OnInputByBuffer가 활성화되도록 자기 자신을 EventData로 넘김
-			UGameplayAbility* Instance = Spec->GetPrimaryInstance();
-			if (!Instance) Instance = Spec->Ability;
-			
 			FGameplayEventData EventData;
-			EventData.OptionalObject = Instance;
-			//bool 값을 EventMagnitude를 통해 전달
-			EventData.EventMagnitude = bBufferActionReleased ? 1.0f : 0.0f;
+			EventData.InstigatorTags.AddTag(CachedInputActionData->FindTagByInputAction(InputAction)); //타깃 어빌리티만 활성화
+
+			//버퍼 저장 시점의 상태 태그 추가
+			EventData.InstigatorTags.AppendTags(BufferedStateTags);
+
+			EventData.EventMagnitude = bBufferedActionReleased ? 1.0f : 0.0f; //release 여부를 EventMagnitude를 통해 전달
 			EventData.EventTag = EventActionInputByBufferTag;
-			
-			ASC->HandleGameplayEvent(EventActionInputByBufferTag, &EventData);
+
+			APASC->HandleGameplayEvent_NetPredicted(EventActionInputByBufferTag, &EventData);
+		}
+		
+		//첫 실행 or bRetriggerInstancedAbility = true여서 재실행될 때
+		else if (APASC->TryActivateAbility(Spec->Handle))
+		{
+			DEBUG_LOG(TEXT("Play Buffer - Activate Ability: %s"), *GetNameSafe(Spec->Ability->GetClass()));
+			Spec->InputPressed = true;
 		}
 
 		//다 아닐때
@@ -186,70 +296,49 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 	}
 }
 
-void UInputBufferComponent::ActivateBufferAction()
+void UInputBufferComponent::CaptureCurrentStateTags()
 {
-	bCanBufferInput = false;
+	BufferedStateTags.Reset();
 
-	//일반버퍼와 홀드버퍼가 같이 있다면 버퍼만 실행, 홀드버퍼는 일반버퍼 액션 실행 후 일반버퍼가 비어있다면 실행
-	if (BufferedAction)
+	if (!OwnerCharacter)
 	{
-		ActivateAbility(BufferedAction);
-		
-		BufferedAction = nullptr;
-		CurrentBufferPriority = -1;
+		return;
 	}
-	
-	else if (BufferedHoldAction.Num() > 0)
+
+	UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent();
+	if (!ASC)
 	{
-		for (const UInputAction* InputAction : BufferedHoldAction)
+		return;
+	}
+
+	//현재 ASC의 모든 태그 가져오기
+	FGameplayTagContainer CurrentTags;
+	ASC->GetOwnedGameplayTags(CurrentTags);
+
+	//State 태그만 필터링하여 저장
+	static const FGameplayTag StateParentTag = FGameplayTag::RequestGameplayTag(FName("State"));
+	for (const FGameplayTag& Tag : CurrentTags)
+	{
+		if (Tag.MatchesTag(StateParentTag))
 		{
-			ActivateAbility(InputAction);
+			BufferedStateTags.AddTag(Tag);
 		}
-		
-		BufferedHoldAction.Empty();
-	}	
-}
-
-bool UInputBufferComponent::IsBufferWaiting()
-{
-	return BufferedAction != nullptr;
-}
-
-void UInputBufferComponent::OnEnableBufferInput(const FGameplayEventData& EventData)
-{
-	bCanBufferInput = true;
-	DEBUG_LOG(TEXT("Enable Buffer Input - Can Buffer Action"));
-}
-
-void UInputBufferComponent::OnPlayBuffer(const FGameplayEventData& EventData)
-{
-	bCanBufferInput = false;
-	
-	if (BufferedAction || BufferedHoldAction.Num() > 0) //저장한 행동이 있을 경우
-	{
-		DEBUG_LOG(TEXT("Play Buffer"));
-		ActivateBufferAction();
 	}
 
-	else DEBUG_LOG(TEXT("Play Buffer - No Buffered Action"));
+	DEBUG_LOG(TEXT("CaptureCurrentStateTags: %s"), *BufferedStateTags.ToString());
 }
+
+void UInputBufferComponent::EnableBufferInput(bool bEnabled)
+{
+	//클라이언트 버퍼 윈도우는 항상 변경
+	bBufferWindowOpened = bEnabled;
+
+	DEBUG_LOG(TEXT("EnableBufferInput %s"), bEnabled ? TEXT("Enabled") : TEXT("Disabled"));
+}
+
+#pragma endregion
 
 void UInputBufferComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent())
-	{
-		if (EnableBufferInputHandle.IsValid())
-		{
-			ASC->GenericGameplayEventCallbacks.FindOrAdd(EventNotifyEnableBufferInputTag)
-				.Remove(EnableBufferInputHandle);
-		}
-
-		if (PlayBufferHandle.IsValid())
-		{
-			ASC->GenericGameplayEventCallbacks.FindOrAdd(EventActionPlayBufferTag)
-				.Remove(PlayBufferHandle);
-		}
-	}
-	
 	Super::EndPlay(EndPlayReason);
 }

@@ -16,6 +16,10 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+/***
+* 레거시 클래스: 사용하지 않음, PlayMontageWithEvents로 대체
+*/
+
 UAbilityTask_PlayNormalAttackMontage::UAbilityTask_PlayNormalAttackMontage(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
@@ -145,18 +149,25 @@ void UAbilityTask_PlayNormalAttackMontage::PlayAttackMontage()
 
     if (AbilitySystemComponent.IsValid())
     {
-        AbilitySystemComponent->AddLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag());
+        AbilitySystemComponent->AddLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag());
     }
-    
-    float PlayLength = AnimInstance->Montage_Play(CurrentMontage, Rate);
+
+    //ASC의 PlayMontage를 사용하여 네트워크 복제 지원
+    float PlayLength = AbilitySystemComponent->PlayMontage(
+        Ability,
+        Ability->GetCurrentActivationInfo(),
+        CurrentMontage,
+        Rate,
+        StartSectionName
+    );
     DEBUG_LOG(TEXT("Montage Play Result: %f, Montage Name: %s"), PlayLength, CurrentMontage ? *CurrentMontage->GetName() : TEXT("NULL"));
 
-    // 블렌드 아웃 델리게이트 바인딩
+    //블렌드 아웃 델리게이트 바인딩
     BlendingOutDelegate = FOnMontageBlendingOutStarted::CreateUObject(this, &UAbilityTask_PlayNormalAttackMontage::OnMontageBlendingOut);
     AnimInstance->Montage_SetBlendingOutDelegate(BlendingOutDelegate, CurrentMontage);
     DEBUG_LOG(TEXT("BlendingOutDelegate Bound Successfully"));
 
-    // 몽타주 종료 델리게이트 바인딩
+    //몽타주 종료 델리게이트 바인딩
     MontageEndedDelegate = FOnMontageEnded::CreateUObject(this, &UAbilityTask_PlayNormalAttackMontage::OnMontageEnded);
     AnimInstance->Montage_SetEndDelegate(MontageEndedDelegate, CurrentMontage);
     DEBUG_LOG(TEXT("MontageEndedDelegate Bound Successfully"));
@@ -242,9 +253,9 @@ void UAbilityTask_PlayNormalAttackMontage::HandleActionRecoveryEndEvent(const FG
         if (AbilitySystemComponent.IsValid())
         {
             // 모든 StateRecovering 태그 제거 (스택된 태그 모두 제거)
-            while (AbilitySystemComponent->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag()))
+            while (AbilitySystemComponent->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag()))
             {
-                AbilitySystemComponent->RemoveLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag());
+                AbilitySystemComponent->RemoveLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag());
             }
             DEBUG_LOG(TEXT("Can ABP Interrupt Attack Montage"));
         }
@@ -327,18 +338,13 @@ void UAbilityTask_PlayNormalAttackMontage::UnregisterGameplayEventCallbacks()
 #pragma region "Montage Functions"
 void UAbilityTask_PlayNormalAttackMontage::StopPlayingMontage()
 {
-    const FGameplayAbilityActorInfo* ActorInfo = Ability->GetCurrentActorInfo();
-    if (!ActorInfo)
+    if (!AbilitySystemComponent.IsValid())
     {
         return;
     }
 
-    UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
-    if (AnimInstance && CurrentMontage)
-    {
-        float BlendOutTime = CurrentMontage->BlendOut.GetBlendTime();
-        AnimInstance->Montage_Stop(BlendOutTime, CurrentMontage);
-    }
+    //ASC의 CurrentMontageStop을 사용하여 네트워크 복제 지원
+    AbilitySystemComponent->CurrentMontageStop();
 }
 
 void UAbilityTask_PlayNormalAttackMontage::OnMontageBlendingOut(UAnimMontage* Montage, bool bInterrupted)
@@ -462,9 +468,9 @@ void UAbilityTask_PlayNormalAttackMontage::OnDestroy(bool AbilityEnded)
     // 상태 정리 - 모든 StateRecovering 태그 제거
     if (AbilitySystemComponent.IsValid())
     {
-        while (AbilitySystemComponent->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag()))
+        while (AbilitySystemComponent->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag()))
         {
-            AbilitySystemComponent->RemoveLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringTag());
+            AbilitySystemComponent->RemoveLooseGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag());
         }
         DEBUG_LOG(TEXT("All StateRecovering tags removed"));
     }

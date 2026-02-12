@@ -10,6 +10,10 @@ class UAnimMontage;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FNormalAttackMontageDelegate);
 
+/***
+* 레거시 클래스: 사용하지 않음, PlayMontageWithEvents로 대체
+*/
+
 UCLASS()
 class ACTIONPRACTICE_API UAbilityTask_PlayNormalAttackMontage : public UAbilityTask
 {

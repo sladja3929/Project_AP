@@ -5,6 +5,7 @@
 #include "Animation/AnimMontage.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Characters/ActionPracticeCharacter.h"
 #include "GAS/Abilities/Player/WeaponAbilityStatics.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 
@@ -17,8 +18,16 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+/***
+* 레거시 클래스: 사용하지 않음, AttackSequenceAbility로 대체
+*/
+
 UNormalAttackAbility::UNormalAttackAbility()
 {
+	//클라이언트 예측 실행 (콤보 입력 버퍼링을 위해 클라이언트에서도 태스크 필요)
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
     StaminaCost = 15.0f;
 }
 
@@ -38,7 +47,7 @@ void UNormalAttackAbility::ActivateInitSettings()
 {
     Super::ActivateInitSettings();
 
-    ReadyInputByBufferTask();
+    START_WAIT_EVENT_TASK(WaitInputByBufferEventTask, EventInputByBufferTag, OnEventInputByBuffer, nullptr, false, true);
 
     //무기 데이터 적용
     MaxComboCount = WeaponAttackData->ComboSequence.Num();
@@ -49,13 +58,31 @@ void UNormalAttackAbility::ActivateInitSettings()
 void UNormalAttackAbility::InputPressed(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
 {
     //ActionRecoveryEnd 이후 구간에서 입력이 들어오면 콤보 실행
-    if (!GetAbilitySystemComponentFromActorInfo()->HasMatchingGameplayTag(StateRecoveringTag))
+    ACharacter* Character = GetActionPracticeCharacterFromActorInfo();
+    if (!Character) return;
+
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+    if (!ASC) return;
+
+    //서버 사이드 확인
+    bool bHasRecoveringTag = false;
+    if (Character->HasAuthority())
+    {
+        bHasRecoveringTag = ASC->HasMatchingGameplayTag(StateRecoveringAuthTag);
+    }
+
+    //클라 사이드 확인 (리슨서버는 둘 다 확인)
+    if (Character->IsLocallyControlled())
+    {
+        bHasRecoveringTag = ASC->HasMatchingGameplayTag(StateRecoveringLocalTag);
+    }
+    
+    if (!bHasRecoveringTag)
     {
         PlayNextAttack();
         DEBUG_LOG(TEXT("Input Pressed - After Recovery"));
     }
 }
-
 
 void UNormalAttackAbility::PlayNextAttack()
 {
@@ -69,20 +96,10 @@ void UNormalAttackAbility::PlayNextAttack()
     DEBUG_LOG(TEXT("NextAttack - ComboCounter: %d"),ComboCounter);
 
     bCreateTask = false;
-    PlayAction();
+    StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 }
 
-/* 공격 수행 메커니즘
- * 1. 몽타주 실행 (State.IsRecovering 태그 추가)
- * 2. EnableComboInput = 입력 저장 가능 구간, 다음 공격과 구르기 저장 가능 (구르기를 저장해도 다음 공격 우선 저장)
- * 3. ActionRecoveryEnd = 공격 선딜이 끝나는 지점
- * 3-1. 2~3 사이 저장한 행동이 있을 경우 CheckComboInput으로 행동 수행
- * 3-2. 2~3 사이 저장한 행동이 없을 경우 입력이 들어오면 다음 공격 가능, 이동/점프/구르기로 캔슬 가능 (State.IsRecovering 태그 제거)
- * 4. ResetCombo = 공격 콤보가 초기화되어 다음 콤보로 연계되지 않음
- * 5. 몽타주 종료 (ResetCombo와 같지 않음)
- */
-
-void UNormalAttackAbility::ExecuteMontageTask()
+void UNormalAttackAbility::StartMontageWithEventsTask()
 {
     UAnimMontage* MontageToPlay = SetMontageToPlayTask();
     if (!MontageToPlay)
@@ -103,16 +120,16 @@ void UNormalAttackAbility::ExecuteMontageTask()
             1.0f
         );
 
-        BindEventsAndReadyMontageTask();
+        SetUpPlayMontageWithEventsTask();
     }
 
     else //태스크 중간에 몽타주 바꾸기
     {
-        PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
+        //PlayMontageWithEventsTask->ChangeMontageAndPlay(MontageToPlay);
     }
 }
 
-void UNormalAttackAbility::BindEventsAndReadyMontageTask()
+void UNormalAttackAbility::SetUpPlayMontageWithEventsTask()
 {
     if (!PlayMontageWithEventsTask)
     {
@@ -121,9 +138,9 @@ void UNormalAttackAbility::BindEventsAndReadyMontageTask()
     }
 
     //ResetCombo 노티파이 이벤트 바인딩
-    PlayMontageWithEventsTask->BindNotifyEventCallbackWithTag(EventNotifyResetComboTag);
+    PlayMontageWithEventsTask->BindNotifyEventTag(EventNotifyResetComboTag);
     
-    Super::BindEventsAndReadyMontageTask();
+    Super::SetUpPlayMontageWithEventsTask();
 }
 
 void UNormalAttackAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload)
@@ -135,7 +152,7 @@ void UNormalAttackAbility::OnTaskNotifyEventsReceived(FGameplayEventData Payload
 
 void UNormalAttackAbility::OnEventInputByBuffer(FGameplayEventData Payload)
 {
-    if (Payload.OptionalObject && Payload.OptionalObject != this) return;
+    if (!Payload.InstigatorTags.HasTag(FGameplayTag::RequestGameplayTag(FName(TEXT("Input.Attack"))))) return;
     
     PlayNextAttack();
     DEBUG_LOG(TEXT("Attack Recovery End - Play Next Attack"));

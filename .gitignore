@@ -82,6 +82,7 @@ DerivedDataCache/*
 
 # ThirdParty / temp content folders
 Content/ThirdParty/*
+Content/Mediterranean_Coast
 
 # Other files
 other_helper/*

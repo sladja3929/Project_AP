@@ -64,7 +64,10 @@ public:
 
 	UFUNCTION()
 	void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
-	
+
+	//===== Replication =====
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 #pragma endregion
 
 protected:
@@ -85,7 +88,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Stats")
 	TObjectPtr<UWeaponDataAsset> WeaponData;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Stats")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Stats", Replicated)
 	float CalculatedDamage;
 
 	//플레이어 근력/기량 Attribute가 바뀔 때

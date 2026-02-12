@@ -6,6 +6,10 @@
 #include "Engine/Engine.h"
 #include "BaseAttackAbility.generated.h"
 
+/***
+* 레거시 클래스: 사용하지 않음, AttackSequenceAbility로 대체
+*/
+
 struct FFinalAttackData;
 class UAbilityTask_PlayMontageWithEvents;
 class UAbilityTask_WaitGameplayEvent;
@@ -50,8 +54,11 @@ protected:
 
 	virtual void ActivateInitSettings() override;
 	virtual bool ConsumeStamina() override;
-	virtual void PlayAction() override;
+	virtual void StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask() override;
 	virtual UAnimMontage* SetMontageToPlayTask() override;
+
+	virtual void OnTaskMontageCompleted() override;
+	virtual void OnTaskMontageInterrupted() override;
 
 #pragma endregion
 

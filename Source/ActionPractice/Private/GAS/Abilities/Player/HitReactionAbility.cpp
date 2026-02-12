@@ -18,8 +18,11 @@
 
 UHitReactionAbility::UHitReactionAbility()
 {
-	bRotateBeforeAction = false;
-	StaminaCost = -1.0f; // 스태미나 체크 안함
+	//피격은 서버에서 시작
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
+	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
+	StaminaCost = -1.0f; //스태미나 체크 안함
 }
 
 void UHitReactionAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
@@ -41,6 +44,8 @@ void UHitReactionAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 
 void UHitReactionAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	
 	bIsBlockReaction = false;
 
 	if (TriggerEventData)
@@ -65,7 +70,32 @@ void UHitReactionAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		ReactionProcessor.SelectReactionLevel(PoiseValue);
 	}
 
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	if (!ConsumeStamina()) return;
+	StartMontageWithEventsTask();
+}
+
+bool UHitReactionAbility::ConsumeStamina()
+{
+	if (!ApplyStaminaCost())
+	{
+		DEBUG_LOG(TEXT("No Stamina"));
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return false;
+	}
+
+	return true;
+}
+
+void UHitReactionAbility::OnTaskMontageCompleted()
+{
+	DEBUG_LOG(TEXT("Montage Task Completed"));
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+void UHitReactionAbility::OnTaskMontageInterrupted()
+{
+	DEBUG_LOG(TEXT("Montage Task Interrupted"));
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 UAnimMontage* UHitReactionAbility::SetMontageToPlayTask()

@@ -40,8 +40,11 @@ public:
 	FORCEINLINE class AEnemyAIController* GetEnemyAIController() const { return Cast<AEnemyAIController>(GetController()); }
 
 	const UEnemyDataAsset* GetEnemyData() const { return EnemyData.Get(); }
- 
+
 	void RotateToTarget(const AActor* TargetActor, float RotateTime);
+
+	//===== Replication =====
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 #pragma endregion
 
@@ -86,6 +89,14 @@ protected:
 	// ===== Audio =====
 	void PlayBossBGM();
 	void StopBossBGM();
+
+	// ===== Network =====
+	//모든 클라이언트에서 보스 조우 연출 (BGM, UI)
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnBossEncounter();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnBossDisengage();
 
 #pragma endregion
 

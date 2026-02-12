@@ -3,11 +3,40 @@
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
 #include "GameplayTagContainer.h"
+#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include <type_traits>
 #include "BaseAbility.generated.h"
 
 class UBaseAttributeSet;
 class ABaseCharacter;
 class UBaseAbilitySystemComponent;
+
+// ===== AbilityTask 헬퍼 매크로 =====
+
+// 기존 Task가 있으면 EndTask() 후 교체
+#define END_ABILITY_TASK(TaskPtr) \
+	do { \
+		if (TaskPtr) \
+		{ \
+			TaskPtr->EndTask(); \
+			TaskPtr = nullptr; \
+		} \
+	} while (0)
+
+// WaitGameplayEvent 태스크 생성 + 바인딩 + 활성화
+// CallbackFuncName은 반드시 UFUNCTION()이어야 하며 시그니처는 void Func(FGameplayEventData Payload)
+// 사용 예시: START_WAIT_EVENT_TASK(WaitEventTask, EventTag, OnEventReceived, nullptr, false, true)
+#define START_WAIT_EVENT_TASK(TaskPtr, EventTag, CallbackFuncName, OptionalExternalTarget, bOnlyTriggerOnce, bOnlyMatchExact) \
+	do { \
+		END_ABILITY_TASK(TaskPtr); \
+		TaskPtr = CreateWaitGameplayEventTask((EventTag), (OptionalExternalTarget), (bOnlyTriggerOnce), (bOnlyMatchExact)); \
+		if (TaskPtr) \
+		{ \
+			using TOwnerClass = std::remove_pointer_t<decltype(this)>; \
+			TaskPtr->EventReceived.AddUniqueDynamic(this, &TOwnerClass::CallbackFuncName); \
+			TaskPtr->ReadyForActivation(); \
+		} \
+	} while (0)
 
 UCLASS()
 class ACTIONPRACTICE_API UBaseAbility : public UGameplayAbility
@@ -30,6 +59,7 @@ public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+	//ActivateAbility에서 태스크 활성화 전에 초기 설정 로직은 이 함수에 작성할 것
 	virtual void ActivateInitSettings() {}
 
 	// 스태미나 체크 (UFUNCTION은 원시 포인터 *를 인자로 못받기 때문에 참조 사용)
@@ -71,6 +101,14 @@ protected:
 
 	//쿨다운 태그를 AbilityTags로 사용
 	virtual const FGameplayTagContainer* GetCooldownTags() const override;
+
+	// ===== WaitGameplayEvent 헬퍼 =====
+	// 매크로 START_WAIT_EVENT_TASK 사용 권장
+	UAbilityTask_WaitGameplayEvent* CreateWaitGameplayEventTask(
+		const FGameplayTag& EventTag,
+		AActor* OptionalExternalTarget = nullptr,
+		bool bOnlyTriggerOnce = false,
+		bool bOnlyMatchExact = true);
 
 	UFUNCTION(BlueprintPure, Category = "Ability")
 	UBaseAbilitySystemComponent* GetBaseAbilitySystemComponentFromActorInfo() const;

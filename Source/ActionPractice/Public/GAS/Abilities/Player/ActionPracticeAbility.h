@@ -10,6 +10,8 @@ class UInputBufferComponent;
 class UActionPracticeAttributeSet;
 class AActionPracticeCharacter;
 
+class UAbilityTask_WaitInputRelease;
+
 UCLASS()
 class ACTIONPRACTICE_API UActionPracticeAbility : public UBaseAbility
 {
@@ -35,6 +37,10 @@ public:
 protected:
 #pragma region "Protected Variables"
 
+	//Hold 계열 릴리즈 감지
+	UPROPERTY()
+	TObjectPtr<UAbilityTask_WaitInputRelease> WaitInputReleaseTask = nullptr;
+	
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -57,5 +63,15 @@ protected:
 	UFUNCTION(BlueprintPure, Category = "Ability")
 	UInputBufferComponent* GetInputBufferComponentFromActorInfo() const;
 
+	// ===== Hold 계열 어빌리티 릴리즈 헬퍼 =====
+	
+	//ActivateAbility 이후 필요한 시점에 호출
+	UFUNCTION(BlueprintCallable, Category = "Ability|Input")
+	void StartWaitInputReleaseTask(bool bTestAlreadyReleased = true);
+
+	//태스크 콜백
+	UFUNCTION()
+	virtual void OnWaitInputRelease(float TimeHeld);
+	
 #pragma endregion
 };

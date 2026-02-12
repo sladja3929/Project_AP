@@ -27,7 +27,7 @@ void UActionPracticeAbilitySystemComponent::BeginPlay()
 
 	if (AActor* Owner = GetOwner())
 	{
-		CachedAPCharacter = Cast<AActionPracticeCharacter>(Owner);
+		OwnerCharacter = Cast<AActionPracticeCharacter>(Owner);
 	}
 
 	EffectStaminaRegenBlockDurationTag = UGameplayTagsSubsystem::GetEffectStaminaRegenBlockDurationTag();
@@ -47,7 +47,140 @@ void UActionPracticeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwner
 {
 	Super::InitAbilityActorInfo(InOwnerActor, InAvatarActor);
 
-	CachedAPCharacter = Cast<AActionPracticeCharacter>(InOwnerActor);
+	OwnerCharacter = Cast<AActionPracticeCharacter>(InOwnerActor);
+}
+
+void UActionPracticeAbilitySystemComponent::AbilitySpecInputPressed(FGameplayAbilitySpec& Spec)
+{
+	Super::AbilitySpecInputPressed(Spec);
+
+	//LocalPredicted만 대상으로
+	const UGameplayAbility* AbilityCDO = Spec.Ability;
+	const bool bIsLocalPredicted = (AbilityCDO && AbilityCDO->GetNetExecutionPolicy() == EGameplayAbilityNetExecutionPolicy::LocalPredicted);
+
+	//Standalone/ListenServer 로컬/Client(Autonomous)에서만 태움
+	const bool bIsLocallyControlled = AbilityActorInfo.IsValid() && AbilityActorInfo->IsLocallyControlled();
+	if (!bIsLocalPredicted || !bIsLocallyControlled || !Spec.IsActive())
+	{
+		return;
+	}
+
+	TArray<UGameplayAbility*> Instances = Spec.GetAbilityInstances();
+	if (Instances.IsEmpty() || !Instances.Last())
+	{
+		return;
+	}
+
+	const FGameplayAbilityActivationInfo& ActivationInfo = Instances.Last()->GetCurrentActivationInfoRef();
+	const FPredictionKey OriginalPredictionKey = ActivationInfo.GetActivationPredictionKey();
+	
+	InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Spec.Handle, OriginalPredictionKey);
+}
+
+void UActionPracticeAbilitySystemComponent::AbilitySpecInputReleased(FGameplayAbilitySpec& Spec)
+{
+	Super::AbilitySpecInputReleased(Spec);
+
+	//LocalPredicted만 대상으로
+	const UGameplayAbility* AbilityCDO = Spec.Ability;
+	const bool bIsLocalPredicted = (AbilityCDO && AbilityCDO->GetNetExecutionPolicy() == EGameplayAbilityNetExecutionPolicy::LocalPredicted);
+
+	//Standalone/ListenServer 로컬/Client(Autonomous)에서만 태움
+	const bool bIsLocallyControlled = AbilityActorInfo.IsValid() && AbilityActorInfo->IsLocallyControlled();
+	if (!bIsLocalPredicted || !bIsLocallyControlled || !Spec.IsActive())
+	{
+		return;
+	}
+
+	TArray<UGameplayAbility*> Instances = Spec.GetAbilityInstances();
+	if (Instances.IsEmpty() || !Instances.Last())
+	{
+		return;
+	}
+
+	const FGameplayAbilityActivationInfo& ActivationInfo = Instances.Last()->GetCurrentActivationInfoRef();
+	const FPredictionKey OriginalPredictionKey = ActivationInfo.GetActivationPredictionKey();
+
+	InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Spec.Handle, OriginalPredictionKey);
+}
+
+void UActionPracticeAbilitySystemComponent::HandleGameplayEvent_NetPredicted(FGameplayTag EventTag, const FGameplayEventData* Payload)
+{
+	if (!EventTag.IsValid() || !Payload || !OwnerCharacter) return;
+
+	//로컬 -> 로컬, 서버 -> 서버 각자에서는 기본 이벤트 발신
+	HandleGameplayEvent(EventTag, Payload);
+	DEBUG_LOG(TEXT("APASC: HandleGameplayEvent called - %s"), *EventTag.ToString());
+	
+	//로컬에서 서버로 RPC
+	if (!OwnerCharacter->HasAuthority())
+	{
+		FGameplayEventData_NetPredicted NetPayload;
+		NetPayload.EventTag = EventTag;
+		NetPayload.InstigatorTags = Payload->InstigatorTags;
+		NetPayload.EventMagnitude = Payload->EventMagnitude;
+	
+		Server_HandleGameplayEvent(NetPayload);
+		DEBUG_LOG(TEXT("APASC: Server HandleGameplayEvent called - %s"), *EventTag.ToString());
+	}
+}
+
+void UActionPracticeAbilitySystemComponent::Server_HandleGameplayEvent_Implementation(const FGameplayEventData_NetPredicted& Payload)
+{
+	if (!Payload.EventTag.IsValid()) return;
+
+	FGameplayEventData EventData;
+	EventData.EventTag = Payload.EventTag;
+	EventData.InstigatorTags = Payload.InstigatorTags;
+	EventData.EventMagnitude = Payload.EventMagnitude;
+
+	HandleGameplayEvent(EventData.EventTag, &EventData);
+}
+
+void UActionPracticeAbilitySystemComponent::AddTag_NetPredicted(FGameplayTag AuthTag, FGameplayTag LocalTag)
+{
+	if (!OwnerCharacter) return;
+
+	//서버: 권위 태그 부여
+	if (OwnerCharacter->HasAuthority() && AuthTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("Adding %s on Authority"), *AuthTag.ToString());
+		AddLooseGameplayTag(AuthTag);
+		AddMinimalReplicationGameplayTag(AuthTag);
+	}
+
+	//클라: 로컬 태그 부여 (로컬 입력 제어용)
+	if (OwnerCharacter->IsLocallyControlled() && LocalTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("Adding %s on Local"), *LocalTag.ToString());
+		AddLooseGameplayTag(LocalTag);
+	}
+}
+
+void UActionPracticeAbilitySystemComponent::RemoveTags_NetPredicted(FGameplayTag AuthTag, FGameplayTag LocalTag)
+{
+	if (!OwnerCharacter) return;
+
+	//서버: 권위 태그 삭제
+	if (OwnerCharacter->HasAuthority() && AuthTag.IsValid())
+	{
+		while (HasMatchingGameplayTag(AuthTag))
+		{
+			RemoveLooseGameplayTag(AuthTag);
+			RemoveMinimalReplicationGameplayTag(AuthTag);
+		}
+		DEBUG_LOG(TEXT("Remove All %s on Authority"), *AuthTag.ToString());
+	}
+
+	//클라: 로컬 태그 삭제 (로컬 입력 제어용)
+	if (OwnerCharacter->IsLocallyControlled() && LocalTag.IsValid())
+	{
+		while (HasMatchingGameplayTag(LocalTag))
+		{
+			RemoveLooseGameplayTag(LocalTag);
+		}
+		DEBUG_LOG(TEXT("Remove All %s on Local"), *LocalTag.ToString());
+	}
 }
 
 const UActionPracticeAttributeSet* UActionPracticeAbilitySystemComponent::GetActionPracticeAttributeSet() const 
@@ -59,7 +192,7 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 {
 	CheckBlockSuccess(SourceActor);
 
-	if (!CachedAPCharacter.IsValid())
+	if (!OwnerCharacter)
 	{
 		Super::CalculateAndSetAttributes(SourceActor, FinalAttackData);
 		return;
@@ -75,7 +208,7 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 	//방어성공 시 계산
 	if (bBlockedLastAttack)
 	{
-		AWeapon* LeftWeapon = CachedAPCharacter->GetLeftWeapon();
+		AWeapon* LeftWeapon = OwnerCharacter->GetLeftWeapon();
 
 		//무기의 DamageReduction 적용
 		const FBlockActionData* BlockData = LeftWeapon->GetWeaponBlockData();
@@ -119,7 +252,7 @@ void UActionPracticeAbilitySystemComponent::CheckBlockSuccess(AActor* SourceActo
 {
 	bBlockedLastAttack = false;
 
-	if (!CachedAPCharacter.IsValid() || !SourceActor)
+	if (!OwnerCharacter || !SourceActor)
 	{
 		return;
 	}
@@ -127,15 +260,15 @@ void UActionPracticeAbilitySystemComponent::CheckBlockSuccess(AActor* SourceActo
 	//방어 태그 확인
 	const bool bIsBlocking = HasMatchingGameplayTag(StateAbilityBlockingTag);
 
-	if (!bIsBlocking || !CachedAPCharacter->GetLeftWeapon())
+	if (!bIsBlocking || !OwnerCharacter->GetLeftWeapon())
 	{
 		return;
 	}
 
 	//공격자 방향 계산
-	const FVector ToSource = SourceActor->GetActorLocation() - CachedAPCharacter->GetActorLocation();
+	const FVector ToSource = SourceActor->GetActorLocation() - OwnerCharacter->GetActorLocation();
 	const FVector ToSourceNormalized = ToSource.GetSafeNormal2D();
-	const FVector Forward = CachedAPCharacter->GetActorForwardVector();
+	const FVector Forward = OwnerCharacter->GetActorForwardVector();
 
 	//캐릭터 정면과 공격 방향 사이의 각도 계산
 	const float DotProduct = FVector::DotProduct(Forward, ToSourceNormalized);
@@ -148,4 +281,9 @@ void UActionPracticeAbilitySystemComponent::CheckBlockSuccess(AActor* SourceActo
 	{
 		bBlockedLastAttack = true;
 	}
+}
+
+void UActionPracticeAbilitySystemComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
 }

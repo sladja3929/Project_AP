@@ -3,6 +3,7 @@
 #include "GAS/Abilities/Player/ActionPracticeAbility.h"
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
+#include "GameplayTagContainer.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -19,7 +20,46 @@ AWeapon* FWeaponAbilityStatics::GetWeaponFromAbility(const UGameplayAbility* Abi
 	return bIsLeft ? Character->GetLeftWeapon() : Character->GetRightWeapon();
 }
 
-const FTaggedAttackData* FWeaponAbilityStatics::GetAttackDataFromAbility(const UGameplayAbility* Ability)
+const UWeaponDataAsset* FWeaponAbilityStatics::GetWeaponDataAssetFromAbility(const UGameplayAbility* Ability, bool bIsLeft)
+{
+	AWeapon* Weapon = GetWeaponFromAbility(Ability, bIsLeft);
+	if (!Weapon)
+	{
+		DEBUG_LOG(TEXT("GetWeaponDataAssetFromAbility: No Weapon"));
+		return nullptr;
+	}
+
+	const UWeaponDataAsset* WeaponDataAsset = Weapon->GetWeaponData();
+	if (!WeaponDataAsset)
+	{
+		DEBUG_LOG(TEXT("GetWeaponDataAssetFromAbility: No WeaponDataAsset"));
+		return nullptr;
+	}
+
+	return WeaponDataAsset;
+}
+
+const FTaggedAttackData* FWeaponAbilityStatics::GetAttackDataByTags(const UWeaponDataAsset* WeaponDataAsset, const FGameplayTagContainer& AttackTags)
+{
+	if (!WeaponDataAsset || !AttackTags.IsValid())
+	{
+		DEBUG_LOG(TEXT("GetAttackDataByTagsFromList: Invalid parameters"));
+		return nullptr;
+	}
+
+	for (const FTaggedAttackData& AttackData : WeaponDataAsset->TaggedAttackData)
+	{
+		if (AttackData.AttackTags.HasAllExact(AttackTags))
+		{
+			return &AttackData;
+		}
+	}
+
+	//DEBUG_LOG(TEXT("GetAttackDataByTagsFromList: No matching AttackData for tag %s"), *AttackTags.ToString());
+	return nullptr;
+}
+
+const FTaggedAttackData* FWeaponAbilityStatics::GetAttackDataByTagsFromAbility(const UGameplayAbility* Ability)
 {
 	AWeapon* Weapon = GetWeaponFromAbility(Ability, false);
 	if (!Weapon)

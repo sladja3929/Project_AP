@@ -6,6 +6,7 @@
 #include "Logging/LogMacros.h"
 #include "ActionPracticeCharacter.generated.h"
 
+class UActionPracticeAbilitySystemComponent;
 class UInputActionDataAsset;
 class IHitDetectionInterface;
 class USpringArmComponent;
@@ -86,6 +87,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Input")
 	bool IsBlockInputPressed() const;
 
+	//===== Replication =====
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 #pragma endregion
 
 protected:
@@ -110,11 +114,11 @@ protected:
 	// ===== Weapon Properties =====
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon")
 	TSubclassOf<AWeapon> WeaponClass = nullptr;
-	
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon")
+
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon", ReplicatedUsing = OnRep_LeftWeapon)
 	TObjectPtr<AWeapon> LeftWeapon = nullptr;
-    
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon")
+
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon", ReplicatedUsing = OnRep_RightWeapon)
 	TObjectPtr<AWeapon> RightWeapon = nullptr;
 
 	// ====== Input Actions ======
@@ -155,26 +159,37 @@ protected:
 	TObjectPtr<UInputActionDataAsset> InputActionData = nullptr;
 
 	// ===== Usage Tags =====
-	FGameplayTag StateRecoveringTag;
+	FGameplayTag StateRecoveringLocalTag;
 	FGameplayTag StateAbilitySprintingTag;
-	FGameplayTag StateAbilityAttackingTag;
+	FGameplayTag StateAbilityRollingTag;
+	FGameplayTag StateAbilityAttackingLocalTag;
 	FGameplayTag AbilityAttackTag;
+	FGameplayTag EventActionAttackInputTag;
+	FGameplayTag EventActionCancelAttackTag;
 	
 	// ===== State Variables =====
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State", Replicated)
 	bool bIsLockOn = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State")
 	bool bIsSwitching = false;
 
 	// ===== LockOn =====
-	UPROPERTY(BlueprintReadOnly, Category = "Combat")
+	UPROPERTY(BlueprintReadOnly, Category = "Combat", Replicated)
 	TObjectPtr<AActor> LockedOnTarget = nullptr;
-	
+
+	// AttackSequenceAbility auto-activation gate
+	bool bAttackSequenceAutoActivated = false;
+	int32 AttackSequenceAutoActivateRetryCount = 0;
+	FTimerHandle AttackSequenceAutoActivateTimer;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
-	
+
+	//현재 상태 태그를 캡처하여 반환
+	FGameplayTagContainer CaptureCurrentStateTags() const;
+
 	// ===== Weapon Functions =====
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	TSubclassOf<AWeapon> LoadWeaponClassByName(const FString& WeaponName);
@@ -195,6 +210,9 @@ protected:
 	
 	UFUNCTION(BlueprintCallable, Category = "GAS")
 	void GASInputReleased(const UInputAction* InputAction);
+
+	void TryAutoActivateAttackSequenceAbility();
+	bool IsAttackSequenceAutoActivateReady() const;
 	
 	// ===== Input Handler Functions =====
 	void Move(const FInputActionValue& Value);
@@ -218,13 +236,45 @@ protected:
 	void OnBlockInputReleased();
 	void OnChargeAttackInput();
 	void OnChargeAttackReleased();
+
 	
+	// ===== Rotation Helper =====
+	bool CalculateYawFromMovementInput(float& OutYaw) const;
+
+	//서버에 회전 요청(RPC)
+	UFUNCTION(Server, Reliable)
+	void Server_RequestRotateToYaw(float TargetYaw, float RotateTime);
+
+	//락온 상태를 서버에 동기화
+	UFUNCTION(Server, Reliable)
+	void ServerSetLockOnState(bool bNewLockOn, AActor* NewTarget);
+
+	//CMC 회전 모드를 서버에 동기화
+	UFUNCTION(Server, Reliable)
+	void ServerSetRotationMode(bool bOrientToMovement, bool bUseControllerDesired);
+
+	//로컬 CMC 세팅 + 서버 동기화를 하나로 묶는 헬퍼
+	void SetRotationMode(bool bOrientToMovement, bool bUseControllerDesired);
+
+	//현재 회전 모드 캐싱 (불필요한 RPC 방지)
+	bool bCachedOrientToMovement = true;
+	bool bCachedUseControllerDesired = false;
+
+	//===== Replication Functions =====
+	UFUNCTION()
+	void OnRep_LeftWeapon();
+
+	UFUNCTION()
+	void OnRep_RightWeapon();	
+
 #pragma endregion
 
 private:
 #pragma region "Private Variables"
 
-
+	UPROPERTY()
+	TObjectPtr<UActionPracticeAbilitySystemComponent> APASC = nullptr;
+	
 #pragma endregion
 
 #pragma region "Private Functions"

@@ -4,6 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
+#include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -27,11 +28,6 @@ bool UActionPracticeAbility::CanActivateAbility(const FGameplayAbilitySpecHandle
 void UActionPracticeAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-}
-
-void UActionPracticeAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
-{
-	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UActionPracticeAbility::ActivateInitSettings()
@@ -87,4 +83,37 @@ UInputBufferComponent* UActionPracticeAbility::GetInputBufferComponentFromActorI
 		return Character->GetInputBufferComponent();
 	}
 	return nullptr;
+}
+
+void UActionPracticeAbility::StartWaitInputReleaseTask(bool bTestAlreadyReleased)
+{
+	if (WaitInputReleaseTask)
+	{
+		WaitInputReleaseTask->EndTask();
+		WaitInputReleaseTask = nullptr;
+	}
+
+	WaitInputReleaseTask = UAbilityTask_WaitInputRelease::WaitInputRelease(this, bTestAlreadyReleased);
+	if (!WaitInputReleaseTask)
+		return;
+
+	WaitInputReleaseTask->OnRelease.AddDynamic(this, &UActionPracticeAbility::OnWaitInputRelease);
+	WaitInputReleaseTask->ReadyForActivation();
+}
+
+void UActionPracticeAbility::OnWaitInputRelease(float TimeHeld)
+{
+	//Base는 기본 동작 없음 (각 Ability에서 override)
+}
+
+void UActionPracticeAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	if (WaitInputReleaseTask)
+	{
+		WaitInputReleaseTask->EndTask();
+		WaitInputReleaseTask = nullptr;
+	}
+
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

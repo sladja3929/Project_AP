@@ -19,7 +19,6 @@ public:
 	
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void ActivateInitSettings() override;
-	virtual void InputReleased(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) override;
 	virtual void CancelAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateCancelAbility) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
@@ -50,24 +49,18 @@ protected:
 
 	UPROPERTY()
 	bool bIsBlocking = false;
-
-	//ExecuteMontageTask 파라미터
-	bool bCreateTask = false;
 	
 #pragma endregion
 
 #pragma region "Protected Functions"
 
 	UFUNCTION()
-	virtual void PlayAction() override;
-
-	UFUNCTION()
 	virtual UAnimMontage* SetMontageToPlayTask() override;
 	
-	virtual void BindEventsAndReadyMontageTask() override;
+	virtual void SetUpPlayMontageWithEventsTask() override;
 
 	UFUNCTION()
-	virtual void ExecuteMontageTask() override;
+	virtual void StartMontageWithEventsTask() override;
 
 	//Idle일 때는 호출되지 않음, 오로지 Reaction일때만
 	UFUNCTION()
@@ -75,6 +68,8 @@ protected:
 	
 	UFUNCTION()
 	virtual void OnTaskMontageInterrupted() override;
+
+	virtual void OnWaitInputRelease(float TimeHeld) override;
 	
 #pragma endregion
 

@@ -46,7 +46,10 @@ bool UBaseAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 
 	if (!bSuperCanActivate)
 	{
-		DEBUG_LOG(TEXT("BaseAbility::CanActivateAbility FAILED at Super. Ability=%s"), *GetName());
+		const FString RelevantTagStr =	(OptionalRelevantTags != nullptr) ? OptionalRelevantTags->ToStringSimple() : TEXT("OptionalRelevantTags=null");
+
+		DEBUG_LOG(TEXT("BaseAbility::CanActivateAbility FAILED at Super. Ability=%s, RelevantTags=%s"),
+			*GetName(), *RelevantTagStr);
 		return false;
 	}
 
@@ -133,7 +136,7 @@ bool UBaseAbility::ApplyStaminaCost()
 	const FActiveGameplayEffectHandle Handle = ASC->ApplyGameplayEffectSpecToSelf(*EffectSpec.Data.Get());
 	const bool bApplied = Handle.IsValid();
 
-	DEBUG_LOG(TEXT("ApplyStaminaCost applied=%s, Cost=%.2f"), bApplied ? TEXT("true") : TEXT("false"), StaminaCost);
+	//DEBUG_LOG(TEXT("ApplyStaminaCost applied=%s, Cost=%.2f"), bApplied ? TEXT("true") : TEXT("false"), StaminaCost);
 
 	return true;
 }
@@ -248,4 +251,18 @@ void UBaseAbility::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const 
 
 	//자기 자신에게 적용
 	ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+}
+
+UAbilityTask_WaitGameplayEvent* UBaseAbility::CreateWaitGameplayEventTask(
+	const FGameplayTag& EventTag,
+	AActor* OptionalExternalTarget,
+	bool bOnlyTriggerOnce,
+	bool bOnlyMatchExact)
+{
+	return UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+		this,
+		EventTag,
+		OptionalExternalTarget,
+		bOnlyTriggerOnce,
+		bOnlyMatchExact);
 }

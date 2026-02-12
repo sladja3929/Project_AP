@@ -3,6 +3,7 @@
 #include "GameplayAbilities/Public/Abilities/GameplayAbility.h"
 #include "GAS/AttributeSet/BaseAttributeSet.h"
 #include "Items/AttackData.h"
+#include "Net/UnrealNetwork.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -16,6 +17,13 @@
 ABaseCharacter::ABaseCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
+
+	//네트워크 복제 활성화
+	bReplicates = true;
+	SetReplicateMovement(true);
+
+	//데디케이티드 서버에서도 애니메이션 틱 활성화 (몽타주 콜백을 위해 필수)
+	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 }
 
 void ABaseCharacter::BeginPlay()
@@ -35,6 +43,13 @@ void ABaseCharacter::Tick(float DeltaTime)
 UAbilitySystemComponent* ABaseCharacter::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
+}
+
+void ABaseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	//AbilitySystemComponent와 AttributeSet은 GAS에서 자동 복사
 }
 
 void ABaseCharacter::InitializeAbilitySystem()
@@ -60,6 +75,9 @@ void ABaseCharacter::GiveAbility(TSubclassOf<UGameplayAbility> AbilityClass)
 
 void ABaseCharacter::GrantStartupAbilities()
 {
+	//서버에서만 어빌리티 부여 (클라이언트에는 복제됨)
+	if (!HasAuthority()) return;
+
 	for (const auto& StartAbility : StartAbilities)
 	{
 		GiveAbility(StartAbility);
@@ -68,6 +86,9 @@ void ABaseCharacter::GrantStartupAbilities()
 
 void ABaseCharacter::ApplyStartupEffects()
 {
+	//서버에서만 시작 효과 적용 (클라이언트에는 ActiveGameplayEffect로 복제됨)
+	if (!HasAuthority()) return;
+
 	FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
 	EffectContext.AddSourceObject(this);
 
