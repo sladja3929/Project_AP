@@ -258,9 +258,8 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 		//락온 상태에서 걸을 때: Strafe 이동 (Sprint, Roll 중에는 제외)
 		if(!bIgnoreLockOnState && bIsLockOn && LockedOnTarget)
 		{
-			//Strafe 이동 설정
-			GetCharacterMovement()->bOrientRotationToMovement = false;
-			GetCharacterMovement()->bUseControllerDesiredRotation = false;
+			//Strafe 이동 설정: CMC가 ControlRotation을 따르도록 설정
+			SetRotationMode(false, true);
 
 			const FVector TargetLocation = LockedOnTarget->GetActorLocation();
 			const FVector CharacterLocation = GetActorLocation();
@@ -281,15 +280,13 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 			//전후 이동
 			AddMovementInput(BackwardDirection, -MovementVector.Y);
 
-			//캐릭터가 타겟을 바라보도록 회전
-			SetActorRotation(TargetRotation);
+			//회전은 CMC가 ControlRotation 기반으로 처리 (UpdateLockOnCamera에서 설정)
 		}
 
 		else //일반적인 회전 이동 (락온 없음 or 락온+달리기)
 		{
 			//일반 회전 이동 설정
-			GetCharacterMovement()->bOrientRotationToMovement = true;
-			GetCharacterMovement()->bUseControllerDesiredRotation = false;
+			SetRotationMode(true, false);
 
 			const FRotator Rotation = Controller->GetControlRotation();
 			const FRotator YawRotation(0, Rotation.Yaw, 0);
@@ -377,6 +374,45 @@ void AActionPracticeCharacter::Server_RequestRotateToYaw_Implementation(float Ta
 	RotateToRotation(TargetRotation, RotateTime);
 }
 
+void AActionPracticeCharacter::ServerSetLockOnState_Implementation(bool bNewLockOn, AActor* NewTarget)
+{
+	bIsLockOn = bNewLockOn;
+	LockedOnTarget = NewTarget;
+
+	DEBUG_LOG(TEXT("Server: Lock-On State Updated - bIsLockOn: %s, Target: %s"),
+		bNewLockOn ? TEXT("true") : TEXT("false"),
+		NewTarget ? *NewTarget->GetName() : TEXT("None"));
+}
+
+void AActionPracticeCharacter::ServerSetRotationMode_Implementation(bool bOrientToMovement, bool bUseControllerDesired)
+{
+	GetCharacterMovement()->bOrientRotationToMovement = bOrientToMovement;
+	GetCharacterMovement()->bUseControllerDesiredRotation = bUseControllerDesired;
+
+	DEBUG_LOG(TEXT("Server: RotationMode Updated - OrientToMovement: %s, UseControllerDesired: %s"),
+		bOrientToMovement ? TEXT("true") : TEXT("false"),
+		bUseControllerDesired ? TEXT("true") : TEXT("false"));
+}
+
+void AActionPracticeCharacter::SetRotationMode(bool bOrientToMovement, bool bUseControllerDesired)
+{
+	//로컬 적용
+	GetCharacterMovement()->bOrientRotationToMovement = bOrientToMovement;
+	GetCharacterMovement()->bUseControllerDesiredRotation = bUseControllerDesired;
+
+	//값이 바뀌었을 때만 서버 RPC
+	if (bCachedOrientToMovement != bOrientToMovement || bCachedUseControllerDesired != bUseControllerDesired)
+	{
+		bCachedOrientToMovement = bOrientToMovement;
+		bCachedUseControllerDesired = bUseControllerDesired;
+
+		if (!HasAuthority())
+		{
+			ServerSetRotationMode(bOrientToMovement, bUseControllerDesired);
+		}
+	}
+}
+
 bool AActionPracticeCharacter::CalculateYawFromMovementInput(float& OutYaw) const
 {
 	const FVector2D MovementInput = GetCurrentMovementInput();
@@ -450,8 +486,13 @@ void AActionPracticeCharacter::ToggleLockOn()
 		LockedOnTarget = nullptr;
 
 		//일반 이동 회전으로 복원
-		GetCharacterMovement()->bOrientRotationToMovement = true;
-		GetCharacterMovement()->bUseControllerDesiredRotation = false;
+		SetRotationMode(true, false);
+
+		//서버에 락온 해제 동기화
+		if (!HasAuthority())
+		{
+			ServerSetLockOnState(false, nullptr);
+		}
 
 		if (CameraBoom)
 		{
@@ -467,6 +508,15 @@ void AActionPracticeCharacter::ToggleLockOn()
 		{
 			bIsLockOn = true;
 			LockedOnTarget = NearestTarget;
+
+			//락온 회전: CMC가 ControlRotation을 따르도록 설정
+			SetRotationMode(false, true);
+
+			//서버에 락온 동기화
+			if (!HasAuthority())
+			{
+				ServerSetLockOnState(true, NearestTarget);
+			}
 
 			DEBUG_LOG(TEXT("Lock-On Target: %s"), *NearestTarget->GetName());
 		}

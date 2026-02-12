@@ -244,7 +244,22 @@ protected:
 	//서버에 회전 요청(RPC)
 	UFUNCTION(Server, Reliable)
 	void Server_RequestRotateToYaw(float TargetYaw, float RotateTime);
-	
+
+	//락온 상태를 서버에 동기화
+	UFUNCTION(Server, Reliable)
+	void ServerSetLockOnState(bool bNewLockOn, AActor* NewTarget);
+
+	//CMC 회전 모드를 서버에 동기화
+	UFUNCTION(Server, Reliable)
+	void ServerSetRotationMode(bool bOrientToMovement, bool bUseControllerDesired);
+
+	//로컬 CMC 세팅 + 서버 동기화를 하나로 묶는 헬퍼
+	void SetRotationMode(bool bOrientToMovement, bool bUseControllerDesired);
+
+	//현재 회전 모드 캐싱 (불필요한 RPC 방지)
+	bool bCachedOrientToMovement = true;
+	bool bCachedUseControllerDesired = false;
+
 	//===== Replication Functions =====
 	UFUNCTION()
 	void OnRep_LeftWeapon();
