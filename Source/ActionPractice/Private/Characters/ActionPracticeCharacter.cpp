@@ -1,4 +1,5 @@
 #include "Public/Characters/ActionPracticeCharacter.h"
+#include "Public/Games/ActionPracticePlayerController.h"
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -160,88 +161,16 @@ void AActionPracticeCharacter::BeginPlay()
 void AActionPracticeCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	UpdateLockOnCamera();
 }
 
 void AActionPracticeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
-		// ===== Basic Input Actions (Direct Function Binding) =====
-		if (IA_Move)
-		{
-			EnhancedInputComponent->BindAction(IA_Move, ETriggerEvent::Triggered, this, &AActionPracticeCharacter::Move);
-		}
-        
-		if (IA_Look)
-		{
-			EnhancedInputComponent->BindAction(IA_Look, ETriggerEvent::Triggered, this, &AActionPracticeCharacter::Look);
-		}
-
-		if(IA_LockOn)
-		{
-			EnhancedInputComponent->BindAction(IA_LockOn, ETriggerEvent::Started, this, &AActionPracticeCharacter::ToggleLockOn);
-		}
-
-		if(IA_WeaponSwitch)
-		{
-			EnhancedInputComponent->BindAction(IA_WeaponSwitch, ETriggerEvent::Started, this, &AActionPracticeCharacter::WeaponSwitch);
-		}
-
-		// ===== GAS Ability Input Actions =====
-		// Jump
-		if (IA_Jump)
-		{
-			EnhancedInputComponent->BindAction(IA_Jump, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnJumpInput);
-		}
-        
-		// Sprint (Hold)
-		if (IA_Sprint)
-		{
-			EnhancedInputComponent->BindAction(IA_Sprint, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnSprintInput);
-			EnhancedInputComponent->BindAction(IA_Sprint, ETriggerEvent::Completed, this, &AActionPracticeCharacter::OnSprintInputReleased);
-		}
-        
-		// Crouch
-		if (IA_Crouch)
-		{
-			EnhancedInputComponent->BindAction(IA_Crouch, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnCrouchInput);
-		}
-        
-		// Roll
-		if (IA_Roll)
-		{
-			EnhancedInputComponent->BindAction(IA_Roll, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnRollInput);
-		}
-        
-		// Attack
-		if (IA_Attack)
-		{
-			EnhancedInputComponent->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnAttackInput);
-		}
-
-		//Hold
-		if (IA_ChargeAttack)
-		{
-			EnhancedInputComponent->BindAction(IA_ChargeAttack, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnChargeAttackInput);
-			EnhancedInputComponent->BindAction(IA_ChargeAttack, ETriggerEvent::Completed, this, &AActionPracticeCharacter::OnChargeAttackReleased);
-		}
-		
-		// Block (Hold)
-		if (IA_Block)
-		{
-			EnhancedInputComponent->BindAction(IA_Block, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnBlockInput);
-			EnhancedInputComponent->BindAction(IA_Block, ETriggerEvent::Completed, this, &AActionPracticeCharacter::OnBlockInputReleased);
-		}
-    }
+	// 입력 바인딩은 AActionPracticePlayerController::SetupInputComponent 에서 처리
 }
 
 #pragma region "Move Functions"
-void AActionPracticeCharacter::Move(const FInputActionValue& Value)
+void AActionPracticeCharacter::ExecuteMove(const FVector2D& MovementVector)
 {
-	const FVector2D MovementVector = Value.Get<FVector2D>();
-
 	//리커버리가 끝나면 어빌리티 중단
 	if (MovementVector.Size() > 0.1f)
 	{
@@ -256,7 +185,7 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 			|| AbilitySystemComponent->HasMatchingGameplayTag(StateAbilityRollingTag);
 
 		//락온 상태에서 걸을 때: Strafe 이동 (Sprint, Roll 중에는 제외)
-		if(!bIgnoreLockOnState && bIsLockOn && LockedOnTarget)
+		if (!bIgnoreLockOnState && bIsLockOn && LockedOnTarget)
 		{
 			//Strafe 이동 설정: CMC가 ControlRotation을 따르도록 설정
 			SetRotationMode(false, true);
@@ -280,7 +209,7 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 			//전후 이동
 			AddMovementInput(BackwardDirection, -MovementVector.Y);
 
-			//회전은 CMC가 ControlRotation 기반으로 처리 (UpdateLockOnCamera에서 설정)
+			//회전은 CMC가 ControlRotation 기반으로 처리 (Controller의 UpdateLockOnCamera에서 설정)
 		}
 
 		else //일반적인 회전 이동 (락온 없음 or 락온+달리기)
@@ -302,14 +231,18 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 
 FVector2D AActionPracticeCharacter::GetCurrentMovementInput() const
 {
-	APlayerController* PC = GetController<APlayerController>();
-	if (PC && IA_Move)
+	// 로컬 입력은 로컬 컨트롤 폰에서만 유효 (데디케이티드 서버·시뮬레이티드 프록시는 ZeroVector)
+	if (!IsLocallyControlled()) return FVector2D::ZeroVector;
+
+	AActionPracticePlayerController* PC = GetController<AActionPracticePlayerController>();
+	UInputAction* MoveAction = PC ? PC->GetIA_Move() : nullptr;
+	if (PC && MoveAction)
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = 
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
 			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
 		{
 			//특정 액션의 현재 값 조회
-			FInputActionValue ActionValue = Subsystem->GetPlayerInput()->GetActionValue(IA_Move);
+			FInputActionValue ActionValue = Subsystem->GetPlayerInput()->GetActionValue(MoveAction);
 			return ActionValue.Get<FVector2D>();
 		}
 	}
@@ -318,14 +251,18 @@ FVector2D AActionPracticeCharacter::GetCurrentMovementInput() const
 
 bool AActionPracticeCharacter::IsBlockInputPressed() const
 {
-	APlayerController* PC = GetController<APlayerController>();
-	if (PC && IA_Block)
+	// 로컬 입력은 로컬 컨트롤 폰에서만 유효 (데디케이티드 서버·시뮬레이티드 프록시는 false)
+	if (!IsLocallyControlled()) return false;
+
+	AActionPracticePlayerController* PC = GetController<AActionPracticePlayerController>();
+	UInputAction* BlockAction = PC ? PC->GetIA_Block() : nullptr;
+	if (PC && BlockAction)
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
 			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
 		{
 			// IA_Block 액션의 현재 값 조회
-			FInputActionValue ActionValue = Subsystem->GetPlayerInput()->GetActionValue(IA_Block);
+			FInputActionValue ActionValue = Subsystem->GetPlayerInput()->GetActionValue(BlockAction);
 			return ActionValue.Get<bool>();
 		}
 	}
@@ -337,13 +274,14 @@ void AActionPracticeCharacter::RotateCharacterToInputDirection(float RotateTime,
 	float DesiredYaw = 0.0f;
 
 	//락온 상태면 락온 대상 방향으로
-	if (!bIgnoreLockOn && bIsLockOn)
+	if (!bIgnoreLockOn && IsLockedOn())
 	{
-		if (!LockedOnTarget) return;
+		AActor* LockTarget = GetLockOnTarget();
+		if (!LockTarget) return;
 		DEBUG_LOG(TEXT("APCharacter - Rotate Character To Lock On Target"));
-		
+
 		//락온 타겟 방향으로 Yaw 계산
-		const FVector DirectionToTarget = (LockedOnTarget->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+		const FVector DirectionToTarget = (LockTarget->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 		DesiredYaw = DirectionToTarget.Rotation().Yaw;
 	}
 	
@@ -467,106 +405,37 @@ void AActionPracticeCharacter::CancelActionForMove()
 #pragma endregion
 
 #pragma region "Look Functions"
-void AActionPracticeCharacter::Look(const FInputActionValue& Value)
+void AActionPracticeCharacter::ExecuteLook(const FVector2D& LookAxisVector)
 {
-	if (Controller == nullptr) return;
-	if(bIsLockOn && LockedOnTarget) return;
-	
-	const FVector2D LookAxisVector = Value.Get<FVector2D>();
-	
+	if (bIsLockOn && LockedOnTarget) return;
+
 	AddControllerYawInput(LookAxisVector.X);
 	AddControllerPitchInput(LookAxisVector.Y);
 }
 
-void AActionPracticeCharacter::ToggleLockOn()
+void AActionPracticeCharacter::SetLockedOnTarget(AActor* NewTarget)
 {
+	bIsLockOn = (NewTarget != nullptr);
+	LockedOnTarget = NewTarget;
+
 	if (bIsLockOn)
 	{
-		bIsLockOn = false;
-		LockedOnTarget = nullptr;
-
-		//일반 이동 회전으로 복원
-		SetRotationMode(true, false);
-
-		//서버에 락온 해제 동기화
-		if (!HasAuthority())
-		{
-			ServerSetLockOnState(false, nullptr);
-		}
-
-		if (CameraBoom)
-		{
-			//필요하면 카메라 설정 복원
-		}
-
-		DEBUG_LOG(TEXT("Lock-On Released"));
+		//락온 회전: CMC가 ControlRotation을 따르도록 설정
+		SetRotationMode(false, true);
+		DEBUG_LOG(TEXT("Lock-On Target: %s"), *NewTarget->GetName());
 	}
 	else
 	{
-		AActor* NearestTarget = FindNearestTarget();
-		if (NearestTarget)
-		{
-			bIsLockOn = true;
-			LockedOnTarget = NearestTarget;
-
-			//락온 회전: CMC가 ControlRotation을 따르도록 설정
-			SetRotationMode(false, true);
-
-			//서버에 락온 동기화
-			if (!HasAuthority())
-			{
-				ServerSetLockOnState(true, NearestTarget);
-			}
-
-			DEBUG_LOG(TEXT("Lock-On Target: %s"), *NearestTarget->GetName());
-		}
-		else
-		{
-			DEBUG_LOG(TEXT("No valid target found for Lock-On"));
-		}
+		//일반 이동 회전으로 복원
+		SetRotationMode(true, false);
+		DEBUG_LOG(TEXT("Lock-On Released"));
 	}
-}
 
-AActor* AActionPracticeCharacter::FindNearestTarget()
-{
-	TArray<AActor*> FoundTargets;
-	UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName("Enemy"), FoundTargets);
-    
-	AActor* NearestTarget = nullptr;
-	float NearestDistance = FLT_MAX;
-    
-	for (AActor* PotentialTarget : FoundTargets)
+	//서버에 락온 상태 동기화
+	if (!HasAuthority())
 	{
-		float Distance = FVector::Dist(GetActorLocation(), PotentialTarget->GetActorLocation());
-		if (Distance < NearestDistance && Distance < 2000.0f)
-		{
-			NearestDistance = Distance;
-			NearestTarget = PotentialTarget;
-		}
+		ServerSetLockOnState(bIsLockOn, LockedOnTarget);
 	}
-    
-	return NearestTarget;
-}
-
-void AActionPracticeCharacter::UpdateLockOnCamera()
-{
-    if (bIsLockOn && LockedOnTarget && Controller && CameraBoom)
-    {
-        const FVector TargetLocation = LockedOnTarget->GetActorLocation();
-        const FVector CharacterLocation = GetActorLocation();
-
-    	//중간점을 바라보게 하여 격렬하게 움직일 때 플레이어와 타겟 모두가 잡히게
-        FVector LookAtPoint = (CharacterLocation + TargetLocation) * 0.5f;
-        FRotator LookAtRotation = (LookAtPoint - CharacterLocation).Rotation();
-
-    	//카메라 위아래 회전 각도 제한
-        LookAtRotation.Pitch = FMath::Clamp(LookAtRotation.Pitch, -25.0f, 15.0f);
-    	
-        FRotator CurrentRotation = Controller->GetControlRotation();
-        FRotator SmoothedRotation = FMath::RInterpTo(CurrentRotation, LookAtRotation, GetWorld()->GetDeltaSeconds(), 5.0f);
-    	
-        Controller->SetControlRotation(SmoothedRotation);
-    }
 }
 #pragma endregion
 
@@ -673,58 +542,6 @@ TSubclassOf<AWeapon> AActionPracticeCharacter::LoadWeaponClassByName(const FStri
 }
 #pragma endregion
 
-#pragma region "GAS Input Functions"
-void AActionPracticeCharacter::OnJumpInput()
-{
-	GASInputPressed(IA_Jump);
-}
-
-void AActionPracticeCharacter::OnSprintInput()
-{
-	GASInputPressed(IA_Sprint);
-}
-
-void AActionPracticeCharacter::OnSprintInputReleased()
-{
-	GASInputReleased(IA_Sprint);
-}
-
-void AActionPracticeCharacter::OnCrouchInput()
-{
-	GASInputPressed(IA_Crouch);
-}
-
-void AActionPracticeCharacter::OnRollInput()
-{
-	GASInputPressed(IA_Roll);
-}
-
-void AActionPracticeCharacter::OnAttackInput()
-{
-	GASInputPressed(IA_Attack);
-}
-
-void AActionPracticeCharacter::OnBlockInput()
-{
-	GASInputPressed(IA_Block);
-}
-
-void AActionPracticeCharacter::OnBlockInputReleased()
-{
-	GASInputReleased(IA_Block);
-}
-
-void AActionPracticeCharacter::OnChargeAttackInput()
-{
-	GASInputPressed(IA_ChargeAttack);
-}
-
-void AActionPracticeCharacter::OnChargeAttackReleased()
-{
-	GASInputReleased(IA_ChargeAttack);
-}
-
-#pragma endregion
 
 #pragma region "GAS Functions"
 FGameplayTagContainer AActionPracticeCharacter::CaptureCurrentStateTags() const

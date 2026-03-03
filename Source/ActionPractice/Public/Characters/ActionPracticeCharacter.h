@@ -19,7 +19,7 @@ class UInputBufferComponent;
 class AWeapon;
 class UPlayerStatsWidget;
 
-DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All); 
+DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS(abstract)
 class AActionPracticeCharacter : public ABaseCharacter
@@ -28,7 +28,7 @@ class AActionPracticeCharacter : public ABaseCharacter
 
 public:
 #pragma region "Public Variables"
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
 	FString WeaponBlueprintBasePath = TEXT("/Game/Items/BluePrint/");
 
@@ -37,21 +37,21 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	TSubclassOf<AWeapon> LeftWeaponClass;
-	
+
 	// ===== Movement Properties =====
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
 	float WalkSpeed = 400.0f;
-	
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
 	float SprintSpeedMultiplier = 1.5f;
-    
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
 	float CrouchSpeedMultiplier = 0.5f;
 
 #pragma endregion
-	
+
 #pragma region "Public Functions"
-	
+
 	AActionPracticeCharacter();
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -59,7 +59,7 @@ public:
 
 	// ===== Getter =====
 	//Camera
-	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }	
+	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
 	//GAS
@@ -68,17 +68,17 @@ public:
 	//Input
 	FORCEINLINE UInputBufferComponent* GetInputBufferComponent() const { return InputBufferComponent; }
 	FORCEINLINE const UInputActionDataAsset* GetInputActionData() const { return InputActionData; }
-	
+
 	//Weapon
 	FORCEINLINE AWeapon* GetLeftWeapon() const { return LeftWeapon; }
 	FORCEINLINE AWeapon* GetRightWeapon() const { return RightWeapon; }
 	virtual TScriptInterface<IHitDetectionInterface> GetHitDetectionInterface() const override;
 	// ===================
-	
+
 	//Movement Functions
 	UFUNCTION(BlueprintPure, Category = "Input")
 	FVector2D GetCurrentMovementInput() const;
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Character")
 	void RotateCharacterToInputDirection(float RotationTime, bool bIgnoreLockOn);
 
@@ -86,6 +86,27 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Input")
 	bool IsBlockInputPressed() const;
+
+	// ===== Controller-facing execution functions =====
+	void ExecuteMove(const FVector2D& MovementVector);
+	void ExecuteLook(const FVector2D& LookAxisVector);
+	void WeaponSwitch();
+
+	// ===== Lock-On Interface (set by Controller) =====
+	void SetLockedOnTarget(AActor* NewTarget);
+
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	bool IsLockedOn() const { return bIsLockOn; }
+
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	AActor* GetLockOnTarget() const { return LockedOnTarget; }
+
+	// ===== GAS Input (called by Controller) =====
+	UFUNCTION(BlueprintCallable, Category = "GAS")
+	void GASInputPressed(const UInputAction* InputAction);
+
+	UFUNCTION(BlueprintCallable, Category = "GAS")
+	void GASInputReleased(const UInputAction* InputAction);
 
 	//===== Replication =====
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -97,10 +118,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USpringArmComponent> CameraBoom = nullptr;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> FollowCamera = nullptr;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputBufferComponent> InputBufferComponent = nullptr;
 
@@ -121,40 +142,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon", ReplicatedUsing = OnRep_RightWeapon)
 	TObjectPtr<AWeapon> RightWeapon = nullptr;
 
-	// ====== Input Actions ======
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_Jump = nullptr;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_Move = nullptr;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_Look = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_LockOn = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_Sprint = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_Crouch = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_Roll = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_Attack = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_Block = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_WeaponSwitch = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_ChargeAttack = nullptr;
-
+	// ===== Input Action Data (for GAS ability mapping) =====
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputActionDataAsset> InputActionData = nullptr;
 
@@ -166,17 +154,10 @@ protected:
 	FGameplayTag AbilityAttackTag;
 	FGameplayTag EventActionAttackInputTag;
 	FGameplayTag EventActionCancelAttackTag;
-	
-	// ===== State Variables =====
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State", Replicated)
-	bool bIsLockOn = false;
 
+	// ===== State Variables =====
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State")
 	bool bIsSwitching = false;
-
-	// ===== LockOn =====
-	UPROPERTY(BlueprintReadOnly, Category = "Combat", Replicated)
-	TObjectPtr<AActor> LockedOnTarget = nullptr;
 
 	// AttackSequenceAbility auto-activation gate
 	bool bAttackSequenceAutoActivated = false;
@@ -193,51 +174,24 @@ protected:
 	// ===== Weapon Functions =====
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	TSubclassOf<AWeapon> LoadWeaponClassByName(const FString& WeaponName);
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, bool bIsLeftHand = true, bool bIsTwoHanded = false);
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void UnequipWeapon(bool bIsLeftHand = true);
-	
+
 	// ===== GAS Functions =====
 	virtual void InitializeAbilitySystem() override;
 	virtual void CreateAbilitySystemComponent() override;
 	virtual void CreateAttributeSet() override;
 
-	UFUNCTION(BlueprintCallable, Category = "GAS")
-	void GASInputPressed(const UInputAction* InputAction);
-	
-	UFUNCTION(BlueprintCallable, Category = "GAS")
-	void GASInputReleased(const UInputAction* InputAction);
-
 	void TryAutoActivateAttackSequenceAbility();
 	bool IsAttackSequenceAutoActivateReady() const;
-	
-	// ===== Input Handler Functions =====
-	void Move(const FInputActionValue& Value);
-	void Look(const FInputActionValue& Value);
-	void ToggleLockOn();
-	void WeaponSwitch();
 
 	// ===== Input Handler Additional Functions =====
 	void CancelActionForMove();
-	AActor* FindNearestTarget();
-	void UpdateLockOnCamera();
-	
-	// ===== GAS Input Handler Functions =====
-	void OnJumpInput();
-	void OnSprintInput();
-	void OnSprintInputReleased();
-	void OnCrouchInput();
-	void OnRollInput();
-	void OnAttackInput();
-	void OnBlockInput();
-	void OnBlockInputReleased();
-	void OnChargeAttackInput();
-	void OnChargeAttackReleased();
 
-	
 	// ===== Rotation Helper =====
 	bool CalculateYawFromMovementInput(float& OutYaw) const;
 
@@ -265,7 +219,7 @@ protected:
 	void OnRep_LeftWeapon();
 
 	UFUNCTION()
-	void OnRep_RightWeapon();	
+	void OnRep_RightWeapon();
 
 #pragma endregion
 
@@ -274,7 +228,14 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UActionPracticeAbilitySystemComponent> APASC = nullptr;
-	
+
+	// ===== Lock-On State (replicated, set via SetLockedOnTarget) =====
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State", Replicated, meta = (AllowPrivateAccess = "true"))
+	bool bIsLockOn = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Combat", Replicated, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<AActor> LockedOnTarget = nullptr;
+
 #pragma endregion
 
 #pragma region "Private Functions"
