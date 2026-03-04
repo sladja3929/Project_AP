@@ -11,7 +11,7 @@ class AActionPracticeCharacter;
 
 /**
  *  PlayerController for ActionPractice
- *  Manages input mappings, input bindings, lock-on system
+ *  Manages input mappings and input bindings
  */
 UCLASS(abstract)
 class AActionPracticePlayerController : public APlayerController
@@ -73,13 +73,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputAction> IA_ChargeAttack = nullptr;
 
-	// ===== Lock-On State =====
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat")
-	bool bIsLockOn = false;
-
-	UPROPERTY(BlueprintReadOnly, Category="Combat")
-	TObjectPtr<AActor> LockedOnTarget = nullptr;
-
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -95,8 +88,6 @@ protected:
 	void HandleGASInputPressed(const UInputAction* InputAction);
 	void HandleGASInputReleased(const UInputAction* InputAction);
 
-	// ===== Lock-On Helpers =====
-	AActor* FindNearestTarget();
 	void UpdateLockOnCamera();
 
 #pragma endregion

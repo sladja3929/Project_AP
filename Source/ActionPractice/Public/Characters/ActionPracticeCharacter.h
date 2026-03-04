@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Characters/BaseCharacter.h"
 #include "GAS/AttributeSet/ActionPracticeAttributeSet.h"
+#include "Characters/WeaponManagerComponent.h"
 #include "Logging/LogMacros.h"
 #include "ActionPracticeCharacter.generated.h"
 
@@ -18,6 +19,7 @@ class UGameplayAbility;
 class UInputBufferComponent;
 class AWeapon;
 class UPlayerStatsWidget;
+class ULockOnComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -28,15 +30,6 @@ class AActionPracticeCharacter : public ABaseCharacter
 
 public:
 #pragma region "Public Variables"
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-	FString WeaponBlueprintBasePath = TEXT("/Game/Items/BluePrint/");
-
-	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
-	TSubclassOf<AWeapon> RightWeaponClass;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
-	TSubclassOf<AWeapon> LeftWeaponClass;
 
 	// ===== Movement Properties =====
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
@@ -70,9 +63,12 @@ public:
 	FORCEINLINE const UInputActionDataAsset* GetInputActionData() const { return InputActionData; }
 
 	//Weapon
-	FORCEINLINE AWeapon* GetLeftWeapon() const { return LeftWeapon; }
-	FORCEINLINE AWeapon* GetRightWeapon() const { return RightWeapon; }
+	FORCEINLINE AWeapon* GetLeftWeapon() const { return WeaponManagerComponent ? WeaponManagerComponent->GetLeftWeapon() : nullptr; }
+	FORCEINLINE AWeapon* GetRightWeapon() const { return WeaponManagerComponent ? WeaponManagerComponent->GetRightWeapon() : nullptr; }
 	virtual TScriptInterface<IHitDetectionInterface> GetHitDetectionInterface() const override;
+
+	//WeaponManagerComponent Getter
+	FORCEINLINE UWeaponManagerComponent* GetWeaponManagerComponent() const { return WeaponManagerComponent; }
 	// ===================
 
 	//Movement Functions
@@ -92,14 +88,8 @@ public:
 	void ExecuteLook(const FVector2D& LookAxisVector);
 	void WeaponSwitch();
 
-	// ===== Lock-On Interface (set by Controller) =====
-	void SetLockedOnTarget(AActor* NewTarget);
-
-	UFUNCTION(BlueprintPure, Category = "Combat")
-	bool IsLockedOn() const { return bIsLockOn; }
-
-	UFUNCTION(BlueprintPure, Category = "Combat")
-	AActor* GetLockOnTarget() const { return LockedOnTarget; }
+	//LockOnComponent Getter
+	FORCEINLINE ULockOnComponent* GetLockOnComponent() const { return LockOnComponent; }
 
 	// ===== GAS Input (called by Controller) =====
 	UFUNCTION(BlueprintCallable, Category = "GAS")
@@ -107,6 +97,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "GAS")
 	void GASInputReleased(const UInputAction* InputAction);
+
+	void TryAutoActivateAttackSequenceAbility();
 
 	//===== Replication =====
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -125,22 +117,18 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputBufferComponent> InputBufferComponent = nullptr;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<ULockOnComponent> LockOnComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UWeaponManagerComponent> WeaponManagerComponent = nullptr;
+
 	// ===== UI Properties =====
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	TSubclassOf<UPlayerStatsWidget> PlayerStatsWidgetClass;
 
 	UPROPERTY()
 	TObjectPtr<UPlayerStatsWidget> PlayerStatsWidget;
-
-	// ===== Weapon Properties =====
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon")
-	TSubclassOf<AWeapon> WeaponClass = nullptr;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon", ReplicatedUsing = OnRep_LeftWeapon)
-	TObjectPtr<AWeapon> LeftWeapon = nullptr;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon", ReplicatedUsing = OnRep_RightWeapon)
-	TObjectPtr<AWeapon> RightWeapon = nullptr;
 
 	// ===== Input Action Data (for GAS ability mapping) =====
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
@@ -155,10 +143,6 @@ protected:
 	FGameplayTag EventActionAttackInputTag;
 	FGameplayTag EventActionCancelAttackTag;
 
-	// ===== State Variables =====
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State")
-	bool bIsSwitching = false;
-
 	// AttackSequenceAbility auto-activation gate
 	bool bAttackSequenceAutoActivated = false;
 	int32 AttackSequenceAutoActivateRetryCount = 0;
@@ -171,22 +155,11 @@ protected:
 	//현재 상태 태그를 캡처하여 반환
 	FGameplayTagContainer CaptureCurrentStateTags() const;
 
-	// ===== Weapon Functions =====
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
-	TSubclassOf<AWeapon> LoadWeaponClassByName(const FString& WeaponName);
-
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
-	void EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, bool bIsLeftHand = true, bool bIsTwoHanded = false);
-
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
-	void UnequipWeapon(bool bIsLeftHand = true);
-
 	// ===== GAS Functions =====
 	virtual void InitializeAbilitySystem() override;
 	virtual void CreateAbilitySystemComponent() override;
 	virtual void CreateAttributeSet() override;
 
-	void TryAutoActivateAttackSequenceAbility();
 	bool IsAttackSequenceAutoActivateReady() const;
 
 	// ===== Input Handler Additional Functions =====
@@ -199,27 +172,6 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void Server_RequestRotateToYaw(float TargetYaw, float RotateTime);
 
-	//락온 상태를 서버에 동기화
-	UFUNCTION(Server, Reliable)
-	void ServerSetLockOnState(bool bNewLockOn, AActor* NewTarget);
-
-	//CMC 회전 모드를 서버에 동기화
-	UFUNCTION(Server, Reliable)
-	void ServerSetRotationMode(bool bOrientToMovement, bool bUseControllerDesired);
-
-	//로컬 CMC 세팅 + 서버 동기화를 하나로 묶는 헬퍼
-	void SetRotationMode(bool bOrientToMovement, bool bUseControllerDesired);
-
-	//현재 회전 모드 캐싱 (불필요한 RPC 방지)
-	bool bCachedOrientToMovement = true;
-	bool bCachedUseControllerDesired = false;
-
-	//===== Replication Functions =====
-	UFUNCTION()
-	void OnRep_LeftWeapon();
-
-	UFUNCTION()
-	void OnRep_RightWeapon();
 
 #pragma endregion
 
@@ -228,13 +180,6 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UActionPracticeAbilitySystemComponent> APASC = nullptr;
-
-	// ===== Lock-On State (replicated, set via SetLockedOnTarget) =====
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Action State", Replicated, meta = (AllowPrivateAccess = "true"))
-	bool bIsLockOn = false;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Combat", Replicated, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<AActor> LockedOnTarget = nullptr;
 
 #pragma endregion
 

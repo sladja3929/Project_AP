@@ -7,6 +7,7 @@
 #include "InputActionValue.h"
 #include "Kismet/GameplayStatics.h"
 #include "Characters/ActionPracticeCharacter.h"
+#include "Characters/LockOnComponent.h"
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
 #define ENABLE_DEBUG_LOG 0
@@ -147,22 +148,10 @@ void AActionPracticePlayerController::HandleToggleLockOn()
 {
 	if (!CachedCharacter) return;
 
-	if (bIsLockOn)
-	{
-		bIsLockOn = false;
-		LockedOnTarget = nullptr;
-		CachedCharacter->SetLockedOnTarget(nullptr);
-	}
-	else
-	{
-		AActor* NearestTarget = FindNearestTarget();
-		if (NearestTarget)
-		{
-			bIsLockOn = true;
-			LockedOnTarget = NearestTarget;
-			CachedCharacter->SetLockedOnTarget(NearestTarget);
-		}
-	}
+	ULockOnComponent* LockOnComp = CachedCharacter->GetLockOnComponent();
+	if (!LockOnComp) return;
+
+	LockOnComp->ToggleLockOn();
 }
 
 void AActionPracticePlayerController::HandleWeaponSwitch()
@@ -189,45 +178,22 @@ void AActionPracticePlayerController::HandleGASInputReleased(const UInputAction*
 	}
 }
 
-AActor* AActionPracticePlayerController::FindNearestTarget()
-{
-	if (!CachedCharacter) return nullptr;
-
-	TArray<AActor*> FoundTargets;
-	UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName("Enemy"), FoundTargets);
-
-	AActor* NearestTarget = nullptr;
-	float NearestDistance = FLT_MAX;
-
-	for (AActor* PotentialTarget : FoundTargets)
-	{
-		float Distance = FVector::Dist(CachedCharacter->GetActorLocation(), PotentialTarget->GetActorLocation());
-		if (Distance < NearestDistance && Distance < 2000.0f)
-		{
-			NearestDistance = Distance;
-			NearestTarget = PotentialTarget;
-		}
-	}
-
-	return NearestTarget;
-}
-
 void AActionPracticePlayerController::UpdateLockOnCamera()
 {
-	if (!bIsLockOn) return;
+	if (!CachedCharacter) return;
 
-	//타겟이 제거/무효화된 경우 Controller 락온 상태 자동 해제
-	if (!IsValid(LockedOnTarget))
+	ULockOnComponent* LockOnComp = CachedCharacter->GetLockOnComponent();
+	if (!LockOnComp || !LockOnComp->IsLockedOn()) return;
+
+	AActor* Target = LockOnComp->GetLockOnTarget();
+	if (!IsValid(Target))
 	{
 		DEBUG_LOG(TEXT("UpdateLockOnCamera: LockOn target is invalid, releasing lock-on"));
-		bIsLockOn = false;
-		LockedOnTarget = nullptr;
+		LockOnComp->SetLockedOnTarget(nullptr);
 		return;
 	}
 
-	if (!CachedCharacter) return;
-
-	const FVector TargetLocation = LockedOnTarget->GetActorLocation();
+	const FVector TargetLocation = Target->GetActorLocation();
 	const FVector CharacterLocation = CachedCharacter->GetActorLocation();
 
 	//중간점을 바라보게 하여 격렬하게 움직일 때 플레이어와 타겟 모두가 잡히게
