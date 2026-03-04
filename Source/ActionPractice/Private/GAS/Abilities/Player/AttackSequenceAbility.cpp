@@ -638,6 +638,16 @@ void UAttackSequenceAbility::OnTaskMontageCompleted()
 void UAttackSequenceAbility::OnTaskMontageInterrupted()
 {
 	DEBUG_LOG(TEXT("AttackSequenceAbility - Task Montage Interrupted"));
+
+	//피격 인터럽트: 버퍼 입력 초기화
+	bHasPendingBufferInput = false;
+	PendingBufferPayload = FGameplayEventData();
+
+	//차지 진행 초기화
+	CurrentChargeProgress = EChargeProgress::NoCharge;
+
+	//Idle로 강제 복귀 (ChangeAttackType(None), 태그 제거, StopMontageAndEndTask 일괄 처리)
+	ChangeState(EAttackSequenceState::Idle);
 }
 
 void UAttackSequenceAbility::OnCurveRisingEdgeReceived(FName CurveName)
