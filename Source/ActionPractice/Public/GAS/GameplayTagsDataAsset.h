@@ -21,6 +21,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input Tags")
 	FGameplayTag Input_ChargeAttack;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input Tags")
+	FGameplayTag Input_UseItem;
+
 #pragma endregion
 
 #pragma region "Ability Tags"
@@ -96,7 +99,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
 	FGameplayTag State_StaminaRegenBlocked;
-	
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
+	FGameplayTag State_CanMove;
+
 #pragma endregion
 
 #pragma region "Event Tags"
@@ -170,5 +176,11 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect Tags")
 	FGameplayTag Effect_Cooldown_Duration;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect Tags")
+	FGameplayTag Effect_UsableItem_Magnitude;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect Tags")
+	FGameplayTag Effect_UsableItem_Duration;
 #pragma endregion
 };

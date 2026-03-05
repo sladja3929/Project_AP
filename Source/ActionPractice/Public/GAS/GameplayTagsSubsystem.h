@@ -18,6 +18,7 @@ public:
 #pragma region "Static Input Tags"
 	static const FGameplayTag& GetInputAttackTag();
 	static const FGameplayTag& GetInputChargeAttackTag();
+	static const FGameplayTag& GetInputUseItemTag();
 #pragma endregion
 
 #pragma region "Static Ability Tags"
@@ -47,6 +48,7 @@ public:
 	static const FGameplayTag& GetStateStunnedTag();
 	static const FGameplayTag& GetStateInvincibleTag();
 	static const FGameplayTag& GetStateStaminaRegenBlockedTag();
+	static const FGameplayTag& GetStateCanMoveTag();
 #pragma endregion
 
 #pragma region "Static Event Tags"
@@ -75,6 +77,8 @@ public:
 	static const FGameplayTag& GetEffectSprintSpeedMultiplierTag();
 	static const FGameplayTag& GetEffectDamageIncomingDamageTag();
 	static const FGameplayTag& GetEffectCooldownDurationTag();
+	static const FGameplayTag& GetEffectUsableItemMagnitudeTag();
+	static const FGameplayTag& GetEffectUsableItemDurationTag();
 #pragma endregion
 
 private:
@@ -84,6 +88,7 @@ private:
 #pragma region "Internal Input Tags"
 	const FGameplayTag& GetInputAttackTagInternal() const;
 	const FGameplayTag& GetInputChargeAttackTagInternal() const;
+	const FGameplayTag& GetInputUseItemTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal Ability Tags"
@@ -113,6 +118,7 @@ private:
 	const FGameplayTag& GetStateStunnedTagInternal() const;
 	const FGameplayTag& GetStateInvincibleTagInternal() const;
 	const FGameplayTag& GetStateStaminaRegenBlockedTagInternal() const;
+	const FGameplayTag& GetStateCanMoveTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal Event Tags"
@@ -141,6 +147,8 @@ private:
 	const FGameplayTag& GetEffectSprintSpeedMultiplierTagInternal() const;
 	const FGameplayTag& GetEffectDamageIncomingDamageTagInternal() const;
 	const FGameplayTag& GetEffectCooldownDurationTagInternal() const;
+	const FGameplayTag& GetEffectUsableItemMagnitudeTagInternal() const;
+	const FGameplayTag& GetEffectUsableItemDurationTagInternal() const;
 #pragma endregion
 	
 protected:

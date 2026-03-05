@@ -73,6 +73,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputAction> IA_ChargeAttack = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
+	TObjectPtr<UInputAction> IA_UseItem = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
+	TObjectPtr<UInputAction> IA_CycleQuickSlot = nullptr;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -85,6 +91,7 @@ protected:
 	void HandleLook(const FInputActionValue& Value);
 	void HandleToggleLockOn();
 	void HandleWeaponSwitch();
+	void HandleCycleQuickSlot();
 	void HandleGASInputPressed(const UInputAction* InputAction);
 	void HandleGASInputReleased(const UInputAction* InputAction);
 
@@ -113,6 +120,7 @@ private:
 	void OnBlockReleased()        { HandleGASInputReleased(IA_Block); }
 	void OnChargeAttackPressed()  { HandleGASInputPressed(IA_ChargeAttack); }
 	void OnChargeAttackReleased() { HandleGASInputReleased(IA_ChargeAttack); }
+	void OnUseItemPressed()       { HandleGASInputPressed(IA_UseItem); }
 
 #pragma endregion
 };

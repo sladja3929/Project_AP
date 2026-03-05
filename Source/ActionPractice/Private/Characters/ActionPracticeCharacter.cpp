@@ -1,6 +1,7 @@
 #include "Public/Characters/ActionPracticeCharacter.h"
 #include "Characters/LockOnComponent.h"
 #include "Characters/WeaponManagerComponent.h"
+#include "Characters/ItemManagerComponent.h"
 #include "Public/Games/ActionPracticePlayerController.h"
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
@@ -29,7 +30,7 @@
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionPracticeCharacter, Log, All);
@@ -79,6 +80,9 @@ AActionPracticeCharacter::AActionPracticeCharacter()
 	//WeaponManager Component Settings
 	WeaponManagerComponent = CreateDefaultSubobject<UWeaponManagerComponent>(TEXT("WeaponManagerComponent"));
 
+	//ItemManager Component Settings
+	ItemManagerComponent = CreateDefaultSubobject<UItemManagerComponent>(TEXT("ItemManagerComponent"));
+
 	//GAS Settings
 	CreateAbilitySystemComponent();
 	CreateAttributeSet();
@@ -96,7 +100,8 @@ void AActionPracticeCharacter::BeginPlay()
 	AbilityAttackTag = UGameplayTagsSubsystem::GetAbilityAttackTag();
 	EventActionAttackInputTag = UGameplayTagsSubsystem::GetEventActionAttackInputTag();
 	EventActionCancelAttackTag = UGameplayTagsSubsystem::GetEventActionCancelAttackTag();
-	
+	StateCanMoveTag = UGameplayTagsSubsystem::GetStateCanMoveTag();
+
 	if (!StateRecoveringLocalTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("StateRecoveringTag is not valid"));
@@ -183,8 +188,18 @@ void AActionPracticeCharacter::ExecuteMove(const FVector2D& MovementVector)
 	}
 
 	bool bIsRecovering = AbilitySystemComponent->HasMatchingGameplayTag(StateRecoveringLocalTag);
+	bool bCanMoveDuringRecovery = AbilitySystemComponent->HasMatchingGameplayTag(StateCanMoveTag);
 
-	if (Controller != nullptr && !bIsRecovering)
+	//리커버리 중이고 CanMove가 없으면 이동 차단 (기존 동작)
+	if (bIsRecovering && !bCanMoveDuringRecovery)
+	{
+		return;
+	}
+
+	//이동 입력 스케일 결정 (리커버리 + CanMove면 감속)
+	float MoveScale = (bIsRecovering && bCanMoveDuringRecovery) ? RecoveryMoveSpeedMultiplier : 1.0f;
+
+	if (Controller != nullptr)
 	{
 		bool bIgnoreLockOnState = AbilitySystemComponent->HasMatchingGameplayTag(StateAbilitySprintingTag)
 			|| AbilitySystemComponent->HasMatchingGameplayTag(StateAbilityRollingTag);
@@ -206,13 +221,13 @@ void AActionPracticeCharacter::ExecuteMove(const FVector2D& MovementVector)
 			//타겟을 기준으로 한 이동 방향 계산
 			const FRotator TargetRotation = DirectionToTarget.Rotation();
 			const FVector RightDirection = FRotationMatrix(TargetRotation).GetUnitAxis(EAxis::Y);
-			const FVector BackwardDirection = -DirectionToTarget; // 타겟 반대 방향
+			const FVector BackwardDirection = -DirectionToTarget; //타겟 반대 방향
 
 			//Strafe 이동
-			AddMovementInput(RightDirection, MovementVector.X);
+			AddMovementInput(RightDirection, MovementVector.X * MoveScale);
 
 			//전후 이동
-			AddMovementInput(BackwardDirection, -MovementVector.Y);
+			AddMovementInput(BackwardDirection, -MovementVector.Y * MoveScale);
 
 			//회전은 CMC가 ControlRotation 기반으로 처리 (Controller의 UpdateLockOnCamera에서 설정)
 		}
@@ -228,8 +243,8 @@ void AActionPracticeCharacter::ExecuteMove(const FVector2D& MovementVector)
 			const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 			const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-			AddMovementInput(ForwardDirection, MovementVector.Y);
-			AddMovementInput(RightDirection, MovementVector.X);
+			AddMovementInput(ForwardDirection, MovementVector.Y * MoveScale);
+			AddMovementInput(RightDirection, MovementVector.X * MoveScale);
 		}
 	}
 }
@@ -567,17 +582,17 @@ bool AActionPracticeCharacter::IsAttackSequenceAutoActivateReady() const
 
 void AActionPracticeCharacter::TryAutoActivateAttackSequenceAbility()
 {
-	// 이미 성공했으면 중복 시도 방지
+	//이미 성공했으면 중복 시도 방지
 	if (bAttackSequenceAutoActivated)
 	{
 		return;
 	}
 
-	// 준비 안 됐으면 약간 딜레이 후 재시도 (복제/OnRep 타이밍 흡수)
+	//준비 안 됐으면 약간 딜레이 후 재시도 (복제/OnRep 타이밍 흡수)
 	if (!IsAttackSequenceAutoActivateReady())
 	{
-		// 무한 루프 방지 (필요하면 값 조정)
-		constexpr int32 MaxRetry = 120; // 0.05s * 120 = 6초
+		//무한 루프 방지 (필요하면 값 조정)
+		constexpr int32 MaxRetry = 120; //0.05s * 120 = 6초
 		if (AttackSequenceAutoActivateRetryCount++ >= MaxRetry)
 		{
 			DEBUG_LOG(TEXT("AttackSequence auto-activate failed: retry limit reached. RightWeapon=%s"),
@@ -598,7 +613,7 @@ void AActionPracticeCharacter::TryAutoActivateAttackSequenceAbility()
 		return;
 	}
 
-	// 이제부터 실제 활성화 시도
+	//활성화 시도
 	GetWorldTimerManager().ClearTimer(AttackSequenceAutoActivateTimer);
 
 	UAbilitySystemComponent* ASC = AbilitySystemComponent.Get();
@@ -607,7 +622,7 @@ void AActionPracticeCharacter::TryAutoActivateAttackSequenceAbility()
 		return;
 	}
 
-	// 기존 BeginPlay 로직과 동일한 방식: AssetTags로 AttackSequenceAbility 식별 후 TryActivate
+	//AssetTags로 AttackSequenceAbility 식별 후 TryActivate
 	const FGameplayTag AbilityAttackNormalTag = UGameplayTagsSubsystem::GetAbilityAttackNormalTag();
 	const FGameplayTag AbilityAttackChargeTag = UGameplayTagsSubsystem::GetAbilityAttackChargeTag();
 
@@ -624,7 +639,7 @@ void AActionPracticeCharacter::TryAutoActivateAttackSequenceAbility()
 			continue;
 		}
 
-		// 이미 활성 상태면 성공 처리
+		//이미 활성 상태면 성공 처리
 		if (Spec.IsActive())
 		{
 			bAttackSequenceAutoActivated = true;

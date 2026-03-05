@@ -55,6 +55,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetInputChargeAttackTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetInputUseItemTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetInputUseItemTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Static Ability Tags"
@@ -266,6 +275,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateStaminaRegenBlockedTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateCanMoveTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateCanMoveTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Static Event Tags"
@@ -468,6 +486,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEffectCooldownDurationTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEffectUsableItemMagnitudeTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEffectUsableItemMagnitudeTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEffectUsableItemDurationTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEffectUsableItemDurationTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Internal Input Tags"
@@ -485,6 +521,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetInputChargeAttackTagInternal() co
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Input_ChargeAttack;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetInputUseItemTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Input_UseItem;
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -699,6 +744,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateStaminaRegenBlockedTagIntern
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateCanMoveTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->State_CanMove;
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Internal Event Tags"
@@ -898,6 +952,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEffectCooldownDurationTagInternal
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Effect_Cooldown_Duration;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEffectUsableItemMagnitudeTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Effect_UsableItem_Magnitude;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEffectUsableItemDurationTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Effect_UsableItem_Duration;
 	}
 	return FGameplayTag::EmptyTag;
 }

@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/DataAsset.h"
+#include "Items/BaseItemDataAsset.h"
 #include "GameplayTagContainer.h"
 #include "WeaponEnums.h"
 #include "AttackData.h"
@@ -53,7 +53,7 @@ struct FBlockActionData
 };
 
 UCLASS(BlueprintType)
-class UWeaponDataAsset : public UPrimaryDataAsset
+class UWeaponDataAsset : public UBaseItemDataAsset
 {
     GENERATED_BODY()
 

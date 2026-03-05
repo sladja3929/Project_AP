@@ -20,6 +20,7 @@ class UInputBufferComponent;
 class AWeapon;
 class UPlayerStatsWidget;
 class ULockOnComponent;
+class UItemManagerComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -40,6 +41,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
 	float CrouchSpeedMultiplier = 0.5f;
+
+	//리커버리 중 이동 허용 시 이속 배율 (0.3 = 30% 속도)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	float RecoveryMoveSpeedMultiplier = 0.3f;
 
 #pragma endregion
 
@@ -69,6 +74,9 @@ public:
 
 	//WeaponManagerComponent Getter
 	FORCEINLINE UWeaponManagerComponent* GetWeaponManagerComponent() const { return WeaponManagerComponent; }
+
+	//Inventory
+	FORCEINLINE UItemManagerComponent* GetItemManagerComponent() const { return ItemManagerComponent; }
 	// ===================
 
 	//Movement Functions
@@ -123,6 +131,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UWeaponManagerComponent> WeaponManagerComponent = nullptr;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UItemManagerComponent> ItemManagerComponent = nullptr;
+
 	// ===== UI Properties =====
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	TSubclassOf<UPlayerStatsWidget> PlayerStatsWidgetClass;
@@ -142,6 +153,7 @@ protected:
 	FGameplayTag AbilityAttackTag;
 	FGameplayTag EventActionAttackInputTag;
 	FGameplayTag EventActionCancelAttackTag;
+	FGameplayTag StateCanMoveTag;
 
 	// AttackSequenceAbility auto-activation gate
 	bool bAttackSequenceAutoActivated = false;

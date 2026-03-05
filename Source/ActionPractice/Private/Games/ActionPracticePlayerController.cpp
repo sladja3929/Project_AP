@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Characters/ActionPracticeCharacter.h"
 #include "Characters/LockOnComponent.h"
+#include "Characters/ItemManagerComponent.h"
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
 #define ENABLE_DEBUG_LOG 0
@@ -93,6 +94,16 @@ void AActionPracticePlayerController::SetupInputComponent()
 			EIC->BindAction(IA_Block, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnBlockPressed);
 			EIC->BindAction(IA_Block, ETriggerEvent::Completed, this, &AActionPracticePlayerController::OnBlockReleased);
 		}
+
+		if (IA_UseItem)
+		{
+			EIC->BindAction(IA_UseItem, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnUseItemPressed);
+		}
+
+		if (IA_CycleQuickSlot)
+		{
+			EIC->BindAction(IA_CycleQuickSlot, ETriggerEvent::Started, this, &AActionPracticePlayerController::HandleCycleQuickSlot);
+		}
 	}
 }
 
@@ -159,6 +170,18 @@ void AActionPracticePlayerController::HandleWeaponSwitch()
 	if (CachedCharacter)
 	{
 		CachedCharacter->WeaponSwitch();
+	}
+}
+
+void AActionPracticePlayerController::HandleCycleQuickSlot()
+{
+	if (CachedCharacter)
+	{
+		UItemManagerComponent* ItemManager = CachedCharacter->GetItemManagerComponent();
+		if (ItemManager)
+		{
+			ItemManager->CycleQuickSlot();
+		}
 	}
 }
 
