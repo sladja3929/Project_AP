@@ -24,8 +24,16 @@ void UWeaponManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	EquipWeapon(RightWeaponClass, false, false);
-	EquipWeapon(LeftWeaponClass, true, false);
+	//첫 번째 무기 장착 (서버에서만, EquipWeapon 내부에서 Authority 체크)
+	if (DefaultRightWeapons.Num() > 0)
+	{
+		EquipWeapon(DefaultRightWeapons[0], false, false);
+	}
+
+	if (DefaultLeftWeapons.Num() > 0)
+	{
+		EquipWeapon(DefaultLeftWeapons[0], true, false);
+	}
 }
 
 void UWeaponManagerComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -85,6 +93,8 @@ void UWeaponManagerComponent::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, b
 		{
 			RightWeapon = NewWeapon;
 		}
+
+		OnWeaponChanged.Broadcast();
 	}
 }
 
@@ -117,8 +127,56 @@ TSubclassOf<AWeapon> UWeaponManagerComponent::LoadWeaponClassByName(const FStrin
 	return nullptr;
 }
 
-void UWeaponManagerComponent::WeaponSwitch()
+void UWeaponManagerComponent::CycleRightWeapon()
 {
+	if (DefaultRightWeapons.Num() <= 1) return;
+
+	AActionPracticeCharacter* OwnerCharacter = GetOwner<AActionPracticeCharacter>();
+	if (!OwnerCharacter) return;
+
+	if (!OwnerCharacter->HasAuthority())
+	{
+		Server_CycleRightWeapon();
+		return;
+	}
+
+	//서버에서 인덱스 변경 + 무기 교체
+	RightWeaponIndex = (RightWeaponIndex + 1) % DefaultRightWeapons.Num();
+	EquipWeapon(DefaultRightWeapons[RightWeaponIndex], false, false);
+
+	//오른손 무기 변경 → AttackSequenceAbility 재활성화
+	OwnerCharacter->ResetAttackSequenceAbility();
+
+	DEBUG_LOG(TEXT("CycleRightWeapon: index %d"), RightWeaponIndex);
+}
+
+void UWeaponManagerComponent::CycleLeftWeapon()
+{
+	if (DefaultLeftWeapons.Num() <= 1) return;
+
+	AActionPracticeCharacter* OwnerCharacter = GetOwner<AActionPracticeCharacter>();
+	if (!OwnerCharacter) return;
+
+	if (!OwnerCharacter->HasAuthority())
+	{
+		Server_CycleLeftWeapon();
+		return;
+	}
+
+	LeftWeaponIndex = (LeftWeaponIndex + 1) % DefaultLeftWeapons.Num();
+	EquipWeapon(DefaultLeftWeapons[LeftWeaponIndex], true, false);
+
+	DEBUG_LOG(TEXT("CycleLeftWeapon: index %d"), LeftWeaponIndex);
+}
+
+void UWeaponManagerComponent::Server_CycleRightWeapon_Implementation()
+{
+	CycleRightWeapon();
+}
+
+void UWeaponManagerComponent::Server_CycleLeftWeapon_Implementation()
+{
+	CycleLeftWeapon();
 }
 
 void UWeaponManagerComponent::OnRep_LeftWeapon()
@@ -138,6 +196,7 @@ void UWeaponManagerComponent::OnRep_LeftWeapon()
 	}
 
 	OwnerCharacter->TryAutoActivateAttackSequenceAbility();
+	OnWeaponChanged.Broadcast();
 }
 
 void UWeaponManagerComponent::OnRep_RightWeapon()
@@ -157,6 +216,7 @@ void UWeaponManagerComponent::OnRep_RightWeapon()
 	}
 
 	OwnerCharacter->TryAutoActivateAttackSequenceAbility();
+	OnWeaponChanged.Broadcast();
 }
 
 FName UWeaponManagerComponent::ResolveSocketName(EWeaponEnums WeaponType, bool bIsLeftHand) const

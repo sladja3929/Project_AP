@@ -68,7 +68,10 @@ protected:
 	TObjectPtr<UInputAction> IA_Block = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
-	TObjectPtr<UInputAction> IA_WeaponSwitch = nullptr;
+	TObjectPtr<UInputAction> IA_CycleRightWeapon = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
+	TObjectPtr<UInputAction> IA_CycleLeftWeapon = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputAction> IA_ChargeAttack = nullptr;
@@ -90,7 +93,8 @@ protected:
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
 	void HandleToggleLockOn();
-	void HandleWeaponSwitch();
+	void HandleCycleRightWeapon();
+	void HandleCycleLeftWeapon();
 	void HandleCycleQuickSlot();
 	void HandleGASInputPressed(const UInputAction* InputAction);
 	void HandleGASInputReleased(const UInputAction* InputAction);

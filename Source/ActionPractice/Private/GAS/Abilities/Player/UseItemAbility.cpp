@@ -7,6 +7,8 @@
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 
 #define ENABLE_DEBUG_LOG 1
 
@@ -89,6 +91,7 @@ void UUseItemAbility::ActivateInitSettings()
 
 	bEffectApplied = false;
 	CachedItemDA = nullptr;
+	DestroyItemMesh();
 
 	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
 	if (!Character)
@@ -126,6 +129,7 @@ void UUseItemAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 	const_cast<UUsableItemDataAsset*>(CachedItemDA.Get())->PreloadMontage();
 
 	SetWeaponsVisibility(false);
+	SpawnItemMesh();
 
 	//회전 없이 바로 몽타주 재생
 	StartMontageWithEventsTask();
@@ -260,6 +264,70 @@ void UUseItemAbility::OnTaskMontageInterrupted()
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
+void UUseItemAbility::SpawnItemMesh()
+{
+	if (!CachedItemDA) return;
+
+	//소켓이 지정되지 않았으면 소품 미표시
+	if (CachedItemDA->UseSocketName.IsNone()) return;
+
+	//메시가 없으면 소품 미표시
+	if (CachedItemDA->UseMesh.IsNull()) return;
+
+	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
+	if (!Character) return;
+
+	USkeletalMeshComponent* CharacterMesh = Character->GetMesh();
+	if (!CharacterMesh) return;
+
+	//TSoftObjectPtr 동기 로드
+	UStaticMesh* ItemMesh = CachedItemDA->UseMesh.LoadSynchronous();
+	if (!ItemMesh)
+	{
+		DEBUG_LOG(TEXT("SpawnItemMesh: Failed to load UseMesh"));
+		return;
+	}
+
+	//StaticMeshComponent 생성
+	SpawnedItemMeshComponent = NewObject<UStaticMeshComponent>(Character);
+	if (!SpawnedItemMeshComponent)
+	{
+		DEBUG_LOG(TEXT("SpawnItemMesh: Failed to create StaticMeshComponent"));
+		return;
+	}
+
+	SpawnedItemMeshComponent->SetStaticMesh(ItemMesh);
+	SpawnedItemMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	//캐릭터 메시의 소켓에 부착
+	SpawnedItemMeshComponent->AttachToComponent(
+		CharacterMesh,
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+		CachedItemDA->UseSocketName
+	);
+
+	SpawnedItemMeshComponent->SetRelativeLocation(CachedItemDA->UseMeshOffset);
+	SpawnedItemMeshComponent->SetRelativeRotation(CachedItemDA->UseMeshRotation);
+	SpawnedItemMeshComponent->SetRelativeScale3D(CachedItemDA->UseMeshScale);
+
+	SpawnedItemMeshComponent->RegisterComponent();
+
+	DEBUG_LOG(TEXT("SpawnItemMesh: Attached %s to socket %s"),
+		*ItemMesh->GetName(), *CachedItemDA->UseSocketName.ToString());
+}
+
+void UUseItemAbility::DestroyItemMesh()
+{
+	if (SpawnedItemMeshComponent)
+	{
+		SpawnedItemMeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+		SpawnedItemMeshComponent->DestroyComponent();
+		SpawnedItemMeshComponent = nullptr;
+
+		DEBUG_LOG(TEXT("DestroyItemMesh: Item mesh removed"));
+	}
+}
+
 void UUseItemAbility::SetWeaponsVisibility(bool bVisible)
 {
 	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
@@ -281,6 +349,7 @@ void UUseItemAbility::SetWeaponsVisibility(bool bVisible)
 
 void UUseItemAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	DestroyItemMesh();
 	SetWeaponsVisibility(true);
 
 	CachedItemDA = nullptr;

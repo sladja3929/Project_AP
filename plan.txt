@@ -1,0 +1,31 @@
+사용 가능 아이템 시스템 전체 플랜
+
+Phase 1: 아이템 DataAsset 계층 구조
+목표: 데이터 드리븐 아이템 정의 시스템 구축
+UPrimaryDataAsset 기반으로 UsableItemDataAsset을 만듭니다. 표시 이름(FText), 아이콘, 무게 등 공통 정보와 함께 사용 몽타주, 적용할 GE 클래스(TSubclassOf), SetByCaller 수치/기간, 최대 보유 수(-1이면 무제한), 사용할 어빌리티 클래스(TSubclassOf) 등 사용 관련 데이터를 담습니다.
+기존 WeaponDataAsset은 현 단계에서 건드리지 않습니다. 아이템 분류는 DA 상속이 아닌 GameplayTag 기반으로 처리하여 결합도를 낮게 유지합니다 (예: Item.Usable.Consumable, Item.Usable.Tool).
+
+Phase 2: Attribute별 GameplayEffect
+목표: 소모품 효과를 처리할 GE 세트 구축
+GE_UsableItem_RestoreHealth (Instant, SetByCaller Magnitude), GE_UsableItem_RestoreStamina (같은 패턴) 등 Attribute별로 GE를 만듭니다. Duration이 필요한 경우(지속 회복 등)를 위해 Duration 기반 GE도 별도로 준비합니다.
+SetByCaller 태그는 GameplayTagsDataAsset에 추가하고, GameplayTagsSubsystem에 접근 함수를 등록합니다. 기존 StaminaCost 패턴과 동일한 흐름입니다.
+
+Phase 3: 인벤토리 시스템
+목표: 사용 가능 아이템의 보유/장착/소모를 관리하는 컴포넌트
+UInventoryComponent를 ActionPracticeCharacter에 추가합니다. 내부적으로 FInventorySlot(DA 레퍼런스 + 현재 수량) 배열을 관리하고, 현재 장착된 슬롯 인덱스(퀵슬롯)를 가집니다.
+네트워크 측면에서 인벤토리 데이터는 서버 권위적으로 관리합니다. 수량 변경은 서버에서만 수행하고, 클라이언트에는 ReplicatedUsing으로 동기화합니다. 아이템 사용 요청 시 서버에서 수량 검증 후 차감하는 흐름입니다.
+
+Phase 4: UseItemAbility
+목표: ActionRecoveryAbility를 상속하는 아이템 사용 어빌리티
+UseItemAbility는 활성화 시 InventoryComponent에서 현재 장착 아이템의 DA를 가져오고, DA의 몽타주를 재생하며, 적절한 타이밍(커브 또는 AnimNotify)에 DA가 지정한 GE를 SetByCaller 수치와 함께 적용합니다. ActionRecovery 구간은 기존 버퍼 시스템을 그대로 활용합니다.
+CanActivateAbility에서 인벤토리 수량 검증(무제한 아이템 제외)을 수행합니다. GE 적용과 수량 차감은 서버에서 처리하고, 몽타주 재생은 LocalPredicted로 클라이언트에서 선 실행합니다. 기존 어빌리티들의 네트워크 패턴과 동일합니다.
+피격 시 사용 취소를 위한 BlockTags/CancelTags 설정도 포함합니다.
+
+Phase 5: Input Action 추가
+목표: 소모품 사용 입력 경로 구축
+IA_UseItem을 새로 만들고, InputActionDataAsset에 UseItemAbility의 AbilityAssetTags와 매핑하는 Rule을 추가합니다. PlayerController에 바인딩하고, 기존 GASInputPressed/Released 흐름을 그대로 탑니다.
+다만 핵심 차이점이 하나 있습니다. 기존 IA-Ability 매핑은 1:1 고정이지만, UseItem은 DA에 따라 동작이 달라집니다. 이 분기는 입력 레이어가 아니라 어빌리티 내부에서 처리하므로, 입력 시스템 자체는 개편 없이 Rule 하나만 추가하면 됩니다. 추후 투척형 아이템이 추가될 때 별도 어빌리티로 분리하고, 인벤토리가 DA를 보고 적절한 어빌리티를 활성화하는 경로로 전환하면 됩니다.
+
+작업 순서 요약
+Phase 1(DA) → Phase 2(GE + 태그) → Phase 3(인벤토리) → Phase 4(어빌리티) → Phase 5(입력)
+1→2는 데이터 정의 단계로, 어빌리티가 참조할 데이터 구조를 먼저 확정합니다. 3은 런타임 상태 관리 계층이고, 4에서 1~3을 모두 엮어서 실제 동작을 만듭니다. 5는 4를 트리거하는 입력 경로입니다.

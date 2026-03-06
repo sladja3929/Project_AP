@@ -21,6 +21,7 @@
 #include "Blueprint/UserWidget.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "UI/PlayerStatsWidget.h"
+#include "UI/EquipmentSlotWidget.h"
 #include "Input/InputActionDataAsset.h"
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
@@ -30,7 +31,7 @@
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionPracticeCharacter, Log, All);
@@ -163,6 +164,27 @@ void AActionPracticeCharacter::BeginPlay()
 	else
 	{
 		DEBUG_LOG(TEXT("PlayerStatsWidgetClass is not set!"));
+	}
+
+	if (EquipmentSlotWidgetClass)
+	{
+		APlayerController* PC = Cast<APlayerController>(GetController());
+		if (PC)
+		{
+			EquipmentSlotWidget = CreateWidget<UEquipmentSlotWidget>(PC, EquipmentSlotWidgetClass);
+			if (EquipmentSlotWidget)
+			{
+				EquipmentSlotWidget->AddToViewport();
+
+				//데이터 소스 연결
+				EquipmentSlotWidget->SetDataSources(WeaponManagerComponent, ItemManagerComponent);
+				DEBUG_LOG(TEXT("EquipmentSlotWidget created and data sources connected"));
+			}
+		}
+	}
+	else
+	{
+		DEBUG_LOG(TEXT("EquipmentSlotWidgetClass is not set!"));
 	}
 
 	TryAutoActivateAttackSequenceAbility();
@@ -403,12 +425,34 @@ TScriptInterface<IHitDetectionInterface> AActionPracticeCharacter::GetHitDetecti
 	return WeaponManagerComponent->GetHitDetectionInterface();
 }
 
-void AActionPracticeCharacter::WeaponSwitch()
+void AActionPracticeCharacter::ResetAttackSequenceAbility()
 {
-	if (WeaponManagerComponent)
+	if (!AbilitySystemComponent) return;
+
+	//현재 활성화된 AttackSequenceAbility 취소
+	const FGameplayTag AbilityAttackNormalTag = UGameplayTagsSubsystem::GetAbilityAttackNormalTag();
+
+	for (FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
 	{
-		WeaponManagerComponent->WeaponSwitch();
+		if (!Spec.Ability) continue;
+
+		if (Spec.Ability->GetAssetTags().HasTag(AbilityAttackNormalTag))
+		{
+			if (Spec.IsActive())
+			{
+				AbilitySystemComponent->CancelAbilityHandle(Spec.Handle);
+				DEBUG_LOG(TEXT("ResetAttackSequenceAbility: Cancelled active AttackSequenceAbility"));
+			}
+			break;
+		}
 	}
+
+	//재활성화 플래그 초기화
+	bAttackSequenceAutoActivated = false;
+	AttackSequenceAutoActivateRetryCount = 0;
+
+	//재활성화 시도
+	TryAutoActivateAttackSequenceAbility();
 }
 
 #pragma endregion

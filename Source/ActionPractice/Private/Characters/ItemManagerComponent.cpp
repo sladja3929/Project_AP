@@ -81,6 +81,7 @@ void UItemManagerComponent::CycleQuickSlot()
 
 	//서버에서 인덱스 변경
 	EquippedIndex = (EquippedIndex + 1) % Slots.Num();
+	OnEquippedItemChanged.Broadcast();
 	DEBUG_LOG(TEXT("QuickSlot cycled to index %d"), EquippedIndex);
 }
 
@@ -112,17 +113,18 @@ bool UItemManagerComponent::ConsumeEquippedItem()
 	}
 
 	DEBUG_LOG(TEXT("ConsumeEquippedItem: Consumed. Remaining=%d"), Slot.CurrentCount);
+	OnEquippedItemChanged.Broadcast();
 	return true;
 }
 
 void UItemManagerComponent::OnRep_Slots()
 {
 	DEBUG_LOG(TEXT("OnRep_Slots: %d slots replicated"), Slots.Num());
-	//추후 UI 업데이트 델리게이트 브로드캐스트 지점
+	OnEquippedItemChanged.Broadcast();
 }
 
 void UItemManagerComponent::OnRep_EquippedIndex()
 {
 	DEBUG_LOG(TEXT("OnRep_EquippedIndex: %d"), EquippedIndex);
-	//추후 UI 업데이트 델리게이트 브로드캐스트 지점
+	OnEquippedItemChanged.Broadcast();
 }

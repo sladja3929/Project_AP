@@ -6,6 +6,7 @@
 
 class UItemManagerComponent;
 class UUsableItemDataAsset;
+class UStaticMeshComponent;
 
 UCLASS()
 class ACTIONPRACTICE_API UUseItemAbility : public UActionRecoveryAbility
@@ -41,6 +42,10 @@ protected:
 	//GE 적용 여부 (중복 적용 방지)
 	bool bEffectApplied = false;
 
+	//사용 중 부착된 소품 메시 컴포넌트
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> SpawnedItemMeshComponent = nullptr;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -62,6 +67,12 @@ protected:
 
 	//어빌리티 실행 중 무기 가시성 제어
 	void SetWeaponsVisibility(bool bVisible);
+
+	//소품 메시 스폰 및 부착
+	void SpawnItemMesh();
+
+	//소품 메시 제거
+	void DestroyItemMesh();
 
 #pragma endregion
 

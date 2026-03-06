@@ -7,6 +7,9 @@
 
 class AActionPracticeCharacter;
 
+//아이템 슬롯 변경 시 UI 갱신 델리게이트
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEquippedItemChanged);
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class ACTIONPRACTICE_API UItemManagerComponent : public UActorComponent
 {
@@ -14,6 +17,9 @@ class ACTIONPRACTICE_API UItemManagerComponent : public UActorComponent
 
 public:
 #pragma region "Public Variables"
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory")
+	FOnEquippedItemChanged OnEquippedItemChanged;
 
 	//초기 아이템 구성 (BeginPlay에서 Slots로 복사)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")

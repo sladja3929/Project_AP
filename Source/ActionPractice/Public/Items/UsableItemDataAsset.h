@@ -8,6 +8,7 @@
 #include "UsableItemDataAsset.generated.h"
 
 class UAnimMontage;
+class UStaticMesh;
 
 UCLASS(BlueprintType)
 class ACTIONPRACTICE_API UUsableItemDataAsset : public UBaseItemDataAsset
@@ -36,6 +37,24 @@ public:
 	//SetByCaller 기간 (0이면 Instant GE 사용)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Usage")
 	float EffectDuration = 0.0f;
+
+	//사용 시 손에 부착할 아이템 메시 (없으면 소품 미표시)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Usage")
+	TSoftObjectPtr<UStaticMesh> UseMesh;
+
+	//아이템 메시를 부착할 소켓 이름 (예: hand_l_item)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Usage")
+	FName UseSocketName = NAME_None;
+
+	//소켓 기준 위치/회전/스케일 오프셋
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Usage")
+	FVector UseMeshOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Usage")
+	FRotator UseMeshRotation = FRotator::ZeroRotator;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Usage")
+	FVector UseMeshScale = FVector::OneVector;
 
 #pragma endregion
 

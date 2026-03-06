@@ -9,6 +9,9 @@ class AWeapon;
 class AActionPracticeCharacter;
 enum class EWeaponEnums : uint8;
 
+//무기 변경 시 UI 갱신 델리게이트
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWeaponChanged);
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class UWeaponManagerComponent : public UActorComponent
 {
@@ -17,14 +20,19 @@ class UWeaponManagerComponent : public UActorComponent
 public:
 #pragma region "Public Variables"
 
+	UPROPERTY(BlueprintAssignable, Category = "Weapon")
+	FOnWeaponChanged OnWeaponChanged;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
 	FString WeaponBlueprintBasePath = TEXT("/Game/Items/BluePrint/");
 
-	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
-	TSubclassOf<AWeapon> RightWeaponClass;
+	//에디터에서 설정할 오른손 무기 목록 (첫 번째가 시작 무기)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
+	TArray<TSubclassOf<AWeapon>> DefaultRightWeapons;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
-	TSubclassOf<AWeapon> LeftWeaponClass;
+	//에디터에서 설정할 왼손 무기 목록 (첫 번째가 시작 무기)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
+	TArray<TSubclassOf<AWeapon>> DefaultLeftWeapons;
 
 #pragma endregion
 
@@ -46,7 +54,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	TSubclassOf<AWeapon> LoadWeaponClassByName(const FString& WeaponName);
 
-	void WeaponSwitch();
+	//오른손 무기 순환
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void CycleRightWeapon();
+
+	//왼손 무기 순환
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void CycleLeftWeapon();
 
 	TScriptInterface<IHitDetectionInterface> GetHitDetectionInterface() const;
 
@@ -74,7 +88,9 @@ private:
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon", ReplicatedUsing = OnRep_RightWeapon, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<AWeapon> RightWeapon = nullptr;
 
-	bool bIsSwitching = false;
+	//현재 장착된 무기 인덱스
+	int32 RightWeaponIndex = 0;
+	int32 LeftWeaponIndex = 0;
 
 #pragma endregion
 
@@ -85,6 +101,12 @@ private:
 
 	UFUNCTION()
 	void OnRep_RightWeapon();
+
+	UFUNCTION(Server, Reliable)
+	void Server_CycleRightWeapon();
+
+	UFUNCTION(Server, Reliable)
+	void Server_CycleLeftWeapon();
 
 	//무기 타입과 손 방향에 따른 소켓 이름 결정
 	FName ResolveSocketName(EWeaponEnums WeaponType, bool bIsLeftHand) const;

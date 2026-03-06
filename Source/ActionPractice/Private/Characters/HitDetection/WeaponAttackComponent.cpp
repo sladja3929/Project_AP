@@ -41,14 +41,14 @@ void UWeaponAttackComponent::BeginPlay()
 		BuildSocketConfigs(WeaponData->HitSocketInfo);
 	}
 
-	//디버그용 1번 키 바인딩
+	//디버그용 4번 키 바인딩
 	if (GetWorld())
 	{
 		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 		{
 			if (PC->InputComponent)
 			{
-				PC->InputComponent->BindKey(EKeys::One, IE_Pressed, this, &UWeaponAttackComponent::ToggleWeaponDebugTrace);
+				PC->InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &UWeaponAttackComponent::ToggleWeaponDebugTrace);
 			}
 		}
 	}

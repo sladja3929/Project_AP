@@ -21,6 +21,7 @@ class AWeapon;
 class UPlayerStatsWidget;
 class ULockOnComponent;
 class UItemManagerComponent;
+class UEquipmentSlotWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -94,7 +95,9 @@ public:
 	// ===== Controller-facing execution functions =====
 	void ExecuteMove(const FVector2D& MovementVector);
 	void ExecuteLook(const FVector2D& LookAxisVector);
-	void WeaponSwitch();
+
+	//오른손 무기 변경 시 AttackSequenceAbility 재활성화
+	void ResetAttackSequenceAbility();
 
 	//LockOnComponent Getter
 	FORCEINLINE ULockOnComponent* GetLockOnComponent() const { return LockOnComponent; }
@@ -140,6 +143,12 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UPlayerStatsWidget> PlayerStatsWidget;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UEquipmentSlotWidget> EquipmentSlotWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UEquipmentSlotWidget> EquipmentSlotWidget;
 
 	// ===== Input Action Data (for GAS ability mapping) =====
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
