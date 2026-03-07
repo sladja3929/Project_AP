@@ -64,6 +64,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetInputUseItemTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetInputCycleRightWeaponTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetInputCycleRightWeaponTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetInputCycleLeftWeaponTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetInputCycleLeftWeaponTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Static Ability Tags"
@@ -162,6 +180,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityHitReactionTag()
 	if (UGameplayTagsSubsystem* Subsystem = Get())
 	{
 		return Subsystem->GetAbilityHitReactionTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityWeaponSwitchTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetAbilityWeaponSwitchTagInternal();
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -533,6 +560,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetInputUseItemTagInternal() const
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetInputCycleRightWeaponTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Input_CycleRightWeapon;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetInputCycleLeftWeaponTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Input_CycleLeftWeapon;
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Internal Ability Tags"
@@ -631,6 +676,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityHitReactionTagInternal() c
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Ability_HitReaction;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityWeaponSwitchTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Ability_WeaponSwitch;
 	}
 	return FGameplayTag::EmptyTag;
 }

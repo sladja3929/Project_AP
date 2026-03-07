@@ -33,7 +33,7 @@ void UEquipmentSlotWidget::NativeDestruct()
 	//델리게이트 해제
 	if (WeaponManager)
 	{
-		WeaponManager->OnWeaponChanged.RemoveDynamic(this, &UEquipmentSlotWidget::RefreshWeaponSlots);
+		WeaponManager->OnWeaponChanged.RemoveDynamic(this, &UEquipmentSlotWidget::RefreshWeaponSlot);
 	}
 	if (ItemManager)
 	{
@@ -50,8 +50,9 @@ void UEquipmentSlotWidget::SetDataSources(UWeaponManagerComponent* InWeaponManag
 
 	if (WeaponManager)
 	{
-		WeaponManager->OnWeaponChanged.AddDynamic(this, &UEquipmentSlotWidget::RefreshWeaponSlots);
-		RefreshWeaponSlots();
+		WeaponManager->OnWeaponChanged.AddDynamic(this, &UEquipmentSlotWidget::RefreshWeaponSlot);
+		RefreshWeaponSlot(true);
+		RefreshWeaponSlot(false);
 	}
 
 	if (ItemManager)
@@ -61,19 +62,24 @@ void UEquipmentSlotWidget::SetDataSources(UWeaponManagerComponent* InWeaponManag
 	}
 }
 
-void UEquipmentSlotWidget::RefreshWeaponSlots()
+void UEquipmentSlotWidget::RefreshWeaponSlot(bool bIsLeftHand)
 {
 	if (!WeaponManager) return;
-
-	//좌무기
-	AWeapon* LeftWeapon = WeaponManager->GetLeftWeapon();
-	const UBaseItemDataAsset* LeftDA = LeftWeapon ? LeftWeapon->GetWeaponData() : nullptr;
-	SetSlotIcon(LeftWeaponIcon, LeftDA);
-
-	//우무기
-	AWeapon* RightWeapon = WeaponManager->GetRightWeapon();
-	const UBaseItemDataAsset* RightDA = RightWeapon ? RightWeapon->GetWeaponData() : nullptr;
-	SetSlotIcon(RightWeaponIcon, RightDA);
+	DEBUG_LOG(TEXT("RefreshWeaponSlot: WeaponChanged Broadcasted, IsLeft=%d"), bIsLeftHand);
+	
+	if (bIsLeftHand)
+	{
+		AWeapon* ChangedWeapon = WeaponManager->GetLeftWeapon();
+		const UBaseItemDataAsset* LeftDA = ChangedWeapon ? ChangedWeapon->GetWeaponData() : nullptr;
+		SetSlotIcon(LeftWeaponIcon, LeftDA);
+	}
+	
+	else
+	{
+		AWeapon* ChangedWeapon = WeaponManager->GetRightWeapon();
+		const UBaseItemDataAsset* RightDA = ChangedWeapon ? ChangedWeapon->GetWeaponData() : nullptr;
+		SetSlotIcon(RightWeaponIcon, RightDA);
+	}	
 }
 
 void UEquipmentSlotWidget::RefreshItemSlot()
@@ -101,7 +107,11 @@ void UEquipmentSlotWidget::RefreshItemSlot()
 
 void UEquipmentSlotWidget::SetSlotIcon(UImage* TargetImage, const UBaseItemDataAsset* ItemDA)
 {
-	if (!TargetImage) return;
+	if (!TargetImage)
+	{
+		DEBUG_LOG(TEXT("SlotIcon: No TargetImage"));
+		return;
+	}
 
 	UTexture2D* IconTexture = nullptr;
 
@@ -113,16 +123,23 @@ void UEquipmentSlotWidget::SetSlotIcon(UImage* TargetImage, const UBaseItemDataA
 
 	if (IconTexture)
 	{
+		DEBUG_LOG(TEXT("SlotIcon: Texture=%s (ptr=%p)"), *GetNameSafe(IconTexture), IconTexture);
 		TargetImage->SetBrushFromTexture(IconTexture);
 		TargetImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		DEBUG_LOG(TEXT("SlotIcon: Icon Changed"));
 	}
+
+	//할당된 아이콘이 없으면 기본(비었음) 아이콘 사용
 	else if (EmptySlotTexture)
 	{
 		TargetImage->SetBrushFromTexture(EmptySlotTexture);
 		TargetImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		DEBUG_LOG(TEXT("SlotIcon: No Icon, EmptySlotTexture"));
 	}
+	
 	else
 	{
 		TargetImage->SetVisibility(ESlateVisibility::Collapsed);
+		DEBUG_LOG(TEXT("SlotIcon: No Icon, No EmptySlotTexture"));
 	}
 }

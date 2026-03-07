@@ -93,8 +93,6 @@ protected:
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
 	void HandleToggleLockOn();
-	void HandleCycleRightWeapon();
-	void HandleCycleLeftWeapon();
 	void HandleCycleQuickSlot();
 	void HandleGASInputPressed(const UInputAction* InputAction);
 	void HandleGASInputReleased(const UInputAction* InputAction);
@@ -123,8 +121,10 @@ private:
 	void OnBlockPressed()         { HandleGASInputPressed(IA_Block); }
 	void OnBlockReleased()        { HandleGASInputReleased(IA_Block); }
 	void OnChargeAttackPressed()  { HandleGASInputPressed(IA_ChargeAttack); }
-	void OnChargeAttackReleased() { HandleGASInputReleased(IA_ChargeAttack); }
-	void OnUseItemPressed()       { HandleGASInputPressed(IA_UseItem); }
+	void OnChargeAttackReleased()    { HandleGASInputReleased(IA_ChargeAttack); }
+	void OnUseItemPressed()          { HandleGASInputPressed(IA_UseItem); }
+	void OnCycleRightWeaponPressed() { HandleGASInputPressed(IA_CycleRightWeapon); }
+	void OnCycleLeftWeaponPressed()  { HandleGASInputPressed(IA_CycleLeftWeapon); }
 
 #pragma endregion
 };

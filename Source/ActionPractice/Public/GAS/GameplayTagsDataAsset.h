@@ -24,6 +24,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input Tags")
 	FGameplayTag Input_UseItem;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input Tags")
+	FGameplayTag Input_CycleRightWeapon;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input Tags")
+	FGameplayTag Input_CycleLeftWeapon;
+
 #pragma endregion
 
 #pragma region "Ability Tags"
@@ -60,6 +66,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
 	FGameplayTag Ability_HitReaction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
+	FGameplayTag Ability_WeaponSwitch;
+
 #pragma endregion
 
 #pragma region "State Tags"

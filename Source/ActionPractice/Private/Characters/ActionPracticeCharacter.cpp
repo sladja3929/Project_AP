@@ -539,7 +539,12 @@ void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 			else
 			{
 				Spec->InputPressed = true;
-				bool bSuccess = APASC->TryActivateAbility(Spec->Handle);
+
+				//InputActionTag를 EventData에 담아 전달
+				FGameplayEventData EventData;
+				EventData.InstigatorTags.AddTag(InputActionData->FindTagByInputAction(InputAction));
+
+				bool bSuccess = APASC->TryActivateAbilityWithEventData(Spec->Handle, &EventData);
 				DEBUG_LOG(TEXT("GASInputPressed: TryActivateAbility %s - %s"), bSuccess ? TEXT("SUCCESS") : TEXT("FAILED"), *GetNameSafe(Spec->Ability));
 			}
 		}

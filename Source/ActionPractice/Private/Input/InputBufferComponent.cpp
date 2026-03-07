@@ -285,14 +285,23 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 		}
 		
 		//첫 실행 or bRetriggerInstancedAbility = true여서 재실행될 때
-		else if (APASC->TryActivateAbility(Spec->Handle))
+		else
 		{
-			DEBUG_LOG(TEXT("Play Buffer - Activate Ability: %s"), *GetNameSafe(Spec->Ability->GetClass()));
-			Spec->InputPressed = true;
-		}
+			//BufferedActionTag를 EventData에 담아 전달
+			FGameplayEventData ActivateEventData;
+			FGameplayTag InputTag = CachedInputActionData->FindTagByInputAction(InputAction);
+			ActivateEventData.InstigatorTags.AddTag(InputTag);
 
-		//다 아닐때
-		else DEBUG_LOG(TEXT("Play Buffer Activate Failed: %s"), *GetNameSafe(Spec->Ability->GetClass()));
+			if (APASC->TryActivateAbilityWithEventData(Spec->Handle, &ActivateEventData))
+			{
+				DEBUG_LOG(TEXT("Play Buffer - Activate Ability: %s"), *GetNameSafe(Spec->Ability->GetClass()));
+				Spec->InputPressed = true;
+			}
+			else
+			{
+				DEBUG_LOG(TEXT("Play Buffer Activate Failed: %s"), *GetNameSafe(Spec->Ability->GetClass()));
+			}
+		}
 	}
 }
 

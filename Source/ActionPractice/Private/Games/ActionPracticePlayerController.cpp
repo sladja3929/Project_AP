@@ -9,7 +9,6 @@
 #include "Characters/ActionPracticeCharacter.h"
 #include "Characters/LockOnComponent.h"
 #include "Characters/ItemManagerComponent.h"
-#include "Characters/WeaponManagerComponent.h"
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
 #define ENABLE_DEBUG_LOG 0
@@ -54,12 +53,12 @@ void AActionPracticePlayerController::SetupInputComponent()
 
 		if (IA_CycleRightWeapon)
 		{
-			EIC->BindAction(IA_CycleRightWeapon, ETriggerEvent::Started, this, &AActionPracticePlayerController::HandleCycleRightWeapon);
+			EIC->BindAction(IA_CycleRightWeapon, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnCycleRightWeaponPressed);
 		}
 
 		if (IA_CycleLeftWeapon)
 		{
-			EIC->BindAction(IA_CycleLeftWeapon, ETriggerEvent::Started, this, &AActionPracticePlayerController::HandleCycleLeftWeapon);
+			EIC->BindAction(IA_CycleLeftWeapon, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnCycleLeftWeaponPressed);
 		}
 
 		// ===== GAS Ability Input Actions =====
@@ -169,30 +168,6 @@ void AActionPracticePlayerController::HandleToggleLockOn()
 	if (!LockOnComp) return;
 
 	LockOnComp->ToggleLockOn();
-}
-
-void AActionPracticePlayerController::HandleCycleRightWeapon()
-{
-	if (CachedCharacter)
-	{
-		UWeaponManagerComponent* WeaponManager = CachedCharacter->GetWeaponManagerComponent();
-		if (WeaponManager)
-		{
-			WeaponManager->CycleRightWeapon();
-		}
-	}
-}
-
-void AActionPracticePlayerController::HandleCycleLeftWeapon()
-{
-	if (CachedCharacter)
-	{
-		UWeaponManagerComponent* WeaponManager = CachedCharacter->GetWeaponManagerComponent();
-		if (WeaponManager)
-		{
-			WeaponManager->CycleLeftWeapon();
-		}
-	}
 }
 
 void AActionPracticePlayerController::HandleCycleQuickSlot()

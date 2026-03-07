@@ -10,7 +10,7 @@ class AActionPracticeCharacter;
 enum class EWeaponEnums : uint8;
 
 //무기 변경 시 UI 갱신 델리게이트
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWeaponChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponChanged, bool, bIsLeftHand);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class UWeaponManagerComponent : public UActorComponent
@@ -101,12 +101,6 @@ private:
 
 	UFUNCTION()
 	void OnRep_RightWeapon();
-
-	UFUNCTION(Server, Reliable)
-	void Server_CycleRightWeapon();
-
-	UFUNCTION(Server, Reliable)
-	void Server_CycleLeftWeapon();
 
 	//무기 타입과 손 방향에 따른 소켓 이름 결정
 	FName ResolveSocketName(EWeaponEnums WeaponType, bool bIsLeftHand) const;

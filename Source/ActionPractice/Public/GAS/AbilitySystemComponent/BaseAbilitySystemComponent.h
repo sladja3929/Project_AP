@@ -31,6 +31,10 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnASCInitialized, UBaseAbilitySystemComponent*);
 	FOnASCInitialized OnASCInitialized;
 
+	//EventData를 포함하여 어빌리티 활성화 시도
+	//TryActivateAbility와 동일하되 TriggerEventData를 전달
+	bool TryActivateAbilityWithEventData(FGameplayAbilitySpecHandle AbilityToActivate, const FGameplayEventData* TriggerEventData);
+
 	//기본 GE 생성 헬퍼
 	UFUNCTION(BlueprintCallable, Category = "Ability|GameplayEffect")
 	FGameplayEffectSpecHandle CreateGameplayEffectSpec(TSubclassOf<UGameplayEffect> GameplayEffectClass, float Level, UObject* SourceObject = nullptr);

@@ -19,6 +19,8 @@ public:
 	static const FGameplayTag& GetInputAttackTag();
 	static const FGameplayTag& GetInputChargeAttackTag();
 	static const FGameplayTag& GetInputUseItemTag();
+	static const FGameplayTag& GetInputCycleRightWeaponTag();
+	static const FGameplayTag& GetInputCycleLeftWeaponTag();
 #pragma endregion
 
 #pragma region "Static Ability Tags"
@@ -33,6 +35,7 @@ public:
 	static const FGameplayTag& GetAbilityJumpTag();
 	static const FGameplayTag& GetAbilityBlockTag();
 	static const FGameplayTag& GetAbilityHitReactionTag();
+	static const FGameplayTag& GetAbilityWeaponSwitchTag();
 #pragma endregion
 
 #pragma region "Static State Tags"
@@ -89,6 +92,8 @@ private:
 	const FGameplayTag& GetInputAttackTagInternal() const;
 	const FGameplayTag& GetInputChargeAttackTagInternal() const;
 	const FGameplayTag& GetInputUseItemTagInternal() const;
+	const FGameplayTag& GetInputCycleRightWeaponTagInternal() const;
+	const FGameplayTag& GetInputCycleLeftWeaponTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal Ability Tags"
@@ -103,6 +108,7 @@ private:
 	const FGameplayTag& GetAbilityJumpTagInternal() const;
 	const FGameplayTag& GetAbilityBlockTagInternal() const;
 	const FGameplayTag& GetAbilityHitReactionTagInternal() const;
+	const FGameplayTag& GetAbilityWeaponSwitchTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal State Tags"

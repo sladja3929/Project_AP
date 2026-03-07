@@ -65,9 +65,8 @@ protected:
 
 #pragma region "Protected Functions"
 
-	//전체 갱신
 	UFUNCTION()
-	void RefreshWeaponSlots();
+	void RefreshWeaponSlot(bool bIsLeftHand);
 
 	UFUNCTION()
 	void RefreshItemSlot();

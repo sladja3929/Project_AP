@@ -57,6 +57,11 @@ void UBaseAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AAc
 	OnASCInitialized.Broadcast(this);
 }
 
+bool UBaseAbilitySystemComponent::TryActivateAbilityWithEventData(FGameplayAbilitySpecHandle AbilityToActivate, const FGameplayEventData* TriggerEventData)
+{
+	return InternalTryActivateAbility(AbilityToActivate, FPredictionKey(), nullptr, nullptr, TriggerEventData);
+}
+
 FGameplayEffectSpecHandle UBaseAbilitySystemComponent::CreateGameplayEffectSpec(TSubclassOf<UGameplayEffect> GameplayEffectClass, float Level, UObject* SourceObject)
 {
 	if (!GameplayEffectClass)

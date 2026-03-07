@@ -94,7 +94,8 @@ void UWeaponManagerComponent::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, b
 			RightWeapon = NewWeapon;
 		}
 
-		OnWeaponChanged.Broadcast();
+		DEBUG_LOG(TEXT("EquipWeapon: Weapon Changed, IsLeft=%d"), bIsLeftHand);
+		OnWeaponChanged.Broadcast(bIsLeftHand);
 	}
 }
 
@@ -134,18 +135,11 @@ void UWeaponManagerComponent::CycleRightWeapon()
 	AActionPracticeCharacter* OwnerCharacter = GetOwner<AActionPracticeCharacter>();
 	if (!OwnerCharacter) return;
 
-	if (!OwnerCharacter->HasAuthority())
-	{
-		Server_CycleRightWeapon();
-		return;
-	}
+	//서버에서만 실행 (LocalPredicted 어빌리티가 양쪽에서 호출하므로 RPC 불필요)
+	if (!OwnerCharacter->HasAuthority()) return;
 
-	//서버에서 인덱스 변경 + 무기 교체
 	RightWeaponIndex = (RightWeaponIndex + 1) % DefaultRightWeapons.Num();
 	EquipWeapon(DefaultRightWeapons[RightWeaponIndex], false, false);
-
-	//오른손 무기 변경 → AttackSequenceAbility 재활성화
-	OwnerCharacter->ResetAttackSequenceAbility();
 
 	DEBUG_LOG(TEXT("CycleRightWeapon: index %d"), RightWeaponIndex);
 }
@@ -157,26 +151,12 @@ void UWeaponManagerComponent::CycleLeftWeapon()
 	AActionPracticeCharacter* OwnerCharacter = GetOwner<AActionPracticeCharacter>();
 	if (!OwnerCharacter) return;
 
-	if (!OwnerCharacter->HasAuthority())
-	{
-		Server_CycleLeftWeapon();
-		return;
-	}
+	if (!OwnerCharacter->HasAuthority()) return;
 
 	LeftWeaponIndex = (LeftWeaponIndex + 1) % DefaultLeftWeapons.Num();
 	EquipWeapon(DefaultLeftWeapons[LeftWeaponIndex], true, false);
 
 	DEBUG_LOG(TEXT("CycleLeftWeapon: index %d"), LeftWeaponIndex);
-}
-
-void UWeaponManagerComponent::Server_CycleRightWeapon_Implementation()
-{
-	CycleRightWeapon();
-}
-
-void UWeaponManagerComponent::Server_CycleLeftWeapon_Implementation()
-{
-	CycleLeftWeapon();
 }
 
 void UWeaponManagerComponent::OnRep_LeftWeapon()
@@ -196,7 +176,7 @@ void UWeaponManagerComponent::OnRep_LeftWeapon()
 	}
 
 	OwnerCharacter->TryAutoActivateAttackSequenceAbility();
-	OnWeaponChanged.Broadcast();
+	OnWeaponChanged.Broadcast(true);
 }
 
 void UWeaponManagerComponent::OnRep_RightWeapon()
@@ -216,7 +196,7 @@ void UWeaponManagerComponent::OnRep_RightWeapon()
 	}
 
 	OwnerCharacter->TryAutoActivateAttackSequenceAbility();
-	OnWeaponChanged.Broadcast();
+	OnWeaponChanged.Broadcast(false);
 }
 
 FName UWeaponManagerComponent::ResolveSocketName(EWeaponEnums WeaponType, bool bIsLeftHand) const
