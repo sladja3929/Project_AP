@@ -10,7 +10,7 @@
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "Items/WeaponDataAsset.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogBlockAbility, Log, All);
@@ -31,7 +31,12 @@ UBlockAbility::UBlockAbility()
 void UBlockAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	
+
+	if (!WeaponBlockData)
+	{
+		return;
+	}
+
 	StartMontageWithEventsTask();
 	StartWaitInputReleaseTask(true);
 }

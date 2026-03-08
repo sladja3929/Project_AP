@@ -222,6 +222,16 @@ void UAttackSequenceAbility::StopMontageAndEndTask()
 	}
 }
 
+void UAttackSequenceAbility::CancelAbilitiesOnAttack()
+{
+	if (AbilityTagsToCancelOnAttack.IsEmpty()) return;
+
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!ASC) return;
+
+	ASC->CancelAbilities(&AbilityTagsToCancelOnAttack);
+}
+
 void UAttackSequenceAbility::AddOrRemoveGameplayTag(const FGameplayTag Auth, const FGameplayTag Local, bool bAdd)
 {
 	UActionPracticeAbilitySystemComponent* APASC = GetActionPracticeAbilitySystemComponentFromActorInfo();
@@ -370,6 +380,7 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 		break;
 
 	case EAttackSequenceState::Prepare:
+		CancelAbilitiesOnAttack();
 		StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 		if (CurrentChargeProgress != EChargeProgress::NoCharge) StartWaitInputReleaseTask(true);
 		break;
@@ -378,6 +389,7 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 		//스테미나 부족시 아이들 상태로 복귀
 		if (!ConsumeStamina()) ChangeState(EAttackSequenceState::Idle);
 
+		CancelAbilitiesOnAttack();
 		SetHitDetectionConfig();
 		AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, true);
 		StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();

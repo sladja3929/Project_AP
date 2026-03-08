@@ -558,13 +558,16 @@ void AActionPracticeCharacter::GASInputReleased(const UInputAction* InputAction)
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
 
-	//버퍼 ON/OFF와 무관하게, 현재 활성화된 어빌리티가 있으면 릴리즈를 먼저 전달
+	//버퍼 ON/OFF와 무관하게, 현재 활성화된 어빌리티가 있으면 릴리즈를 먼저 전달 
 	for (auto& Spec : TryActivateSpecs)
 	{
+		//활성화 여부와 무관하게 InputPressed 상태 업데이트
+		//비활성 시 놓친 릴리즈를 기록해두지 않으면, 이후 재활성화 시 WaitInputRelease가 발동하지 않음
+		Spec->InputPressed = false;
+
 		if (!Spec->IsActive())
 			continue;
 
-		Spec->InputPressed = false;
 		APASC->AbilitySpecInputReleased(*Spec);
 	}
 

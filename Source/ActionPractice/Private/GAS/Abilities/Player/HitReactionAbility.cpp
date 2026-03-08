@@ -135,7 +135,10 @@ UAnimMontage* UHitReactionAbility::SetMontageToPlayTask()
 
 void UHitReactionAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	//BlockReaction 후처리, 누르고 있으면 계속 방어
+	//BlockReaction 후처리에 필요한 값을 Super 호출 전에 미리 캡처
+	bool bShouldReactivateBlock = false;
+	FGameplayAbilitySpecHandle BlockAbilityHandle;
+
 	if (bIsBlockReaction)
 	{
 		//State.Blocking 태그 제거
@@ -148,35 +151,32 @@ void UHitReactionAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 		DEBUG_LOG(TEXT("bWasCancelled=%d"), bWasCancelled);
 
 		//BlockAbility Spec 찾기
-		FGameplayAbilitySpec* BlockAbilitySpec = nullptr;
-		for (FGameplayAbilitySpec& Spec : GetAbilitySystemComponentFromActorInfo()->GetActivatableAbilities())
+		for (FGameplayAbilitySpec& Spec : ActorInfo->AbilitySystemComponent->GetActivatableAbilities())
 		{
 			if (Spec.Ability && Spec.Ability->GetAssetTags().HasTag(AbilityBlockTag))
 			{
-				BlockAbilitySpec = &Spec;
+				BlockAbilityHandle = Spec.Handle;
 				break;
 			}
 		}
 
-		if (BlockAbilitySpec)
+		if (BlockAbilityHandle.IsValid())
 		{
-			//실시간 입력 상태 확인
-			bool bIsBlockInputPressed = false;
-
 			if (AActionPracticeCharacter* Character = Cast<AActionPracticeCharacter>(ActorInfo->AvatarActor.Get()))
 			{
-				bIsBlockInputPressed = Character->IsBlockInputPressed();
+				bShouldReactivateBlock = Character->IsBlockInputPressed();
 			}
-
-			DEBUG_LOG(TEXT("bIsBlockInputPressed=%d (real-time check)"), bIsBlockInputPressed);
-
-			if (bIsBlockInputPressed)
-			{
-				DEBUG_LOG(TEXT("Block input still pressed, reactivating BlockAbility"));
-				ActorInfo->AbilitySystemComponent->TryActivateAbility(BlockAbilitySpec->Handle);
-			}
+			DEBUG_LOG(TEXT("bIsBlockInputPressed=%d (real-time check)"), bShouldReactivateBlock);
 		}
 	}
 
+	//Super 먼저 호출 → HitReaction 태그/블로킹 태그 정리
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+
+	//HitReaction이 완전히 종료된 후 BlockAbility 재활성화
+	if (bShouldReactivateBlock)
+	{
+		DEBUG_LOG(TEXT("Block input still pressed, reactivating BlockAbility"));
+		ActorInfo->AbilitySystemComponent->TryActivateAbility(BlockAbilityHandle);
+	}
 }

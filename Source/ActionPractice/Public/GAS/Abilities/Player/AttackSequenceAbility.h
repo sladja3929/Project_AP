@@ -118,6 +118,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
 	TSubclassOf<UGameplayEffect> DamageInstantEffect;
 
+	// 공격 시작 시 취소할 어빌리티 태그 (AbilityTagsToCancel 대체 - 이미 활성화된 어빌리티라 직접 처리)
+	UPROPERTY(EditDefaultsOnly, Category = "Attack")
+	FGameplayTagContainer AbilityTagsToCancelOnAttack;
+
 	// ===== 태스크 =====
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitAttackInputEventTask = nullptr;
@@ -163,6 +167,7 @@ protected:
 	// ===== 설정 / 초기화 =====
 	virtual void ActivateInitSettings() override;
 	void CacheWeaponData();
+	void CancelAbilitiesOnAttack();
 	void CacheGameplayTags();
 	void BindHitDetectionSetter();
 	void StopMontageAndEndTask();

@@ -7,7 +7,7 @@
 #include "Input/InputActionDataAsset.h"
 #include "Net/UnrealNetwork.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogInputBufferComponent, Log, All);
@@ -292,13 +292,18 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 			FGameplayTag InputTag = CachedInputActionData->FindTagByInputAction(InputAction);
 			ActivateEventData.InstigatorTags.AddTag(InputTag);
 
+			//TryActivate 내부에서 ActivateAbility가 동기 실행되므로,
+			//StartWaitInputReleaseTask(true)가 Spec->InputPressed=false인 채로 실행되면 즉시 종료됨
+			//→ 먼저 true로 세팅하여 WaitInputRelease 즉시 발동 방지
+			Spec->InputPressed = true;
+
 			if (APASC->TryActivateAbilityWithEventData(Spec->Handle, &ActivateEventData))
 			{
 				DEBUG_LOG(TEXT("Play Buffer - Activate Ability: %s"), *GetNameSafe(Spec->Ability->GetClass()));
-				Spec->InputPressed = true;
 			}
 			else
 			{
+				Spec->InputPressed = false; //활성화 실패 시 원복
 				DEBUG_LOG(TEXT("Play Buffer Activate Failed: %s"), *GetNameSafe(Spec->Ability->GetClass()));
 			}
 		}

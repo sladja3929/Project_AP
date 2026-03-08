@@ -6,7 +6,7 @@
 #include "Characters/HitDetection/HitDetectionInterface.h"
 #include "Net/UnrealNetwork.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogWeaponManagerComponent, Log, All);
