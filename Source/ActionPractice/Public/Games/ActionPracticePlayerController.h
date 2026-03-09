@@ -93,7 +93,10 @@ protected:
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
 	void HandleToggleLockOn();
-	void HandleCycleQuickSlot();
+	//마우스 휠 스크롤 (Axis1D): 양수=위, 음수=아래
+	void HandleCycleQuickSlot(const FInputActionValue& Value);
+	//Shift+휠: 양수=RightWeapon, 음수=LeftWeapon
+	void HandleCycleWeapon(const FInputActionValue& Value);
 	void HandleGASInputPressed(const UInputAction* InputAction);
 	void HandleGASInputReleased(const UInputAction* InputAction);
 
@@ -123,8 +126,6 @@ private:
 	void OnChargeAttackPressed()  { HandleGASInputPressed(IA_ChargeAttack); }
 	void OnChargeAttackReleased()    { HandleGASInputReleased(IA_ChargeAttack); }
 	void OnUseItemPressed()          { HandleGASInputPressed(IA_UseItem); }
-	void OnCycleRightWeaponPressed() { HandleGASInputPressed(IA_CycleRightWeapon); }
-	void OnCycleLeftWeaponPressed()  { HandleGASInputPressed(IA_CycleLeftWeapon); }
 
 #pragma endregion
 };

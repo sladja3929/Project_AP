@@ -67,6 +67,7 @@ protected:
 	TObjectPtr<AActionPracticeCharacter> OwnerCharacter;
 	FGameplayTag EffectStaminaRegenBlockDurationTag;
 	FGameplayTag StateAbilityBlockingTag;
+	FGameplayTag StateGuardBrokenTag;
 
 #pragma endregion
 
@@ -74,6 +75,9 @@ protected:
 
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	//포이즈 브레이크 + 가드 브레이크 시 HitReaction 활성화
+	virtual bool ShouldActivateHitReaction() const override;
 
 #pragma endregion
 
@@ -84,6 +88,7 @@ private:
 
 	//블로킹 관련 변수
 	bool bBlockedLastAttack = false;
+	bool bGuardBroken = false;
 
 #pragma endregion
 

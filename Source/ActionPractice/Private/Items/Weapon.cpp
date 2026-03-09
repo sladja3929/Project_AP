@@ -1,6 +1,7 @@
 #include "Public/Items/Weapon.h"
 #include "Public/Items/WeaponDataAsset.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Math/UnrealMathUtility.h"
@@ -12,7 +13,9 @@
 #include "GAS/AttributeSet/ActionPracticeAttributeSet.h"
 #include "Net/UnrealNetwork.h"
 
-#define ENABLE_DEBUG_LOG 0
+const FName AWeapon::GripSocketName = TEXT("grip_oh_socket");
+
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogWeapon, Log, All);
@@ -160,8 +163,50 @@ void AWeapon::CalculateCalculatedDamage()
 		CalculatedDamage, WeaponData->BaseDamage, StrengthBonus, DexterityBonus);
 }
 
+void AWeapon::AttachToCharacterHandByGripSocket(USkeletalMeshComponent* CharacterMesh, const FName HandSocketName)
+{
+	if (!CharacterMesh)
+	{
+		DEBUG_LOG(TEXT("AttachToCharacterHandByGripSocket: CharacterMesh is null"));
+		return;
+	}
+
+	if (!WeaponMesh)
+	{
+		DEBUG_LOG(TEXT("AttachToCharacterHandByGripSocket: WeaponMesh is null"));
+		return;
+	}
+
+	//손 소켓에 액터 부착
+	AttachToComponent(CharacterMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocketName);
+
+	//grip_oh_socket 존재 여부 확인
+	if (!WeaponMesh->DoesSocketExist(GripSocketName))
+	{
+		DEBUG_LOG(TEXT("AttachToCharacterHandByGripSocket: grip_oh_socket not found on [%s]. Keeping current attachment to [%s]"),
+			*GetNameSafe(this), *HandSocketName.ToString());
+		return;
+	}
+
+	//grip_oh_socket의 컴포넌트 공간 트랜스폼 취득
+	//RTS_Component: WeaponMesh 로컬 공간 기준 소켓 오프셋
+	const FTransform GripSocketTransform = WeaponMesh->GetSocketTransform(GripSocketName, RTS_Component);
+
+	//WeaponMeshRelative = Inverse(GripSocketTransform)
+	//장착 후 grip_oh_socket 위치/회전이 손 소켓과 정확히 일치
+	const FTransform NewRelativeTransform = GripSocketTransform.Inverse();
+
+	//스케일은 BP 값 유지
+	const FVector CurrentScale = WeaponMesh->GetRelativeScale3D();
+	WeaponMesh->SetRelativeTransform(NewRelativeTransform);
+	WeaponMesh->SetRelativeScale3D(CurrentScale);
+
+	DEBUG_LOG(TEXT("AttachToCharacterHandByGripSocket: Attached to [%s] with grip_oh_socket alignment applied"),
+		*HandSocketName.ToString());
+}
+
 void AWeapon::EquipWeapon()
-{    
+{
     //무기 장착시 실행할 몽타주, 이펙트, 사운드 등의 로직
 }
 

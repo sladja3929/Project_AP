@@ -28,27 +28,9 @@ protected:
 #pragma region "Protected Variables"
 
 	const FBlockActionData* WeaponBlockData = nullptr;
-	
+
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_PlayMontageWithEvents> PlayMontageWithEventsTask = nullptr;
-	
-	UPROPERTY()
-	float BlockAngle = 120.0f; // 정면 120도
-
-	UPROPERTY()
-	float ParryWindow = 0.5f;
-
-	UPROPERTY()
-	float DamageReductionMultiplier = 0.8f; // 20% 데미지만 받음
-
-	UPROPERTY()
-	float StaminaDamageReduction = 0.5f; // 50% 스태미나 데미지만 받음
-	
-	UPROPERTY()
-	float BlockStartTime = 0.0f;
-
-	UPROPERTY()
-	bool bIsBlocking = false;
 	
 #pragma endregion
 

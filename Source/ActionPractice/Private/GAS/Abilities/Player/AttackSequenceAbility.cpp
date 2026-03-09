@@ -322,6 +322,11 @@ void UAttackSequenceAbility::ChangeAttackType(const EAttackType NewType)
 		CurrentAttackTags.AddTag(AbilityAttackNormalTag);
 		CurrentAttackTags.AddTag(AbilityAttackSprintTag);
 		break;
+
+	case EAttackType::ChargeSprint:
+		CurrentAttackTags.AddTag(AbilityAttackChargeTag);
+		CurrentAttackTags.AddTag(AbilityAttackSprintTag);
+		break;
 		
 	case EAttackType::Roll:
 		CurrentAttackTags.AddTag(AbilityAttackNormalTag);
@@ -375,11 +380,15 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 	case EAttackSequenceState::Idle:
 		//None: ComboCounter, MaxComboCount 0
 		ChangeAttackType(EAttackType::None);
+		CurrentChargeProgress = EChargeProgress::NoCharge;
 		AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, false);
 		StopMontageAndEndTask();
 		break;
 
 	case EAttackSequenceState::Prepare:
+		//스테미나 부족시 아이들 상태로 복귀
+		if (!ConsumeStamina()) ChangeState(EAttackSequenceState::Idle);
+		
 		CancelAbilitiesOnAttack();
 		StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 		if (CurrentChargeProgress != EChargeProgress::NoCharge) StartWaitInputReleaseTask(true);
@@ -494,7 +503,7 @@ void UAttackSequenceAbility::OnEventAttackInput(FGameplayEventData Payload)
 	else if (Payload.InstigatorTags.HasTag(InputChargeAttackTag))
 	{
 		CurrentChargeProgress = EChargeProgress::WindUp;
-		ProcessChargeAttackInput();
+		ProcessChargeAttackInput(Payload);
 	}
 }
 
@@ -505,10 +514,12 @@ void UAttackSequenceAbility::ProcessNormalAttackInput(const FGameplayEventData& 
 	{
 		ChangeAttackType(EAttackType::Roll);
 	}
+	
 	else if (Payload.InstigatorTags.HasTag(StateSprintingTag))
 	{
 		ChangeAttackType(EAttackType::Sprint);
 	}
+	
 	else
 	{
 		ChangeAttackType(EAttackType::Normal);
@@ -517,10 +528,26 @@ void UAttackSequenceAbility::ProcessNormalAttackInput(const FGameplayEventData& 
 	ChangeState(EAttackSequenceState::Attacking);
 }
 
-void UAttackSequenceAbility::ProcessChargeAttackInput()
+void UAttackSequenceAbility::ProcessChargeAttackInput(const FGameplayEventData& Payload)
 {
-	ChangeAttackType(EAttackType::Charge);
-	ChangeState(EAttackSequenceState::Prepare);
+	//Payload의 태그로 공격 타입 판정 (버퍼 저장 시점 기준)
+	if (Payload.InstigatorTags.HasTag(StateJustRolledTag) || Payload.InstigatorTags.HasTag(StateRollingTag))
+	{
+		ChangeAttackType(EAttackType::Roll);
+		ChangeState(EAttackSequenceState::Attacking);
+	}
+	
+	else if (Payload.InstigatorTags.HasTag(StateSprintingTag))
+	{
+		ChangeAttackType(EAttackType::ChargeSprint);
+		ChangeState(EAttackSequenceState::Attacking);
+	}
+	
+	else
+	{
+		ChangeAttackType(EAttackType::Charge);
+		ChangeState(EAttackSequenceState::Prepare);
+	}	
 }
 
 void UAttackSequenceAbility::OnWaitInputRelease(float TimeHeld)
@@ -566,6 +593,7 @@ void UAttackSequenceAbility::OnEventInputByBuffer(FGameplayEventData Payload)
 	}
 	else if (Payload.InstigatorTags.HasTag(InputChargeAttackTag))
 	{
+		//EventMagnitude로 단발인지 홀드인지 판별
 		if (Payload.EventMagnitude != 0.0f)
 		{
 			DEBUG_LOG(TEXT("Input By Buffer - No Charge true"));
@@ -576,7 +604,7 @@ void UAttackSequenceAbility::OnEventInputByBuffer(FGameplayEventData Payload)
 			CurrentChargeProgress = EChargeProgress::WindUp;
 		}
 
-		ProcessChargeAttackInput();
+		ProcessChargeAttackInput(Payload);
 	}
 }
 
@@ -598,18 +626,21 @@ void UAttackSequenceAbility::ConsumePendingBufferInput()
 	{
 		ProcessNormalAttackInput(Payload);
 	}
+	
 	else if (Payload.InstigatorTags.HasTag(InputChargeAttackTag))
 	{
+		//EventMagnitude로 단발인지 홀드인지 판별
 		if (Payload.EventMagnitude != 0.0f)
 		{
 			CurrentChargeProgress = EChargeProgress::NoCharge;
 		}
+		
 		else
 		{
 			CurrentChargeProgress = EChargeProgress::WindUp;
 		}
 
-		ProcessChargeAttackInput();
+		ProcessChargeAttackInput(Payload);
 	}
 
 	//Payload 초기화

@@ -42,6 +42,7 @@ public:
 	static const FGameplayTag& GetStateAbilityAttackingLocalTag();
 	static const FGameplayTag& GetStateAbilityAttackingAuthTag();
 	static const FGameplayTag& GetStateAbilityBlockingTag();
+	static const FGameplayTag& GetStateGuardBrokenTag();
 	static const FGameplayTag& GetStateAbilityJumpingTag();
 	static const FGameplayTag& GetStateAbilitySprintingTag();
 	static const FGameplayTag& GetStateAbilityRollingTag();
@@ -115,6 +116,7 @@ private:
 	const FGameplayTag& GetStateAbilityAttackingLocalTagInternal() const;
 	const FGameplayTag& GetStateAbilityAttackingAuthTagInternal() const;
 	const FGameplayTag& GetStateAbilityBlockingTagInternal() const;
+	const FGameplayTag& GetStateGuardBrokenTagInternal() const;
 	const FGameplayTag& GetStateAbilityJumpingTagInternal() const;
 	const FGameplayTag& GetStateAbilitySprintingTagInternal() const;
 	const FGameplayTag& GetStateAbilityRollingTagInternal() const;

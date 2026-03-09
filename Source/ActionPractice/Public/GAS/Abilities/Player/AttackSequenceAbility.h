@@ -30,6 +30,7 @@ enum class EAttackType : uint8
 	Normal,			//일반 공격
 	Charge,			//차지 공격
 	Sprint,			//스프린트 공격
+	ChargeSprint,
 	Roll			//롤 공격
 };
 
@@ -192,7 +193,7 @@ protected:
 	void OnEventAttackInput(FGameplayEventData Payload); //InputPressed 대체 이벤트, IA_Attack과 IA_ChargeAttack 모두 수신
 
 	void ProcessNormalAttackInput(const FGameplayEventData& Payload);
-	void ProcessChargeAttackInput();
+	void ProcessChargeAttackInput(const FGameplayEventData& Payload);
 
 	virtual void OnWaitInputRelease(float TimeHeld) override; 
 	virtual void OnEventInputByBuffer(FGameplayEventData Payload) override;

@@ -83,6 +83,10 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+	//HitReaction을 활성화할지 여부 (포이즈 브레이크 체크)
+	//파생 클래스에서 오버라이드하여 추가 조건을 포함할 수 있음
+	virtual bool ShouldActivateHitReaction() const;
+
 #pragma endregion
 
 private:

@@ -18,6 +18,9 @@
 
 UHitReactionAbility::UHitReactionAbility()
 {
+	//연속 피격시 재활성화
+	bRetriggerInstancedAbility = true;
+	
 	//피격은 서버에서 시작
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -35,6 +38,12 @@ void UHitReactionAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 		DEBUG_LOG(TEXT("StateAbilityBlockingTag is Invalid"));
 	}
 
+	StateGuardBrokenTag = UGameplayTagsSubsystem::GetStateGuardBrokenTag();
+	if (!StateGuardBrokenTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("StateGuardBrokenTag is Invalid"));
+	}
+
 	AbilityBlockTag = UGameplayTagsSubsystem::GetAbilityBlockTag();
 	if (!AbilityBlockTag.IsValid())
 	{
@@ -47,14 +56,24 @@ void UHitReactionAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	
 	bIsBlockReaction = false;
+	bIsGuardBreakReaction = false;
 
 	if (TriggerEventData)
 	{
 		const float PoiseValue = TriggerEventData->EventMagnitude;
 		DEBUG_LOG(TEXT("HitReaction activated with Poise=%.1f"), PoiseValue);
 
-		//블로킹 상태 확인
-		if (TriggerEventData->TargetTags.HasTag(StateAbilityBlockingTag))
+		//가드 브레이크
+		if (TriggerEventData->TargetTags.HasTag(StateGuardBrokenTag))
+		{
+			bIsGuardBreakReaction = true;
+			DEBUG_LOG(TEXT("Guard Break Reaction detected"));
+			//State.Blocking 태그 수동 추가하지 않음
+			//BlockAbility가 캔슬되면서 자동 제거됨
+		}
+		
+		//가드
+		else if (TriggerEventData->TargetTags.HasTag(StateAbilityBlockingTag))
 		{
 			bIsBlockReaction = true;
 			DEBUG_LOG(TEXT("Block Reaction detected"));
@@ -102,6 +121,25 @@ UAnimMontage* UHitReactionAbility::SetMontageToPlayTask()
 {
 	const EReactionLevel Level = ReactionProcessor.GetReactionLevel();
 
+	//가드 브레이크
+	if (bIsGuardBreakReaction)
+	{
+		const FBlockActionData* BlockData = FWeaponAbilityStatics::GetBlockDataFromAbility(this);
+		if (BlockData && !BlockData->GuardBreakMontage.IsNull())
+		{
+			DEBUG_LOG(TEXT("Playing GuardBreakMontage"));
+			return BlockData->GuardBreakMontage.LoadSynchronous();
+		}
+		
+		//GuardBreakMontage가 없으면 Heavy BlockReaction으로 폴백
+		if (BlockData && !BlockData->BlockReactionHeavyMontage.IsNull())
+		{
+			DEBUG_LOG(TEXT("GuardBreakMontage not set, falling back to BlockReactionHeavy"));
+			return BlockData->BlockReactionHeavyMontage.LoadSynchronous();
+		}
+	}
+
+	//일반 블록 리액션
 	if (bIsBlockReaction)
 	{
 		const FBlockActionData* BlockData = FWeaponAbilityStatics::GetBlockDataFromAbility(this);
@@ -124,6 +162,7 @@ UAnimMontage* UHitReactionAbility::SetMontageToPlayTask()
 		}
 	}
 
+	//일반 피격 리액션
 	switch (Level)
 	{
 		case EReactionLevel::Heavy: return HitReactionHeavyMontage;
@@ -139,7 +178,8 @@ void UHitReactionAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 	bool bShouldReactivateBlock = false;
 	FGameplayAbilitySpecHandle BlockAbilityHandle;
 
-	if (bIsBlockReaction)
+	//가드 + 가드 브레이크 시 방어 유지
+	if (bIsBlockReaction || bIsGuardBreakReaction)
 	{
 		//State.Blocking 태그 제거
 		if (StateAbilityBlockingTag.IsValid())

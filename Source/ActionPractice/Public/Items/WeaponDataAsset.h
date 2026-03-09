@@ -44,12 +44,17 @@ struct FBlockActionData
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
     TSoftObjectPtr<UAnimMontage> BlockReactionHeavyMontage;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+    TSoftObjectPtr<UAnimMontage> GuardBreakMontage;
+
     //방어 데미지 감소량
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Block", meta = (ClampMin = "0.0", ClampMax = "100.0"))
     float DamageReduction = 50.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Block")
-    float StaminaCost = 10.0f;
+    //가드 강도 (엘든링의 Guard Boost에 해당, 0~100)
+    //높을수록 방어 시 스태미나 소모가 줄어든다
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Block", meta = (ClampMin = "0.0", ClampMax = "100.0"))
+    float GuardStrength = 50.0f;
 };
 
 UCLASS(BlueprintType)

@@ -225,12 +225,9 @@ void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, c
 		return;
 	}
 
-	//포이즈 브레이크 체크
-	if (BaseAttributeSet->GetPoise() <= 0.0f)
+	//HitReaction 활성화 여부 체크
+	if (ShouldActivateHitReaction())
 	{
-		DEBUG_LOG(TEXT("HandleOnDamagedResolved: Poise broken, Poise=%.1f"), BaseAttributeSet->GetPoise());
-
-		//HitReaction Ability 활성화
 		if (AbilityHitReactionTag.IsValid())
 		{
 			TArray<FGameplayAbilitySpec*> HitReactionSpecs;
@@ -238,23 +235,16 @@ void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, c
 
 			if (HitReactionSpecs.Num() > 0)
 			{
-				FGameplayAbilitySpec* HitReactionSpec = HitReactionSpecs[0];
-
-				//EventData 준비
 				FGameplayEventData EventData;
 				PrepareHitReactionEventData(EventData, FinalAttackData);
 
-				FGameplayAbilityActorInfo* ActorInfo = const_cast<FGameplayAbilityActorInfo*>(AbilityActorInfo.Get());
-				if (ActorInfo && HitReactionSpec)
+				if (TryActivateAbilityWithEventData(HitReactionSpecs[0]->Handle, &EventData))
 				{
-					TriggerAbilityFromGameplayEvent(
-						HitReactionSpec->Handle,
-						ActorInfo,
-						AbilityHitReactionTag,
-						&EventData,
-						*this
-					);
-					DEBUG_LOG(TEXT("HitReaction Ability activated with Poise=%.1f"), EventData.EventMagnitude);
+					DEBUG_LOG(TEXT("HitReaction activated with Poise=%.1f"), EventData.EventMagnitude);
+				}
+				else
+				{
+					DEBUG_LOG(TEXT("HitReaction activation failed"));
 				}
 			}
 			else
@@ -263,6 +253,19 @@ void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, c
 			}
 		}
 	}
+}
+
+bool UBaseAbilitySystemComponent::ShouldActivateHitReaction() const
+{
+	UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(GetAttributeSet(UBaseAttributeSet::StaticClass()));
+	const UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
+	if (!BaseAttributeSet)
+	{
+		return false;
+	}
+
+	//포이즈 브레이크 체크
+	return BaseAttributeSet->GetPoise() <= 0.0f;
 }
 
 void UBaseAbilitySystemComponent::PrepareHitReactionEventData(FGameplayEventData& OutEventData, const FFinalAttackData& FinalAttackData)

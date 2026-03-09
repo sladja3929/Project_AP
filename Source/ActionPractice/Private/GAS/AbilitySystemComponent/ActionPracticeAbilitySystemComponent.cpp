@@ -41,6 +41,12 @@ void UActionPracticeAbilitySystemComponent::BeginPlay()
 	{
 		DEBUG_LOG(TEXT("StateAbilityBlockingTag is Invalid"));
 	}
+
+	StateGuardBrokenTag = UGameplayTagsSubsystem::GetStateGuardBrokenTag();
+	if (!StateGuardBrokenTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("StateGuardBrokenTag is Invalid"));
+	}
 }
 
 void UActionPracticeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AActor* InAvatarActor)
@@ -191,6 +197,7 @@ const UActionPracticeAttributeSet* UActionPracticeAbilitySystemComponent::GetAct
 void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
 {
 	CheckBlockSuccess(SourceActor);
+	bGuardBroken = false;
 
 	if (!OwnerCharacter)
 	{
@@ -205,30 +212,46 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 		return;
 	}
 
-	//방어성공 시 계산
+	//방어 성공 시 계산
 	if (bBlockedLastAttack)
 	{
 		AWeapon* LeftWeapon = OwnerCharacter->GetLeftWeapon();
-
-		//무기의 DamageReduction 적용
-		const FBlockActionData* BlockData = LeftWeapon->GetWeaponBlockData();
+		const FBlockActionData* BlockData = LeftWeapon ? LeftWeapon->GetWeaponBlockData() : nullptr;
 		const float DamageReduction = BlockData ? BlockData->DamageReduction : 0.0f;
 		const float FinalDamage = FinalAttackData.FinalDamage * (1.0f - DamageReduction / 100.0f);
 
 		//HP 적용
 		const float OldHealth = APAttributeSet->GetHealth();
 		APAttributeSet->SetHealth(FMath::Clamp(OldHealth - FinalDamage, 0.0f, APAttributeSet->GetMaxHealth()));
-		
-		//포이즈 대미지 적용
-		if (FinalAttackData.PoiseDamage > 0.0f)
+
+		//가드 성공 시 포이즈 대미지는 적용하지 않음
+
+		//===== 가드 스태미나 소모 (엘든링 Guard Boost 공식) =====
+		if (FinalAttackData.PoiseDamage > 0.0f && BlockData)
 		{
-			const float OldPoise = APAttributeSet->GetPoise();
-			APAttributeSet->SetPoise(FMath::Clamp(OldPoise - FinalAttackData.PoiseDamage, 0.0f, APAttributeSet->GetMaxPoise()));
+			const float GuardStrength = FMath::Clamp(BlockData->GuardStrength, 0.0f, 100.0f);
+			const float StaminaCost = FinalAttackData.PoiseDamage * (1.0f - GuardStrength / 100.0f);
+
+			if (StaminaCost > 0.0f)
+			{
+				const float OldStamina = APAttributeSet->GetStamina();
+				const float NewStamina = FMath::Max(0.0f, OldStamina - StaminaCost);
+				APAttributeSet->SetStamina(NewStamina);
+
+				DEBUG_LOG(TEXT("Guard Stamina: PoiseDmg=%.1f, GuardStr=%.1f, Cost=%.1f, Stamina=%.1f->%.1f"),
+					FinalAttackData.PoiseDamage, GuardStrength, StaminaCost, OldStamina, NewStamina);
+
+				if (NewStamina <= 0.0f)
+				{
+					bGuardBroken = true;
+					DEBUG_LOG(TEXT("Guard Break! Stamina depleted"));
+				}
+			}
 		}
 
-		DEBUG_LOG(TEXT("Blocked: Damage=%.1f, FinalDamage=%.1f, DamageReduction=%.1f%%, Health=%.1f/%.1f"),
+		DEBUG_LOG(TEXT("Blocked: Damage=%.1f, FinalDamage=%.1f, Reduction=%.1f%%, Health=%.1f/%.1f, GuardBroken=%d"),
 			FinalAttackData.FinalDamage, FinalDamage, DamageReduction,
-			APAttributeSet->GetHealth(), APAttributeSet->GetMaxHealth());
+			APAttributeSet->GetHealth(), APAttributeSet->GetMaxHealth(), bGuardBroken);
 		return;
 	}
 
@@ -240,12 +263,30 @@ void UActionPracticeAbilitySystemComponent::PrepareHitReactionEventData(FGamepla
 {
 	Super::PrepareHitReactionEventData(OutEventData, FinalAttackData);
 
-	//블로킹 상태를 TargetTags에 추가
-	if (bBlockedLastAttack)
+	if (bGuardBroken)
 	{
+		//가드 브레이크: State.GuardBroken 태그 전달
+		OutEventData.TargetTags.AddTag(StateGuardBrokenTag);
+		DEBUG_LOG(TEXT("GuardBreak Reaction: State.GuardBroken tag added"));
+	}
+	else if (bBlockedLastAttack)
+	{
+		//일반 블록 리액션: State.Blocking 태그 전달
 		OutEventData.TargetTags.AddTag(StateAbilityBlockingTag);
 		DEBUG_LOG(TEXT("Block Reaction triggered"));
 	}
+}
+
+bool UActionPracticeAbilitySystemComponent::ShouldActivateHitReaction() const
+{
+	//가드 + 가드 브레이크 시 즉시 활성화
+	if (bBlockedLastAttack || bGuardBroken)
+	{
+		return true;
+	}
+
+	//기본 포이즈 브레이크 체크
+	return Super::ShouldActivateHitReaction();
 }
 
 void UActionPracticeAbilitySystemComponent::CheckBlockSuccess(AActor* SourceActor)

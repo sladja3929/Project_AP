@@ -51,14 +51,9 @@ void AActionPracticePlayerController::SetupInputComponent()
 			EIC->BindAction(IA_LockOn, ETriggerEvent::Started, this, &AActionPracticePlayerController::HandleToggleLockOn);
 		}
 
-		if (IA_CycleRightWeapon)
+		if (IA_CycleQuickSlot)
 		{
-			EIC->BindAction(IA_CycleRightWeapon, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnCycleRightWeaponPressed);
-		}
-
-		if (IA_CycleLeftWeapon)
-		{
-			EIC->BindAction(IA_CycleLeftWeapon, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnCycleLeftWeaponPressed);
+			EIC->BindAction(IA_CycleQuickSlot, ETriggerEvent::Triggered, this, &AActionPracticePlayerController::HandleCycleQuickSlot);
 		}
 
 		// ===== GAS Ability Input Actions =====
@@ -105,9 +100,11 @@ void AActionPracticePlayerController::SetupInputComponent()
 			EIC->BindAction(IA_UseItem, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnUseItemPressed);
 		}
 
-		if (IA_CycleQuickSlot)
+		//IA_CycleRightWeapon: Shift+휠 Axis1D → HandleCycleWeapon에서 부호로 좌/우 분기
+		//IA_CycleLeftWeapon: 바인딩 없음, GAS 키로만 사용
+		if (IA_CycleRightWeapon)
 		{
-			EIC->BindAction(IA_CycleQuickSlot, ETriggerEvent::Started, this, &AActionPracticePlayerController::HandleCycleQuickSlot);
+			EIC->BindAction(IA_CycleRightWeapon, ETriggerEvent::Triggered, this, &AActionPracticePlayerController::HandleCycleWeapon);
 		}
 	}
 }
@@ -170,8 +167,12 @@ void AActionPracticePlayerController::HandleToggleLockOn()
 	LockOnComp->ToggleLockOn();
 }
 
-void AActionPracticePlayerController::HandleCycleQuickSlot()
+void AActionPracticePlayerController::HandleCycleQuickSlot(const FInputActionValue& Value)
 {
+	//휠 아래(음수): 퀵슬롯 순환
+	//필요 시 양수(위) 방향도 별도 처리
+	if (Value.Get<float>() >= 0.f) return;
+
 	if (CachedCharacter)
 	{
 		UItemManagerComponent* ItemManager = CachedCharacter->GetItemManagerComponent();
@@ -179,6 +180,22 @@ void AActionPracticePlayerController::HandleCycleQuickSlot()
 		{
 			ItemManager->CycleQuickSlot();
 		}
+	}
+}
+
+void AActionPracticePlayerController::HandleCycleWeapon(const FInputActionValue& Value)
+{
+	//Shift+휠 위(양수): 오른손 무기 순환
+	//Shift+휠 아래(음수): 왼손 무기 순환
+	const float ScrollValue = Value.Get<float>();
+	if (ScrollValue > 0.f)
+	{
+		HandleGASInputPressed(IA_CycleRightWeapon);
+	}
+	
+	else if (ScrollValue < 0.f)
+	{
+		HandleGASInputPressed(IA_CycleLeftWeapon);
 	}
 }
 

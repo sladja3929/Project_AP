@@ -78,7 +78,7 @@ void UWeaponManagerComponent::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, b
 	{
 		FName SocketName = ResolveSocketName(type, bIsLeftHand);
 		DEBUG_LOG(TEXT("Equiped Weapon: %s"), *SocketName.ToString());
-		NewWeapon->AttachToComponent(OwnerCharacter->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
+		NewWeapon->AttachToCharacterHandByGripSocket(OwnerCharacter->GetMesh(), SocketName);
 
 		if (bIsTwoHanded)
 		{
@@ -170,7 +170,7 @@ void UWeaponManagerComponent::OnRep_LeftWeapon()
 		if (type != EWeaponEnums::None)
 		{
 			FName SocketName = ResolveSocketName(type, true);
-			LeftWeapon->AttachToComponent(OwnerCharacter->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
+			LeftWeapon->AttachToCharacterHandByGripSocket(OwnerCharacter->GetMesh(), SocketName);
 			DEBUG_LOG(TEXT("OnRep_LeftWeapon: Attached to %s"), *SocketName.ToString());
 		}
 	}
@@ -190,7 +190,7 @@ void UWeaponManagerComponent::OnRep_RightWeapon()
 		if (type != EWeaponEnums::None)
 		{
 			FName SocketName = ResolveSocketName(type, false);
-			RightWeapon->AttachToComponent(OwnerCharacter->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
+			RightWeapon->AttachToCharacterHandByGripSocket(OwnerCharacter->GetMesh(), SocketName);
 			DEBUG_LOG(TEXT("OnRep_RightWeapon: Attached to %s"), *SocketName.ToString());
 		}
 	}

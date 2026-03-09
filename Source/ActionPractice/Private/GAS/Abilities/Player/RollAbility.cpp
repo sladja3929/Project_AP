@@ -22,7 +22,7 @@ URollAbility::URollAbility()
 	StaminaCost = 20.0f;
 	RotateTime = 0.05f;
 	bIgnoreLockOn = true;
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 }
 
 void URollAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)

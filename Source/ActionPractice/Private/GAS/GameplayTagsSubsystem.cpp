@@ -222,6 +222,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateAbilityBlockingTag()
 	return FGameplayTag::EmptyTag;
 }
 
+const FGameplayTag& UGameplayTagsSubsystem::GetStateGuardBrokenTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateGuardBrokenTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
 const FGameplayTag& UGameplayTagsSubsystem::GetStateAbilityJumpingTag()
 {
 	if (UGameplayTagsSubsystem* Subsystem = Get())
@@ -714,6 +723,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateAbilityBlockingTagInternal()
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->State_Ability_Blocking;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateGuardBrokenTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->State_GuardBroken;
 	}
 	return FGameplayTag::EmptyTag;
 }
