@@ -430,8 +430,13 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 
 bool UAttackSequenceAbility::ConsumeStamina()
 {
-	SetStaminaCost(CurrentAttackData->ComboSequence[ComboCounter].AttackData.StaminaCost);
+	if (CurrentState == EAttackSequenceState::Attacking)
+	{
+		SetStaminaCost(CurrentAttackData->ComboSequence[ComboCounter].AttackData.StaminaCost);
+	}
 
+	else SetStaminaCost(0);
+	
 	if (!ApplyStaminaCost())
 	{
 		DEBUG_LOG(TEXT("No Stamina"));
