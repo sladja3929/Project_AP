@@ -7,6 +7,7 @@
 
 class AWeapon;
 class AActionPracticeCharacter;
+class UAnimInstance;
 enum class EWeaponEnums : uint8;
 
 //무기 변경 시 UI 갱신 델리게이트
@@ -75,6 +76,12 @@ protected:
 
 #pragma region "Protected Functions"
 
+	//무기 변경 시 해당 팔의 애니메이션 레이어 ABP 교체
+	void UpdateAnimationLayer(AWeapon* NewWeapon, bool bIsLeftHand);
+
+	//특정 팔의 Link된 레이어 ABP를 Unlink
+	void UnlinkAnimationLayer(bool bIsLeftHand);
+
 #pragma endregion
 
 private:
@@ -91,6 +98,12 @@ private:
 	//현재 장착된 무기 인덱스
 	int32 RightWeaponIndex = 0;
 	int32 LeftWeaponIndex = 0;
+
+	//현재 Link된 좌팔 레이어 ABP 클래스 (Unlink용 캐싱)
+	TSubclassOf<UAnimInstance> CurrentLeftArmLayerClass = nullptr;
+
+	//현재 Link된 우팔 레이어 ABP 클래스 (Unlink용 캐싱)
+	TSubclassOf<UAnimInstance> CurrentRightArmLayerClass = nullptr;
 
 #pragma endregion
 

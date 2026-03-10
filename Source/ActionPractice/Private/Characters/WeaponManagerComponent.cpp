@@ -5,6 +5,7 @@
 #include "Items/WeaponEnums.h"
 #include "Characters/HitDetection/HitDetectionInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "Animation/AnimInstance.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -94,6 +95,13 @@ void UWeaponManagerComponent::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, b
 			RightWeapon = NewWeapon;
 		}
 
+		//Listen Server에서는 OnRep이 호출되지 않으므로 직접 레이어 교체
+		if (OwnerCharacter->IsLocallyControlled())
+		{
+			AWeapon* EquippedWeapon = bIsLeftHand ? LeftWeapon.Get() : RightWeapon.Get();
+			UpdateAnimationLayer(EquippedWeapon, bIsLeftHand);
+		}
+
 		DEBUG_LOG(TEXT("EquipWeapon: Weapon Changed, IsLeft=%d"), bIsLeftHand);
 		OnWeaponChanged.Broadcast(bIsLeftHand);
 	}
@@ -105,6 +113,13 @@ void UWeaponManagerComponent::UnequipWeapon(bool bIsLeftHand)
 
 	if (WeaponToRemove)
 	{
+		//맨손 상태로 돌아갈 때 레이어 Unlink
+		AActionPracticeCharacter* OwnerCharacter = GetOwner<AActionPracticeCharacter>();
+		if (OwnerCharacter && OwnerCharacter->IsLocallyControlled())
+		{
+			UnlinkAnimationLayer(bIsLeftHand);
+		}
+
 		WeaponToRemove->Destroy();
 		WeaponToRemove = nullptr;
 	}
@@ -175,6 +190,7 @@ void UWeaponManagerComponent::OnRep_LeftWeapon()
 		}
 	}
 
+	UpdateAnimationLayer(LeftWeapon, true);
 	OwnerCharacter->TryAutoActivateAttackSequenceAbility();
 	OnWeaponChanged.Broadcast(true);
 }
@@ -195,6 +211,7 @@ void UWeaponManagerComponent::OnRep_RightWeapon()
 		}
 	}
 
+	UpdateAnimationLayer(RightWeapon, false);
 	OwnerCharacter->TryAutoActivateAttackSequenceAbility();
 	OnWeaponChanged.Broadcast(false);
 }
@@ -219,4 +236,64 @@ FName UWeaponManagerComponent::ResolveSocketName(EWeaponEnums WeaponType, bool b
 	}
 
 	return FName(*SocketString);
+}
+
+void UWeaponManagerComponent::UpdateAnimationLayer(AWeapon* NewWeapon, bool bIsLeftHand)
+{
+	AActionPracticeCharacter* OwnerCharacter = GetOwner<AActionPracticeCharacter>();
+	if (!OwnerCharacter || !OwnerCharacter->GetMesh()) return;
+
+	UAnimInstance* AnimInstance = OwnerCharacter->GetMesh()->GetAnimInstance();
+	if (!AnimInstance) return;
+
+	//무기가 없으면 해당 팔만 Unlink
+	if (!NewWeapon)
+	{
+		UnlinkAnimationLayer(bIsLeftHand);
+		return;
+	}
+
+	const UWeaponDataAsset* WeaponDA = NewWeapon->GetWeaponData();
+	if (!WeaponDA) return;
+
+	//장착 손에 따라 해당 팔의 ABP 클래스 결정
+	TSubclassOf<UAnimInstance> LayerClass = bIsLeftHand ? WeaponDA->LeftArmLayerABP : WeaponDA->RightArmLayerABP;
+
+	if (!LayerClass)
+	{
+		UnlinkAnimationLayer(bIsLeftHand);
+		return;
+	}
+
+	//해당 팔의 이전 레이어 Unlink 후 새 레이어 Link
+	UnlinkAnimationLayer(bIsLeftHand);
+	AnimInstance->LinkAnimClassLayers(LayerClass);
+
+	if (bIsLeftHand)
+	{
+		CurrentLeftArmLayerClass = LayerClass;
+	}
+	else
+	{
+		CurrentRightArmLayerClass = LayerClass;
+	}
+
+	DEBUG_LOG(TEXT("UpdateAnimationLayer: Linked %s (IsLeft=%d)"), *LayerClass->GetName(), bIsLeftHand);
+}
+
+void UWeaponManagerComponent::UnlinkAnimationLayer(bool bIsLeftHand)
+{
+	TSubclassOf<UAnimInstance>& LayerClassRef = bIsLeftHand ? CurrentLeftArmLayerClass : CurrentRightArmLayerClass;
+	if (!LayerClassRef) return;
+
+	AActionPracticeCharacter* OwnerCharacter = GetOwner<AActionPracticeCharacter>();
+	if (!OwnerCharacter || !OwnerCharacter->GetMesh()) return;
+
+	UAnimInstance* AnimInstance = OwnerCharacter->GetMesh()->GetAnimInstance();
+	if (!AnimInstance) return;
+
+	AnimInstance->UnlinkAnimClassLayers(LayerClassRef);
+	LayerClassRef = nullptr;
+
+	DEBUG_LOG(TEXT("UnlinkAnimationLayer: Unlinked (IsLeft=%d)"), bIsLeftHand);
 }

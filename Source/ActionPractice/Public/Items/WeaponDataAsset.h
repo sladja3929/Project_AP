@@ -10,6 +10,7 @@
 #include "WeaponDataAsset.generated.h"
 
 class UAnimMontage;
+class UAnimInstance;
 
 //TMap 대신 사용할 구조체
 USTRUCT(BlueprintType)
@@ -86,6 +87,17 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Block Definitions")
     FBlockActionData BlockData;
+
+    //이 무기의 팔 애니메이션 레이어 ABP (좌/우 팔 인터페이스에 맞는 ABP를 각각 할당)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation Layer")
+    TSubclassOf<UAnimInstance> LeftArmLayerABP;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation Layer")
+    TSubclassOf<UAnimInstance> RightArmLayerABP;
+
+    //양손 레이어 ABP (미구현 — 에디터 설정용으로만 노출)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation Layer")
+    TSubclassOf<UAnimInstance> TwoHandedLayerABP;
 
     //GetOptions용 함수 - HitSocketInfo에서 소켓 그룹 이름들을 반환
     UFUNCTION()
