@@ -55,6 +55,9 @@ public:
 	// 서버: AuthTag 전부 제거, 클라: LocalTag 전부 제거
 	void RemoveTags_NetPredicted(FGameplayTag AuthTag, FGameplayTag LocalTag);
 
+	//===== Death =====
+	virtual void HandleDeath() override;
+
 	//===== Defense Policy Override =====
 	virtual void CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
 	virtual void PrepareHitReactionEventData(FGameplayEventData& OutEventData, const FFinalAttackData& FinalAttackData) override;

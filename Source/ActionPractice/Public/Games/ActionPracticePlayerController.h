@@ -2,12 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "GameplayTagContainer.h"
 #include "ActionPracticePlayerController.generated.h"
 
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
 class AActionPracticeCharacter;
+class ABonfire;
+class UDeathScreenWidget;
+class UAbilitySystemComponent;
 
 /**
  *  PlayerController for ActionPractice
@@ -30,6 +34,9 @@ public:
 	FORCEINLINE UInputAction* GetIA_Move() const { return IA_Move; }
 	FORCEINLINE UInputAction* GetIA_Block() const { return IA_Block; }
 
+	void SetLastActivatedBonfire(ABonfire* NewBonfire);
+	FORCEINLINE ABonfire* GetLastActivatedBonfire() const { return LastActivatedBonfire.Get(); }
+
 #pragma endregion
 
 protected:
@@ -51,6 +58,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputAction> IA_LockOn = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
+	TObjectPtr<UInputAction> IA_Interact = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputAction> IA_Sprint = nullptr;
@@ -82,6 +92,19 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputAction> IA_CycleQuickSlot = nullptr;
 
+	// ===== Death UI =====
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UDeathScreenWidget> DeathScreenWidgetClass = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UDeathScreenWidget> DeathScreenWidget = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAbilitySystemComponent> CachedDeathUIASC = nullptr;
+
+	FGameplayTag StateDeadTag;
+	FDelegateHandle DeadTagChangedHandle;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -93,14 +116,24 @@ protected:
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
 	void HandleToggleLockOn();
+	
 	//마우스 휠 스크롤 (Axis1D): 양수=위, 음수=아래
 	void HandleCycleQuickSlot(const FInputActionValue& Value);
+	
 	//Shift+휠: 양수=RightWeapon, 음수=LeftWeapon
 	void HandleCycleWeapon(const FInputActionValue& Value);
 	void HandleGASInputPressed(const UInputAction* InputAction);
 	void HandleGASInputReleased(const UInputAction* InputAction);
 
 	void UpdateLockOnCamera();
+	void OnInteractInput();
+
+	// ===== Death UI =====
+	void InitializeDeathScreenWidget();
+	void BindDeathStateTagEvent();
+	void UnbindDeathStateTagEvent();
+	void RefreshDeathScreenVisibilityFromASC();
+	void HandleDeadTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 
 #pragma endregion
 
@@ -109,6 +142,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<AActionPracticeCharacter> CachedCharacter = nullptr;
+
+	TWeakObjectPtr<ABonfire> LastActivatedBonfire = nullptr;
 
 #pragma endregion
 

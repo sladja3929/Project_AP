@@ -46,6 +46,9 @@ void UBaseAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AAc
 
 	CachedCharacter = Cast<ABaseCharacter>(InOwnerActor);
 
+	//죽음 가드 리셋 (캐릭터가 다시 살아날 때 재사용 가능)
+	bDeathHandled = false;
+
 	//AttributeSet의 OnDamagedPreResolve 델리게이트 바인딩
 	UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(GetAttributeSet(UBaseAttributeSet::StaticClass()));
 	if (UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet))
@@ -158,6 +161,16 @@ void UBaseAbilitySystemComponent::SetSpecSetByCallerMagnitudes(FGameplayEffectSp
 	}
 }
 
+void UBaseAbilitySystemComponent::HandleDeath()
+{
+	if (bDeathHandled) return;
+	bDeathHandled = true;
+
+	//StateDead 태그는 PlayerDeathAbility가 몽타주 종료 후 직접 추가
+	//UI가 몽타주 연출 이후에 반응하도록 타이밍 분리
+	DEBUG_LOG(TEXT("HandleDeath: bDeathHandled set"));
+}
+
 void UBaseAbilitySystemComponent::OnDamaged(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
 {
 	//방어력 계산 및 Attribute 설정
@@ -221,7 +234,7 @@ void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, c
 	if (BaseAttributeSet->GetHealth() <= 0.0f)
 	{
 		DEBUG_LOG(TEXT("HandleOnDamagedResolved: Character died"));
-		//TODO: 죽음 처리
+		HandleDeath();
 		return;
 	}
 

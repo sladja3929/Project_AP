@@ -55,6 +55,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ability|GameplayEffect")
 	void SetSpecSetByCallerMagnitudes(FGameplayEffectSpecHandle& SpecHandle, const TMap<FGameplayTag, float>& Magnitudes);
 
+	//===== Death =====
+	//Health <= 0 시 HandleOnDamagedResolved에서 호출되는 공통 진입점
+	//파생 ASC에서 오버라이드하여 플레이어/보스 각자의 죽음 처리를 분기
+	virtual void HandleDeath();
+
 	//===== Defense Policy Interface =====
 	UFUNCTION()
 	virtual void OnDamaged(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
@@ -75,6 +80,9 @@ protected:
 	TWeakObjectPtr<ABaseCharacter> CachedCharacter;
 
 	FGameplayTag AbilityHitReactionTag;
+
+	//죽음 중복 진입 방지 가드
+	bool bDeathHandled = false;
 
 #pragma endregion
 

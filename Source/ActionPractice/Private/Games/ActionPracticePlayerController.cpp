@@ -9,6 +9,13 @@
 #include "Characters/ActionPracticeCharacter.h"
 #include "Characters/LockOnComponent.h"
 #include "Characters/ItemManagerComponent.h"
+#include "Characters/InteractionComponent.h"
+#include "Interaction/Bonfire.h"
+#include "GAS/GameplayTagsSubsystem.h"
+#include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
+#include "UI/DeathScreenWidget.h"
+#include "AbilitySystemComponent.h"
+#include "Blueprint/UserWidget.h"
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
 #define ENABLE_DEBUG_LOG 0
@@ -49,6 +56,11 @@ void AActionPracticePlayerController::SetupInputComponent()
 		if (IA_LockOn)
 		{
 			EIC->BindAction(IA_LockOn, ETriggerEvent::Started, this, &AActionPracticePlayerController::HandleToggleLockOn);
+		}
+
+		if (IA_Interact)
+		{
+			EIC->BindAction(IA_Interact, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnInteractInput);
 		}
 
 		if (IA_CycleQuickSlot)
@@ -113,10 +125,17 @@ void AActionPracticePlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 	CachedCharacter = Cast<AActionPracticeCharacter>(InPawn);
+
+	if (IsLocalController())
+	{
+		InitializeDeathScreenWidget();
+		BindDeathStateTagEvent();
+	}
 }
 
 void AActionPracticePlayerController::OnUnPossess()
 {
+	UnbindDeathStateTagEvent();
 	CachedCharacter = nullptr;
 	Super::OnUnPossess();
 }
@@ -126,6 +145,9 @@ void AActionPracticePlayerController::AcknowledgePossession(APawn* P)
 	Super::AcknowledgePossession(P);
 	CachedCharacter = Cast<AActionPracticeCharacter>(P);
 	DEBUG_LOG(TEXT("AcknowledgePossession: CachedCharacter = %s"), *GetNameSafe(CachedCharacter));
+
+	InitializeDeathScreenWidget();
+	BindDeathStateTagEvent();
 }
 
 void AActionPracticePlayerController::OnRep_Pawn()
@@ -133,6 +155,9 @@ void AActionPracticePlayerController::OnRep_Pawn()
 	Super::OnRep_Pawn();
 	CachedCharacter = Cast<AActionPracticeCharacter>(GetPawn());
 	DEBUG_LOG(TEXT("OnRep_Pawn: CachedCharacter = %s"), *GetNameSafe(CachedCharacter));
+
+	InitializeDeathScreenWidget();
+	BindDeathStateTagEvent();
 }
 
 void AActionPracticePlayerController::PlayerTick(float DeltaTime)
@@ -214,6 +239,117 @@ void AActionPracticePlayerController::HandleGASInputReleased(const UInputAction*
 		CachedCharacter->GASInputReleased(InputAction);
 	}
 }
+
+void AActionPracticePlayerController::SetLastActivatedBonfire(ABonfire* NewBonfire)
+{
+	LastActivatedBonfire = NewBonfire;
+	DEBUG_LOG(TEXT("SetLastActivatedBonfire: %s"), *GetNameSafe(NewBonfire));
+}
+
+void AActionPracticePlayerController::OnInteractInput()
+{
+	if (!CachedCharacter) return;
+
+	//휴식 중이면 Ability.Rest 이벤트를 전송해 RestAbility의 WaitGameplayEvent를 트리거
+	//RestAbility는 ServerInitiated라 WaitInputPress 신호 전달이 불가능하므로 GameplayEvent 방식 사용
+	UActionPracticeAbilitySystemComponent* APASC = Cast<UActionPracticeAbilitySystemComponent>(CachedCharacter->GetAbilitySystemComponent());
+	if (APASC && APASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRestingTag()))
+	{
+		FGameplayEventData ExitEventData;
+		ExitEventData.EventTag = UGameplayTagsSubsystem::GetAbilityRestTag();
+		APASC->HandleGameplayEvent_NetPredicted(UGameplayTagsSubsystem::GetAbilityRestTag(), &ExitEventData);
+		DEBUG_LOG(TEXT("OnInteractInput: Sent exit rest event"));
+		return;
+	}
+
+	UInteractionComponent* InteractionComp = CachedCharacter->FindComponentByClass<UInteractionComponent>();
+	if (!InteractionComp) return;
+
+	InteractionComp->TryInteract();
+}
+
+#pragma region "Death UI"
+
+void AActionPracticePlayerController::InitializeDeathScreenWidget()
+{
+	if (!IsLocalController()) return;
+	if (!DeathScreenWidgetClass) return;
+	if (DeathScreenWidget) return; //이미 생성됨
+
+	DeathScreenWidget = CreateWidget<UDeathScreenWidget>(this, DeathScreenWidgetClass);
+	if (DeathScreenWidget)
+	{
+		DeathScreenWidget->AddToViewport();
+		DeathScreenWidget->HandleDeadStateFinish();
+		DEBUG_LOG(TEXT("InitializeDeathScreenWidget: Created and hidden"));
+	}
+}
+
+void AActionPracticePlayerController::BindDeathStateTagEvent()
+{
+	UnbindDeathStateTagEvent();
+
+	if (!CachedCharacter) return;
+
+	UAbilitySystemComponent* ASC = CachedCharacter->GetAbilitySystemComponent();
+	if (!ASC) return;
+
+	if (!StateDeadTag.IsValid())
+	{
+		StateDeadTag = UGameplayTagsSubsystem::GetStateDeadTag();
+	}
+	if (!StateDeadTag.IsValid()) return;
+
+	CachedDeathUIASC = ASC;
+	DeadTagChangedHandle = ASC->RegisterGameplayTagEvent(StateDeadTag, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &AActionPracticePlayerController::HandleDeadTagChanged);
+
+	//RefreshDeathScreenVisibilityFromASC();
+	DEBUG_LOG(TEXT("BindDeathStateTagEvent: Bound to ASC %s"), *GetNameSafe(ASC));
+}
+
+void AActionPracticePlayerController::UnbindDeathStateTagEvent()
+{
+	if (CachedDeathUIASC && DeadTagChangedHandle.IsValid())
+	{
+		CachedDeathUIASC->UnregisterGameplayTagEvent(DeadTagChangedHandle, StateDeadTag, EGameplayTagEventType::NewOrRemoved);
+		DeadTagChangedHandle.Reset();
+		DEBUG_LOG(TEXT("UnbindDeathStateTagEvent: Unbound"));
+	}
+	CachedDeathUIASC = nullptr;
+}
+
+void AActionPracticePlayerController::RefreshDeathScreenVisibilityFromASC()
+{
+	if (!DeathScreenWidget || !CachedDeathUIASC) return;
+
+	if (CachedDeathUIASC->HasMatchingGameplayTag(StateDeadTag))
+	{
+		DeathScreenWidget->SetDeathScreenVisibility(true);
+	}
+	else
+	{
+		DeathScreenWidget->SetDeathScreenVisibility(false);
+	}
+}
+
+void AActionPracticePlayerController::HandleDeadTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
+{
+	if (!DeathScreenWidget) return;
+
+	if (NewCount > 0)
+	{
+		DeathScreenWidget->HandleDeadStateStart();
+		DEBUG_LOG(TEXT("HandleDeadTagChanged: Show (Count=%d)"), NewCount);
+	}
+	else
+	{
+		DeathScreenWidget->HandleDeadStateFinish();
+		DEBUG_LOG(TEXT("HandleDeadTagChanged: Hide"));
+	}
+}
+
+#pragma endregion
 
 void AActionPracticePlayerController::UpdateLockOnCamera()
 {

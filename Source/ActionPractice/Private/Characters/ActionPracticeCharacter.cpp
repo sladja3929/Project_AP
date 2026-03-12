@@ -18,6 +18,7 @@
 #include "GameplayAbilities/Public/Abilities/GameplayAbility.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "Input/InputBufferComponent.h"
+#include "Characters/InteractionComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "UI/PlayerStatsWidget.h"
@@ -83,6 +84,9 @@ AActionPracticeCharacter::AActionPracticeCharacter()
 
 	//ItemManager Component Settings
 	ItemManagerComponent = CreateDefaultSubobject<UItemManagerComponent>(TEXT("ItemManagerComponent"));
+
+	//InteractionComponent Settings
+	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
 
 	//GAS Settings
 	CreateAbilitySystemComponent();
@@ -345,6 +349,22 @@ void AActionPracticeCharacter::RotateCharacterToInputDirection(float RotateTime,
 	{
 		DEBUG_LOG(TEXT("APCharacter - Server_RequestRotateToYaw RPC called"));
 		Server_RequestRotateToYaw(DesiredYaw, RotateTime);
+	}
+}
+
+void AActionPracticeCharacter::RotateToTargetPosition(const FVector& TargetPosition, float RotationTime)
+{
+	const FVector Direction = (TargetPosition - GetActorLocation()).GetSafeNormal2D();
+	if (Direction.IsNearlyZero()) return;
+
+	const float DesiredYaw = Direction.Rotation().Yaw;
+	const FRotator TargetRotation(0.0f, DesiredYaw, 0.0f);
+
+	RotateToRotation(TargetRotation, RotationTime);
+
+	if (!HasAuthority())
+	{
+		Server_RequestRotateToYaw(DesiredYaw, RotationTime);
 	}
 }
 

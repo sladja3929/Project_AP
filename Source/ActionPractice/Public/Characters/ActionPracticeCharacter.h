@@ -22,6 +22,7 @@ class UPlayerStatsWidget;
 class ULockOnComponent;
 class UItemManagerComponent;
 class UEquipmentSlotWidget;
+class UInteractionComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -87,6 +88,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Character")
 	void RotateCharacterToInputDirection(float RotationTime, bool bIgnoreLockOn);
 
+	//특정 월드 위치를 향해 캐릭터를 회전 (BaseCharacter::RotateToPosition 래퍼)
+	UFUNCTION(BlueprintCallable, Category = "Character")
+	void RotateToTargetPosition(const FVector& TargetPosition, float RotationTime);
+
 	TArray<FGameplayAbilitySpec*> FindAbilitySpecsWithInputAction(const UInputAction* InputAction);
 
 	UFUNCTION(BlueprintPure, Category = "Input")
@@ -101,6 +106,9 @@ public:
 
 	//LockOnComponent Getter
 	FORCEINLINE ULockOnComponent* GetLockOnComponent() const { return LockOnComponent; }
+
+	//InteractionComponent Getter
+	FORCEINLINE UInteractionComponent* GetInteractionComponent() const { return InteractionComponent; }
 
 	// ===== GAS Input (called by Controller) =====
 	UFUNCTION(BlueprintCallable, Category = "GAS")
@@ -136,6 +144,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UItemManagerComponent> ItemManagerComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UInteractionComponent> InteractionComponent = nullptr;
 
 	// ===== UI Properties =====
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")

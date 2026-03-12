@@ -32,6 +32,12 @@ void AActionPracticeGameMode::BeginPlay()
 	}
 }
 
+void AActionPracticeGameMode::ResetAllEnemies()
+{
+	//TODO Phase 6: 보스 텔레포트, HP 회복, 어빌리티 취소, StateTree 재시작
+	UE_LOG(LogTemp, Log, TEXT("AActionPracticeGameMode::ResetAllEnemies - stub (Phase 6에서 구현 예정)"));
+}
+
 AActor* AActionPracticeGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
 	//모든 PlayerStart 찾기

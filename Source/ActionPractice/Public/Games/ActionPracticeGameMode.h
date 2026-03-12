@@ -30,6 +30,9 @@ public:
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	virtual void BeginPlay() override;
 
+	//Phase 6에서 구현 예정: 보스 초기화 (호출 지점만 고정)
+	void ResetAllEnemies();
+
 protected:
 	UPROPERTY()
 	TObjectPtr<ABossCharacter> SpawnedBoss = nullptr;

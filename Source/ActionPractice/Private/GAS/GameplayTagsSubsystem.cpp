@@ -192,6 +192,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityWeaponSwitchTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityRestTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetAbilityRestTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityDeathTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetAbilityDeathTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Static State Tags"
@@ -317,6 +335,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateCanMoveTag()
 	if (UGameplayTagsSubsystem* Subsystem = Get())
 	{
 		return Subsystem->GetStateCanMoveTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateDeadTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateDeadTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateRestingTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateRestingTagInternal();
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -697,6 +733,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityWeaponSwitchTagInternal() 
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityRestTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->AbilityRest;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityDeathTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->AbilityDeath;
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Internal State Tags"
@@ -822,6 +876,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateCanMoveTagInternal() const
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->State_CanMove;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateDeadTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->StateDead;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateRestingTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->StateResting;
 	}
 	return FGameplayTag::EmptyTag;
 }

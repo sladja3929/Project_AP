@@ -3,6 +3,9 @@
 #include "GameFramework/Actor.h"
 #include "Characters/BossCharacter.h"
 #include "GAS/AttributeSet/BossAttributeSet.h"
+#include "AI/EnemyAIController.h"
+#include "BrainComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -39,4 +42,30 @@ void UBossAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AAc
 const UBossAttributeSet* UBossAbilitySystemComponent::GetBossAttributeSet() const
 {
 	return this->GetSet<UBossAttributeSet>();
+}
+
+void UBossAbilitySystemComponent::HandleDeath()
+{
+	if (bDeathHandled) return;
+	Super::HandleDeath();
+
+	if (!CachedBossCharacter.IsValid()) return;
+
+	//이동 정지
+	if (UCharacterMovementComponent* MoveComp = CachedBossCharacter->GetCharacterMovement())
+	{
+		MoveComp->StopMovementImmediately();
+		MoveComp->DisableMovement();
+	}
+
+	//AI 로직 정지
+	if (AEnemyAIController* AIController = CachedBossCharacter->GetEnemyAIController())
+	{
+		if (UBrainComponent* Brain = AIController->GetBrainComponent())
+		{
+			Brain->StopLogic(TEXT("Death"));
+		}
+	}
+
+	DEBUG_LOG(TEXT("BossASC::HandleDeath - Movement and AI stopped"));
 }

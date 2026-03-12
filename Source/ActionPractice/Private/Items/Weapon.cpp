@@ -15,7 +15,7 @@
 
 const FName AWeapon::GripSocketName = TEXT("grip_oh_socket");
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogWeapon, Log, All);

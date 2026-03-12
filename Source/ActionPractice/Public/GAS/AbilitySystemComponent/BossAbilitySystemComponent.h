@@ -26,6 +26,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Attributes")
 	const UBossAttributeSet* GetBossAttributeSet() const;
 
+	//===== Death =====
+	virtual void HandleDeath() override;
+
 #pragma endregion
 
 protected:

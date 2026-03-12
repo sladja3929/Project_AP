@@ -11,8 +11,8 @@
 #define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
-	DEFINE_LOG_CATEGORY_STATIC(LogBaseAbilitySystemComponent, Log, All);
-	#define DEBUG_LOG(Format, ...) UE_LOG(LogBaseAbilitySystemComponent, Warning, Format, ##__VA_ARGS__)
+	DEFINE_LOG_CATEGORY_STATIC(LogActionPracticeAbilitySystemComponent, Log, All);
+	#define DEBUG_LOG(Format, ...) UE_LOG(LogActionPracticeAbilitySystemComponent, Warning, Format, ##__VA_ARGS__)
 #else
 	#define DEBUG_LOG(Format, ...)
 #endif
@@ -54,6 +54,43 @@ void UActionPracticeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwner
 	Super::InitAbilityActorInfo(InOwnerActor, InAvatarActor);
 
 	OwnerCharacter = Cast<AActionPracticeCharacter>(InOwnerActor);
+}
+
+void UActionPracticeAbilitySystemComponent::HandleDeath()
+{
+	if (bDeathHandled) return;
+	Super::HandleDeath();
+
+	//서버 권한에서만 Death Ability 활성화
+	if (!OwnerCharacter || !OwnerCharacter->HasAuthority()) return;
+
+	//AbilityDeath 태그로 스펙 조회
+	const FGameplayTag AbilityDeathTag = UGameplayTagsSubsystem::GetAbilityDeathTag();
+	if (!AbilityDeathTag.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("APASC::HandleDeath - AbilityDeathTag is not valid"));
+		return;
+	}
+
+	TArray<FGameplayAbilitySpec*> DeathSpecs;
+	GetActivatableGameplayAbilitySpecsByAllMatchingTags(FGameplayTagContainer(AbilityDeathTag), DeathSpecs);
+	if (DeathSpecs.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("APASC::HandleDeath - No Death ability spec found"));
+		return;
+	}
+
+	//이미 활성화 중이면 중복 방지
+	if (DeathSpecs[0]->IsActive())
+	{
+		DEBUG_LOG(TEXT("HandleDeath: PlayerDeathAbility already active"));
+		return;
+	}
+
+	if (!TryActivateAbilityWithEventData(DeathSpecs[0]->Handle, nullptr))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("APASC::HandleDeath - Failed to activate PlayerDeathAbility"));
+	}
 }
 
 void UActionPracticeAbilitySystemComponent::AbilitySpecInputPressed(FGameplayAbilitySpec& Spec)
