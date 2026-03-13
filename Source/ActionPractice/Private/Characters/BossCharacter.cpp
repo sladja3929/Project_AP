@@ -3,7 +3,9 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/AbilitySystemComponent/BossAbilitySystemComponent.h"
+#include "GAS/AbilitySystemComponent/BaseAbilitySystemComponent.h"
 #include "GAS/AttributeSet/BossAttributeSet.h"
+#include "GAS/GameplayTagsSubsystem.h"
 #include "AI/EnemyAIController.h"
 #include "UI/BossHealthWidget.h"
 #include "Characters/ActionPracticeCharacter.h"
@@ -14,6 +16,9 @@
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Animation/AnimInstance.h"
+#include "BrainComponent.h"
+#include "GameplayEffect.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -115,6 +120,9 @@ void ABossCharacter::BeginPlay()
 			}
 		}
 	}
+
+	//초기 스폰 상태 캐시 (Super::BeginPlay 이후, ASC 초기화 완료 후 시점)
+	CacheInitialEnemyState();
 }
 
 void ABossCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -131,6 +139,122 @@ void ABossCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	Super::EndPlay(EndPlayReason);
 }
+
+#pragma region "Enemy Reset"
+
+void ABossCharacter::CacheInitialEnemyState()
+{
+	InitialTransform = GetActorTransform();
+	DEBUG_LOG(TEXT("CacheInitialEnemyState: Transform cached at %s"), *InitialTransform.GetLocation().ToString());
+}
+
+void ABossCharacter::ResetEnemy()
+{
+	if (!HasAuthority()) return;
+
+	UAbilitySystemComponent* ASC = AbilitySystemComponent.Get();
+
+	//진행 중인 어빌리티 전부 취소
+	if (ASC)
+	{
+		ASC->CancelAllAbilities();
+	}
+
+	//사망 가드 리셋 (다시 죽음 판정 가능하도록)
+	if (UBaseAbilitySystemComponent* BaseASC = Cast<UBaseAbilitySystemComponent>(ASC))
+	{
+		BaseASC->ResetDeathHandled();
+	}
+
+	//사망 관련 태그 제거
+	if (ASC)
+	{
+		const FGameplayTag StateDeadTag = UGameplayTagsSubsystem::GetStateDeadTag();
+		if (StateDeadTag.IsValid())
+		{
+			while (ASC->HasMatchingGameplayTag(StateDeadTag))
+			{
+				ASC->RemoveLooseGameplayTag(StateDeadTag);
+				ASC->RemoveMinimalReplicationGameplayTag(StateDeadTag);
+			}
+		}
+	}
+
+	//애니메이션 일시정지 해제 및 몽타주 중단
+	if (USkeletalMeshComponent* InMesh = GetMesh())
+	{
+		InMesh->bPauseAnims = false;
+		if (UAnimInstance* AnimInst = InMesh->GetAnimInstance())
+		{
+			AnimInst->StopAllMontages(0.0f);
+		}
+	}
+
+	//이동 복구
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		if (MoveComp->MovementMode == MOVE_None)
+		{
+			MoveComp->SetMovementMode(MOVE_Walking);
+		}
+		MoveComp->StopMovementImmediately();
+	}
+
+	//초기 위치로 텔레포트
+	SetActorTransform(InitialTransform, false, nullptr, ETeleportType::TeleportPhysics);
+
+	//HP/스탯 GE 기반 회복
+	ApplyEnemyResetEffect();
+
+	//전투 캐시 초기화
+	DetectedPlayer.Reset();
+	if (bHealthWidgetActive)
+	{
+		bHealthWidgetActive = false;
+		Multicast_OnBossDisengage();
+	}
+
+	//AI 재시작
+	RestartEnemyAI();
+
+	DEBUG_LOG(TEXT("ResetEnemy: Complete"));
+}
+
+void ABossCharacter::ApplyEnemyResetEffect()
+{
+	if (!EnemyResetRecoveryEffect)
+	{
+		DEBUG_LOG(TEXT("ApplyEnemyResetEffect: EnemyResetRecoveryEffect not set"));
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = AbilitySystemComponent.Get();
+	if (!ASC) return;
+
+	FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(EnemyResetRecoveryEffect, 1.0f, ASC->MakeEffectContext());
+	if (!Spec.IsValid()) return;
+
+	ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+	DEBUG_LOG(TEXT("ApplyEnemyResetEffect: GE applied"));
+}
+
+void ABossCharacter::RestartEnemyAI()
+{
+	AEnemyAIController* AIController = GetEnemyAIController();
+	if (!AIController) return;
+
+	//타깃 캐시 초기화
+	AIController->CurrentTarget.Reset();
+
+	//StateTree 재시작
+	if (UBrainComponent* Brain = AIController->GetBrainComponent())
+	{
+		Brain->RestartLogic();
+		DEBUG_LOG(TEXT("RestartEnemyAI: StateTree restarted"));
+	}
+}
+
+#pragma endregion
 
 void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
 {

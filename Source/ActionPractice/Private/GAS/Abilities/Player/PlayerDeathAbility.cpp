@@ -9,6 +9,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Abilities/Tasks/AbilityTask_WaitDelay.h"
 #include "AbilitySystemComponent.h"
+#include "GAS/AbilitySystemComponent/BaseAbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "Animation/AnimInstance.h"
 
@@ -92,6 +93,7 @@ void UPlayerDeathAbility::SetUpPlayMontageWithEventsTask()
 		return;
 	}
 
+	PlayMontageWithEventsTask->OnMontageBlendOut.AddDynamic(this, &UPlayerDeathAbility::OnTaskMontageBlendOut);
 	PlayMontageWithEventsTask->OnMontageCompleted.AddDynamic(this, &UPlayerDeathAbility::OnTaskMontageCompleted);
 	PlayMontageWithEventsTask->OnMontageInterrupted.AddDynamic(this, &UPlayerDeathAbility::OnTaskMontageInterrupted);
 }
@@ -127,23 +129,33 @@ void UPlayerDeathAbility::StartMontageWithEventsTask()
 	PlayMontageWithEventsTask->ReadyForActivation();
 }
 
-void UPlayerDeathAbility::OnTaskMontageCompleted()
+void UPlayerDeathAbility::OnTaskMontageBlendOut()
 {
-	DEBUG_LOG(TEXT("OnTaskMontageCompleted: holding last pose"));
+	DEBUG_LOG(TEXT("OnTaskMontageBlendOut: freezing mesh anim to hold last pose"));
 
-	//마지막 포즈 유지 (몽타주 에셋의 BlendOut을 0으로 설정해야 효과적)
+	//bPauseAnims로 AnimBP 틱 전체를 중단 → blend weight 감소 없이 마지막 포즈 고정
 	if (ABaseCharacter* Character = GetBaseCharacterFromActorInfo())
 	{
-		if (UAnimInstance* AnimInst = Character->GetMesh()->GetAnimInstance())
-		{
-			AnimInst->Montage_Pause(DeathMontage);
-		}
+		Character->GetMesh()->bPauseAnims = true;
 	}
 
 	//StateDead 추가 → PlayerController가 감지하여 UI 표시
 	AddStateDeadTag();
 
 	StartRespawnDelay();
+}
+
+void UPlayerDeathAbility::OnTaskMontageCompleted()
+{
+	//OnTaskMontageBlendOut에서 정상 처리됨
+	//BlendOut 없이 즉시 완료된 경우 폴백
+	DEBUG_LOG(TEXT("OnTaskMontageCompleted: fallback path"));
+
+	if (!WaitDelayTask)
+	{
+		AddStateDeadTag();
+		StartRespawnDelay();
+	}
 }
 
 void UPlayerDeathAbility::OnTaskMontageInterrupted()
@@ -203,6 +215,12 @@ void UPlayerDeathAbility::PerformRespawn()
 		{
 			DEBUG_LOG(TEXT("PerformRespawn: No LastActivatedBonfire, keeping current location"));
 		}
+	}
+
+	//다음 사망을 받을 수 있도록 가드 리셋
+	if (UBaseAbilitySystemComponent* BaseASC = Cast<UBaseAbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo()))
+	{
+		BaseASC->ResetDeathHandled();
 	}
 
 	//회복 GE 적용
@@ -268,6 +286,9 @@ void UPlayerDeathAbility::RestoreCharacterMovement()
 		MoveComp->SetMovementMode(MOVE_Walking);
 		DEBUG_LOG(TEXT("RestoreCharacterMovement: Walking mode restored"));
 	}
+
+	//사망 시 고정했던 AnimBP 틱 재개
+	Character->GetMesh()->bPauseAnims = false;
 }
 
 void UPlayerDeathAbility::ApplyRespawnRecovery()

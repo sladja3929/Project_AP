@@ -34,8 +34,25 @@ void AActionPracticeGameMode::BeginPlay()
 
 void AActionPracticeGameMode::ResetAllEnemies()
 {
-	//TODO Phase 6: 보스 텔레포트, HP 회복, 어빌리티 취소, StateTree 재시작
-	UE_LOG(LogTemp, Log, TEXT("AActionPracticeGameMode::ResetAllEnemies - stub (Phase 6에서 구현 예정)"));
+	if (!HasAuthority()) return;
+
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	TArray<AActor*> FoundEnemies;
+	UGameplayStatics::GetAllActorsOfClass(World, ABossCharacter::StaticClass(), FoundEnemies);
+
+	int32 ResetCount = 0;
+	for (AActor* Actor : FoundEnemies)
+	{
+		ABossCharacter* Enemy = Cast<ABossCharacter>(Actor);
+		if (!Enemy || !IsValid(Enemy)) continue;
+
+		Enemy->ResetEnemy();
+		++ResetCount;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("AActionPracticeGameMode::ResetAllEnemies - Reset %d enemies"), ResetCount);
 }
 
 AActor* AActionPracticeGameMode::ChoosePlayerStart_Implementation(AController* Player)

@@ -128,6 +128,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
 	FGameplayTag StateResting;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
+	FGameplayTag StateUndetectable;
+
 #pragma endregion
 
 #pragma region "Event Tags"

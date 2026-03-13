@@ -171,6 +171,12 @@ void UBaseAbilitySystemComponent::HandleDeath()
 	DEBUG_LOG(TEXT("HandleDeath: bDeathHandled set"));
 }
 
+void UBaseAbilitySystemComponent::ResetDeathHandled()
+{
+	bDeathHandled = false;
+	DEBUG_LOG(TEXT("ResetDeathHandled: death guard cleared"));
+}
+
 void UBaseAbilitySystemComponent::OnDamaged(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
 {
 	//방어력 계산 및 Attribute 설정

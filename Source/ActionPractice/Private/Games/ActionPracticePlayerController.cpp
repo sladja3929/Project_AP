@@ -280,7 +280,7 @@ void AActionPracticePlayerController::InitializeDeathScreenWidget()
 	if (DeathScreenWidget)
 	{
 		DeathScreenWidget->AddToViewport();
-		DeathScreenWidget->HandleDeadStateFinish();
+		DeathScreenWidget->SetDeathScreenVisibility(false);
 		DEBUG_LOG(TEXT("InitializeDeathScreenWidget: Created and hidden"));
 	}
 }

@@ -60,6 +60,9 @@ public:
 	//파생 ASC에서 오버라이드하여 플레이어/보스 각자의 죽음 처리를 분기
 	virtual void HandleDeath();
 
+	//리스폰 후 다시 사망 가능 상태로 복구
+	void ResetDeathHandled();
+
 	//===== Defense Policy Interface =====
 	UFUNCTION()
 	virtual void OnDamaged(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;

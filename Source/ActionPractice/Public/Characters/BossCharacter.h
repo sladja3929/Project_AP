@@ -10,6 +10,7 @@ class UBossHealthWidget;
 class AActionPracticeCharacter;
 class UEnemyAttackComponent;
 class UEnemyDataAsset;
+class UGameplayEffect;
 
 UCLASS()
 class ACTIONPRACTICE_API ABossCharacter : public ABaseCharacter
@@ -32,7 +33,7 @@ public:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	//===== Hit Detection Interface =====
+	// ===== Hit Detection Interface =====
 	virtual TScriptInterface<IHitDetectionInterface> GetHitDetectionInterface() const override;
 
 	FORCEINLINE UBossAttributeSet* GetAttributeSet() const { return Cast<UBossAttributeSet>(AttributeSet); }
@@ -43,7 +44,14 @@ public:
 
 	void RotateToTarget(const AActor* TargetActor, float RotateTime);
 
-	//===== Replication =====
+	// ===== Enemy Reset  =====
+	//BeginPlay 시점에 초기 스폰 상태를 캐시
+	void CacheInitialEnemyState();
+
+	//GameMode에서 호출
+	void ResetEnemy();
+
+	// ===== Replication =====
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 #pragma endregion
@@ -53,6 +61,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Data")
 	TObjectPtr<UEnemyDataAsset> EnemyData;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Reset")
+	TSubclassOf<UGameplayEffect> EnemyResetRecoveryEffect;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UBossHealthWidget> BossHealthWidgetClass;
@@ -79,6 +90,10 @@ protected:
 	virtual void CreateAbilitySystemComponent() override;
 	virtual void CreateAttributeSet() override;
 
+	// ===== Enemy Reset Helpers =====
+	void ApplyEnemyResetEffect();
+	void RestartEnemyAI();
+
 	// ===== UI =====
 	UFUNCTION()
 	void OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus);
@@ -104,6 +119,9 @@ private:
 #pragma region "Private Variables"
 
 	TWeakObjectPtr<AActionPracticeCharacter> DetectedPlayer;
+
+	//초기 스폰 Transform 캐시
+	FTransform InitialTransform;
 
 #pragma endregion
 

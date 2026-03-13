@@ -106,6 +106,7 @@ void AActionPracticeCharacter::BeginPlay()
 	EventActionAttackInputTag = UGameplayTagsSubsystem::GetEventActionAttackInputTag();
 	EventActionCancelAttackTag = UGameplayTagsSubsystem::GetEventActionCancelAttackTag();
 	StateCanMoveTag = UGameplayTagsSubsystem::GetStateCanMoveTag();
+	StateUndetectableTag = UGameplayTagsSubsystem::GetStateUndetectableTag();
 
 	if (!StateRecoveringLocalTag.IsValid())
 	{
@@ -591,7 +592,7 @@ void AActionPracticeCharacter::GASInputReleased(const UInputAction* InputAction)
 		APASC->AbilitySpecInputReleased(*Spec);
 	}
 
-	//릴리즈 버퍼링
+	//릴리즈 버퍼링 
 	if (InputBufferComponent && InputBufferComponent->bBufferWindowOpened)
 	{
 		DEBUG_LOG(TEXT("Character UnBuffer"));
@@ -630,6 +631,34 @@ TArray<FGameplayAbilitySpec*> AActionPracticeCharacter::FindAbilitySpecsWithInpu
 	}
 
 	return SameAssetSpecs;
+}
+#pragma endregion
+
+#pragma region "AI Interface"
+bool AActionPracticeCharacter::CanBeSeenFrom(
+	const FVector& ObserverLocation,
+	FVector& OutSeenLocation,
+	int32& NumberOfLoSChecksPerformed,
+	float& OutSightStrength,
+	const AActor* IgnoreActor,
+	const bool* bWasVisible,
+	int32* UserData) const
+{
+	//State.Undetectable 태그 보유 시 AI Sight 감지 차단
+	if (AbilitySystemComponent && StateUndetectableTag.IsValid())
+	{
+		if (AbilitySystemComponent->HasMatchingGameplayTag(StateUndetectableTag))
+		{
+			OutSightStrength = 0.0f;
+			return false;
+		}
+	}
+
+	//기본 동작: 액터 중심 위치를 감지 위치로 반환
+	OutSeenLocation = GetActorLocation();
+	NumberOfLoSChecksPerformed = 0;
+	OutSightStrength = 1.0f;
+	return true;
 }
 #pragma endregion
 

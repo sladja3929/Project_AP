@@ -5,6 +5,7 @@
 #include "GAS/AttributeSet/ActionPracticeAttributeSet.h"
 #include "Characters/WeaponManagerComponent.h"
 #include "Logging/LogMacros.h"
+#include "Perception/AISightTargetInterface.h"
 #include "ActionPracticeCharacter.generated.h"
 
 class UActionPracticeAbilitySystemComponent;
@@ -27,7 +28,7 @@ class UInteractionComponent;
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS(abstract)
-class AActionPracticeCharacter : public ABaseCharacter
+class AActionPracticeCharacter : public ABaseCharacter, public IAISightTargetInterface
 {
 	GENERATED_BODY()
 
@@ -119,6 +120,10 @@ public:
 
 	void TryAutoActivateAttackSequenceAbility();
 
+	//===== IAISightTargetInterface =====
+	//State.Undetectable 태그 보유 시 AI Sight 감지를 차단
+	virtual bool CanBeSeenFrom(const FVector& ObserverLocation, FVector& OutSeenLocation, int32& NumberOfLoSChecksPerformed, float& OutSightStrength, const AActor* IgnoreActor = nullptr, const bool* bWasVisible = nullptr, int32* UserData = nullptr) const override;
+
 	//===== Replication =====
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -174,6 +179,7 @@ protected:
 	FGameplayTag EventActionAttackInputTag;
 	FGameplayTag EventActionCancelAttackTag;
 	FGameplayTag StateCanMoveTag;
+	FGameplayTag StateUndetectableTag;
 
 	// AttackSequenceAbility auto-activation gate
 	bool bAttackSequenceAutoActivated = false;

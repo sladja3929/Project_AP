@@ -62,6 +62,9 @@ protected:
 	UFUNCTION()
 	virtual void OnTaskMontageInterrupted() override;
 
+	UFUNCTION()
+	void OnTaskMontageBlendOut();
+
 	//===== 흐름 제어 =====
 	void StartRespawnDelay();
 	void PerformRespawn();

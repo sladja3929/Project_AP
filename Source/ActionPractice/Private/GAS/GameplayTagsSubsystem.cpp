@@ -356,6 +356,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateRestingTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateUndetectableTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateUndetectableTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Static Event Tags"
@@ -894,6 +903,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateRestingTagInternal() const
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->StateResting;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateUndetectableTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->StateUndetectable;
 	}
 	return FGameplayTag::EmptyTag;
 }
