@@ -19,10 +19,8 @@ class UAbilitySystemComponent;
 class UGameplayAbility;
 class UInputBufferComponent;
 class AWeapon;
-class UPlayerStatsWidget;
 class ULockOnComponent;
 class UItemManagerComponent;
-class UEquipmentSlotWidget;
 class UInteractionComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -152,19 +150,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UInteractionComponent> InteractionComponent = nullptr;
-
-	// ===== UI Properties =====
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
-	TSubclassOf<UPlayerStatsWidget> PlayerStatsWidgetClass;
-
-	UPROPERTY()
-	TObjectPtr<UPlayerStatsWidget> PlayerStatsWidget;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
-	TSubclassOf<UEquipmentSlotWidget> EquipmentSlotWidgetClass;
-
-	UPROPERTY()
-	TObjectPtr<UEquipmentSlotWidget> EquipmentSlotWidget;
 
 	// ===== Input Action Data (for GAS ability mapping) =====
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")

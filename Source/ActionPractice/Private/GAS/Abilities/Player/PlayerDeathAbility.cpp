@@ -3,6 +3,7 @@
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "Characters/ActionPracticeCharacter.h"
+#include "Characters/LockOnComponent.h"
 #include "Games/ActionPracticePlayerController.h"
 #include "Games/ActionPracticeGameMode.h"
 #include "Interaction/Bonfire.h"
@@ -24,7 +25,7 @@
 
 UPlayerDeathAbility::UPlayerDeathAbility()
 {
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 }
 
@@ -53,27 +54,47 @@ void UPlayerDeathAbility::ActivateAbility(
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	//다른 일반 어빌리티 취소 (자기 자신 제외)
-	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	//===== 서버 전용 로직 =====
+	if (HasAuthority(&ActivationInfo))
 	{
-		ASC->CancelAllAbilities(this);
+		//다른 일반 어빌리티 취소 (자기 자신 제외)
+		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+		{
+			ASC->CancelAllAbilities(this);
+		}
+
+		//이동 비활성화
+		DisableCharacterMovement();
+
+		//락온 해제
+		if (AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo())
+		{
+			if (ULockOnComponent* LockOnComp = Character->GetLockOnComponent())
+			{
+				if (LockOnComp->IsLockedOn())
+				{
+					LockOnComp->SetLockedOnTarget(nullptr);
+					DEBUG_LOG(TEXT("ActivateAbility: LockOn released on death"));
+				}
+			}
+		}
 	}
 
-	//이동 비활성화
-	DisableCharacterMovement();
-
+	//===== 서버+클라이언트 공통 (몽타주, 포즈 고정 등 비주얼) =====
 	//데스 몽타주 재생 또는 바로 딜레이 단계로
 	//StateDead 태그는 몽타주 종료 시 AddStateDeadTag()에서 추가 (UI 타이밍 분리)
 	if (DeathMontage)
 	{
 		StartMontageWithEventsTask();
 	}
-	
 	else
 	{
-		//몽타주 없을 때는 즉시 StateDead 추가 후 딜레이
-		AddStateDeadTag();
-		StartRespawnDelay();
+		if (HasAuthority(&ActivationInfo))
+		{
+			//몽타주 없을 때는 즉시 StateDead 추가 후 딜레이
+			AddStateDeadTag();
+			StartRespawnDelay();
+		}
 	}
 }
 
@@ -133,16 +154,19 @@ void UPlayerDeathAbility::OnTaskMontageBlendOut()
 {
 	DEBUG_LOG(TEXT("OnTaskMontageBlendOut: freezing mesh anim to hold last pose"));
 
-	//bPauseAnims로 AnimBP 틱 전체를 중단 → blend weight 감소 없이 마지막 포즈 고정
+	//bPauseAnims로 AnimBP 틱 전체를 중단 → blend weight 감소 없이 마지막 포즈 고정 (로컬 비주얼)
 	if (ABaseCharacter* Character = GetBaseCharacterFromActorInfo())
 	{
 		Character->GetMesh()->bPauseAnims = true;
 	}
 
-	//StateDead 추가 → PlayerController가 감지하여 UI 표시
-	AddStateDeadTag();
-
-	StartRespawnDelay();
+	//서버에서만 태그 추가 및 리스폰 딜레이 시작
+	if (HasAuthority(&CurrentActivationInfo))
+	{
+		//StateDead 추가 → PlayerController가 감지하여 UI 표시
+		AddStateDeadTag();
+		StartRespawnDelay();
+	}
 }
 
 void UPlayerDeathAbility::OnTaskMontageCompleted()
@@ -151,7 +175,7 @@ void UPlayerDeathAbility::OnTaskMontageCompleted()
 	//BlendOut 없이 즉시 완료된 경우 폴백
 	DEBUG_LOG(TEXT("OnTaskMontageCompleted: fallback path"));
 
-	if (!WaitDelayTask)
+	if (HasAuthority(&CurrentActivationInfo) && !WaitDelayTask)
 	{
 		AddStateDeadTag();
 		StartRespawnDelay();
@@ -162,10 +186,12 @@ void UPlayerDeathAbility::OnTaskMontageInterrupted()
 {
 	DEBUG_LOG(TEXT("OnTaskMontageInterrupted"));
 
-	//인터럽트 경로에서도 StateDead 추가
-	AddStateDeadTag();
-
-	StartRespawnDelay();
+	if (HasAuthority(&CurrentActivationInfo))
+	{
+		//인터럽트 경로에서도 StateDead 추가
+		AddStateDeadTag();
+		StartRespawnDelay();
+	}
 }
 
 #pragma endregion
@@ -198,6 +224,9 @@ void UPlayerDeathAbility::PerformRespawn()
 {
 	DEBUG_LOG(TEXT("PerformRespawn"));
 
+	//서버 전용: 리스폰 위치, GE, 적 리셋, 태그 제거
+	if (!HasAuthority(&CurrentActivationInfo)) return;
+
 	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
 	if (!Character) return;
 
@@ -229,7 +258,7 @@ void UPlayerDeathAbility::PerformRespawn()
 	//적 리셋
 	RequestEnemyReset();
 
-	//이동 복구
+	//이동 복구 (CMC는 서버에서 복제됨, bPauseAnims는 로컬이지만 서버 메시에도 적용)
 	RestoreCharacterMovement();
 
 	//StateDead 태그 제거 (BaseASC::HandleDeath에서 추가된 것)

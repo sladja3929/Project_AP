@@ -13,8 +13,15 @@
 #include "Interaction/Bonfire.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
+#include "UI/MasterHUDWidget.h"
 #include "UI/DeathScreenWidget.h"
+#include "Characters/BossCharacter.h"
+#include "GAS/AttributeSet/BossAttributeSet.h"
+#include "GAS/AttributeSet/ActionPracticeAttributeSet.h"
+#include "Characters/WeaponManagerComponent.h"
+#include "Characters/ItemManagerComponent.h"
 #include "AbilitySystemComponent.h"
+#include "TimerManager.h"
 #include "Blueprint/UserWidget.h"
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
@@ -40,7 +47,7 @@ void AActionPracticePlayerController::SetupInputComponent()
 		}
 	}
 
-	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
+	 if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
 	{
 		// ===== Basic Input Actions =====
 		if (IA_Move)
@@ -76,7 +83,7 @@ void AActionPracticePlayerController::SetupInputComponent()
 
 		if (IA_Sprint)
 		{
-			EIC->BindAction(IA_Sprint, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnSprintPressed);
+			EIC->BindAction(IA_Sprint, ETriggerEvent::Triggered, this, &AActionPracticePlayerController::OnSprintPressed);
 			EIC->BindAction(IA_Sprint, ETriggerEvent::Completed, this, &AActionPracticePlayerController::OnSprintReleased);
 		}
 
@@ -87,7 +94,7 @@ void AActionPracticePlayerController::SetupInputComponent()
 
 		if (IA_Roll)
 		{
-			EIC->BindAction(IA_Roll, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnRollPressed);
+			EIC->BindAction(IA_Roll, ETriggerEvent::Triggered, this, &AActionPracticePlayerController::OnRollPressed);
 		}
 
 		if (IA_Attack)
@@ -128,13 +135,16 @@ void AActionPracticePlayerController::OnPossess(APawn* InPawn)
 
 	if (IsLocalController())
 	{
-		InitializeDeathScreenWidget();
+		InitializeMasterHUD();
+		//PIE 초기화 시 AddDynamic 크래시 방지 — 다음 틱으로 지연
+		GetWorldTimerManager().SetTimer(BindHUDTimerHandle, this, &AActionPracticePlayerController::BindPlayerHUDData, 0.01f, false);
 		BindDeathStateTagEvent();
 	}
 }
 
 void AActionPracticePlayerController::OnUnPossess()
 {
+	GetWorldTimerManager().ClearTimer(BindHUDTimerHandle);
 	UnbindDeathStateTagEvent();
 	CachedCharacter = nullptr;
 	Super::OnUnPossess();
@@ -146,7 +156,8 @@ void AActionPracticePlayerController::AcknowledgePossession(APawn* P)
 	CachedCharacter = Cast<AActionPracticeCharacter>(P);
 	DEBUG_LOG(TEXT("AcknowledgePossession: CachedCharacter = %s"), *GetNameSafe(CachedCharacter));
 
-	InitializeDeathScreenWidget();
+	InitializeMasterHUD();
+	GetWorldTimerManager().SetTimer(BindHUDTimerHandle, this, &AActionPracticePlayerController::BindPlayerHUDData, 0.01f, false);
 	BindDeathStateTagEvent();
 }
 
@@ -156,7 +167,8 @@ void AActionPracticePlayerController::OnRep_Pawn()
 	CachedCharacter = Cast<AActionPracticeCharacter>(GetPawn());
 	DEBUG_LOG(TEXT("OnRep_Pawn: CachedCharacter = %s"), *GetNameSafe(CachedCharacter));
 
-	InitializeDeathScreenWidget();
+	InitializeMasterHUD();
+	GetWorldTimerManager().SetTimer(BindHUDTimerHandle, this, &AActionPracticePlayerController::BindPlayerHUDData, 0.01f, false);
 	BindDeathStateTagEvent();
 }
 
@@ -268,21 +280,52 @@ void AActionPracticePlayerController::OnInteractInput()
 	InteractionComp->TryInteract();
 }
 
-#pragma region "Death UI"
+#pragma region "UI"
 
-void AActionPracticePlayerController::InitializeDeathScreenWidget()
+void AActionPracticePlayerController::InitializeMasterHUD()
 {
 	if (!IsLocalController()) return;
-	if (!DeathScreenWidgetClass) return;
-	if (DeathScreenWidget) return; //이미 생성됨
+	if (!MasterHUDWidgetClass) return;
+	if (MasterHUDWidget) return; //이미 생성됨
 
-	DeathScreenWidget = CreateWidget<UDeathScreenWidget>(this, DeathScreenWidgetClass);
-	if (DeathScreenWidget)
+	MasterHUDWidget = CreateWidget<UMasterHUDWidget>(this, MasterHUDWidgetClass);
+	if (MasterHUDWidget)
 	{
-		DeathScreenWidget->AddToViewport();
-		DeathScreenWidget->SetDeathScreenVisibility(false);
-		DEBUG_LOG(TEXT("InitializeDeathScreenWidget: Created and hidden"));
+		MasterHUDWidget->AddToViewport();
+		//AddToViewport 이후 호출 — UMG 초기화 완료 후 자식 위젯 생성
+		MasterHUDWidget->CreateChildWidgets();
+		DEBUG_LOG(TEXT("MasterHUDWidget created and added to viewport"));
 	}
+}
+
+void AActionPracticePlayerController::BindPlayerHUDData()
+{
+	if (!MasterHUDWidget) return;
+	if (!CachedCharacter) return;
+
+	UActionPracticeAttributeSet* AttrSet = CachedCharacter->GetAttributeSet();
+	UWeaponManagerComponent* WeaponMgr = CachedCharacter->GetWeaponManagerComponent();
+	UItemManagerComponent* ItemMgr = CachedCharacter->GetItemManagerComponent();
+
+	MasterHUDWidget->BindPlayerData(AttrSet, WeaponMgr, ItemMgr);
+	DEBUG_LOG(TEXT("BindPlayerHUDData: Bound to %s"), *GetNameSafe(CachedCharacter));
+}
+
+void AActionPracticePlayerController::ShowBossHealth(ABossCharacter* Boss)
+{
+	if (!MasterHUDWidget || !Boss) return;
+
+	UBossAttributeSet* BossAttrSet = Boss->GetAttributeSet();
+	MasterHUDWidget->ShowBossHealth(BossAttrSet, Boss->EnemyName);
+	DEBUG_LOG(TEXT("ShowBossHealth: %s"), *Boss->EnemyName.ToString());
+}
+
+void AActionPracticePlayerController::HideBossHealth()
+{
+	if (!MasterHUDWidget) return;
+
+	MasterHUDWidget->HideBossHealth();
+	DEBUG_LOG(TEXT("HideBossHealth"));
 }
 
 void AActionPracticePlayerController::BindDeathStateTagEvent()
@@ -321,30 +364,30 @@ void AActionPracticePlayerController::UnbindDeathStateTagEvent()
 
 void AActionPracticePlayerController::RefreshDeathScreenVisibilityFromASC()
 {
-	if (!DeathScreenWidget || !CachedDeathUIASC) return;
+	if (!MasterHUDWidget || !CachedDeathUIASC) return;
 
 	if (CachedDeathUIASC->HasMatchingGameplayTag(StateDeadTag))
 	{
-		DeathScreenWidget->SetDeathScreenVisibility(true);
+		MasterHUDWidget->SetDeathScreenVisibility(true);
 	}
 	else
 	{
-		DeathScreenWidget->SetDeathScreenVisibility(false);
+		MasterHUDWidget->SetDeathScreenVisibility(false);
 	}
 }
 
 void AActionPracticePlayerController::HandleDeadTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
 {
-	if (!DeathScreenWidget) return;
+	if (!MasterHUDWidget) return;
 
 	if (NewCount > 0)
 	{
-		DeathScreenWidget->HandleDeadStateStart();
+		MasterHUDWidget->HandleDeadStateStart();
 		DEBUG_LOG(TEXT("HandleDeadTagChanged: Show (Count=%d)"), NewCount);
 	}
 	else
 	{
-		DeathScreenWidget->HandleDeadStateFinish();
+		MasterHUDWidget->HandleDeadStateFinish();
 		DEBUG_LOG(TEXT("HandleDeadTagChanged: Hide"));
 	}
 }

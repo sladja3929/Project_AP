@@ -10,8 +10,9 @@ class UInputAction;
 struct FInputActionValue;
 class AActionPracticeCharacter;
 class ABonfire;
-class UDeathScreenWidget;
+class UMasterHUDWidget;
 class UAbilitySystemComponent;
+class ABossCharacter;
 
 /**
  *  PlayerController for ActionPractice
@@ -36,6 +37,10 @@ public:
 
 	void SetLastActivatedBonfire(ABonfire* NewBonfire);
 	FORCEINLINE ABonfire* GetLastActivatedBonfire() const { return LastActivatedBonfire.Get(); }
+
+	//보스 캐릭터에서 호출 — 로컬 HUD에 보스 HP바 표시/숨김
+	void ShowBossHealth(ABossCharacter* Boss);
+	void HideBossHealth();
 
 #pragma endregion
 
@@ -92,18 +97,21 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputAction> IA_CycleQuickSlot = nullptr;
 
-	// ===== Death UI =====
+	// ===== UI =====
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
-	TSubclassOf<UDeathScreenWidget> DeathScreenWidgetClass = nullptr;
+	TSubclassOf<UMasterHUDWidget> MasterHUDWidgetClass = nullptr;
 
 	UPROPERTY()
-	TObjectPtr<UDeathScreenWidget> DeathScreenWidget = nullptr;
+	TObjectPtr<UMasterHUDWidget> MasterHUDWidget = nullptr;
 
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> CachedDeathUIASC = nullptr;
 
 	FGameplayTag StateDeadTag;
 	FDelegateHandle DeadTagChangedHandle;
+
+	//BindPlayerHUDData 지연 호출용 — 동일 핸들 재사용으로 중복 방지
+	FTimerHandle BindHUDTimerHandle;
 
 #pragma endregion
 
@@ -128,8 +136,10 @@ protected:
 	void UpdateLockOnCamera();
 	void OnInteractInput();
 
-	// ===== Death UI =====
-	void InitializeDeathScreenWidget();
+	// ===== UI =====
+	void InitializeMasterHUD();
+	void BindPlayerHUDData();
+
 	void BindDeathStateTagEvent();
 	void UnbindDeathStateTagEvent();
 	void RefreshDeathScreenVisibilityFromASC();

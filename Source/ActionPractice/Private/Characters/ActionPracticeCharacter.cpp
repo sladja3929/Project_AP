@@ -21,8 +21,6 @@
 #include "Characters/InteractionComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
-#include "UI/PlayerStatsWidget.h"
-#include "UI/EquipmentSlotWidget.h"
 #include "Input/InputActionDataAsset.h"
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
@@ -138,59 +136,6 @@ void AActionPracticeCharacter::BeginPlay()
 	}
 	
 	//InitializeAbilitySystem();
-
-	if (PlayerStatsWidgetClass)
-	{
-		APlayerController* PC = Cast<APlayerController>(GetController());
-		if (PC)
-		{
-			PlayerStatsWidget = CreateWidget<UPlayerStatsWidget>(PC, PlayerStatsWidgetClass);
-			if (PlayerStatsWidget)
-			{
-				PlayerStatsWidget->AddToViewport();
-				
-				//AttributeSet 연결
-				if (AttributeSet)
-				{
-					PlayerStatsWidget->SetAttributeSet(GetAttributeSet());
-					DEBUG_LOG(TEXT("PlayerStatsWidget created and AttributeSet connected"));
-				}
-				else
-				{
-					DEBUG_LOG(TEXT("AttributeSet is nullptr!"));
-				}
-			}
-		}
-		else
-		{
-			DEBUG_LOG(TEXT("PlayerController is nullptr!"));
-		}
-	}
-	else
-	{
-		DEBUG_LOG(TEXT("PlayerStatsWidgetClass is not set!"));
-	}
-
-	if (EquipmentSlotWidgetClass)
-	{
-		APlayerController* PC = Cast<APlayerController>(GetController());
-		if (PC)
-		{
-			EquipmentSlotWidget = CreateWidget<UEquipmentSlotWidget>(PC, EquipmentSlotWidgetClass);
-			if (EquipmentSlotWidget)
-			{
-				EquipmentSlotWidget->AddToViewport();
-
-				//데이터 소스 연결
-				EquipmentSlotWidget->SetDataSources(WeaponManagerComponent, ItemManagerComponent);
-				DEBUG_LOG(TEXT("EquipmentSlotWidget created and data sources connected"));
-			}
-		}
-	}
-	else
-	{
-		DEBUG_LOG(TEXT("EquipmentSlotWidgetClass is not set!"));
-	}
 
 	TryAutoActivateAttackSequenceAbility();
 }

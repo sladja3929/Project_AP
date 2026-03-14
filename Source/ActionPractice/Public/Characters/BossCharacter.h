@@ -6,8 +6,8 @@
 #include "GAS/AttributeSet/BossAttributeSet.h"
 #include "BossCharacter.generated.h"
 
-class UBossHealthWidget;
 class AActionPracticeCharacter;
+class AActionPracticePlayerController;
 class UEnemyAttackComponent;
 class UEnemyDataAsset;
 class UGameplayEffect;
@@ -37,7 +37,6 @@ public:
 	virtual TScriptInterface<IHitDetectionInterface> GetHitDetectionInterface() const override;
 
 	FORCEINLINE UBossAttributeSet* GetAttributeSet() const { return Cast<UBossAttributeSet>(AttributeSet); }
-	FORCEINLINE UBossHealthWidget* GetBossHealthWidget() const { return BossHealthWidget; }
 	FORCEINLINE class AEnemyAIController* GetEnemyAIController() const { return Cast<AEnemyAIController>(GetController()); }
 
 	const UEnemyDataAsset* GetEnemyData() const { return EnemyData.Get(); }
@@ -65,13 +64,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Reset")
 	TSubclassOf<UGameplayEffect> EnemyResetRecoveryEffect;
 
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<UBossHealthWidget> BossHealthWidgetClass;
-
-	UPROPERTY()
-	TObjectPtr<UBossHealthWidget> BossHealthWidget;
-
-	bool bHealthWidgetActive = false;
+	//보스 조우 중인지 서버측 플래그
+	bool bBossEncountered = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 	TObjectPtr<UEnemyAttackComponent> EnemyAttackComponent;
@@ -97,9 +91,6 @@ protected:
 	// ===== UI =====
 	UFUNCTION()
 	void OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus);
-
-	void CreateAndAttachHealthWidget();
-	void RemoveHealthWidget();
 
 	// ===== Audio =====
 	void PlayBossBGM();

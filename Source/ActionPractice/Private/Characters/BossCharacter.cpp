@@ -7,8 +7,8 @@
 #include "GAS/AttributeSet/BossAttributeSet.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "AI/EnemyAIController.h"
-#include "UI/BossHealthWidget.h"
 #include "Characters/ActionPracticeCharacter.h"
+#include "Games/ActionPracticePlayerController.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Characters/HitDetection/EnemyAttackComponent.h"
@@ -130,13 +130,11 @@ void ABossCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	//보스는 복제할 추가 변수가 거의 없음
-	// DetectedPlayer는 서버 전용, bHealthWidgetActive는 로컬 UI 상태
+	// DetectedPlayer는 서버 전용, bBossEncountered는 서버 전용 플래그
 }
 
 void ABossCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	RemoveHealthWidget();
-
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -208,9 +206,9 @@ void ABossCharacter::ResetEnemy()
 
 	//전투 캐시 초기화
 	DetectedPlayer.Reset();
-	if (bHealthWidgetActive)
+	if (bBossEncountered)
 	{
-		bHealthWidgetActive = false;
+		bBossEncountered = false;
 		Multicast_OnBossDisengage();
 	}
 
@@ -270,10 +268,10 @@ void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
 		{
 			DEBUG_LOG(TEXT("Player detected by Boss: %s"), *Actor->GetName());
 
-			if (!bHealthWidgetActive)
+			if (!bBossEncountered)
 			{
 				DetectedPlayer = Player;
-				bHealthWidgetActive = true;
+				bBossEncountered = true;
 
 				//서버에서 모든 클라이언트에 조우 연출 전파
 				Multicast_OnBossEncounter();
@@ -285,7 +283,7 @@ void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
 
 			if (Actor == DetectedPlayer.Get())
 			{
-				bHealthWidgetActive = false;
+				bBossEncountered = false;
 				DetectedPlayer.Reset();
 
 				//서버에서 모든 클라이언트에 이탈 연출 전파
@@ -293,54 +291,6 @@ void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
 			}
 		}
 	}
-}
-
-void ABossCharacter::CreateAndAttachHealthWidget()
-{
-	//이미 위젯이 있으면 리턴
-	if (BossHealthWidget)
-	{
-		DEBUG_LOG(TEXT("BossHealthWidget already exists"));
-		return;
-	}
-
-	if (!BossHealthWidgetClass)
-	{
-		DEBUG_LOG(TEXT("BossHealthWidgetClass is not set"));
-		return;
-	}
-
-	BossHealthWidget = CreateWidget<UBossHealthWidget>(GetWorld(), BossHealthWidgetClass);
-	if (!BossHealthWidget)
-	{
-		DEBUG_LOG(TEXT("Failed to create BossHealthWidget"));
-		return;
-	}
-
-	UBossAttributeSet* BossAttributeSet = GetAttributeSet();
-	if (BossAttributeSet)
-	{
-		BossHealthWidget->SetBossAttributeSet(BossAttributeSet);
-	}
-
-	//보스 이름 설정
-	BossHealthWidget->SetBossName(EnemyName);
-
-	BossHealthWidget->AddToViewport();
-
-	DEBUG_LOG(TEXT("BossHealthWidget created and attached"));
-}
-
-void ABossCharacter::RemoveHealthWidget()
-{
-	if (!BossHealthWidget)
-	{
-		return;
-	}
-
-	BossHealthWidget->RemoveFromParent();
-	BossHealthWidget = nullptr;
-	DEBUG_LOG(TEXT("BossHealthWidget removed"));
 }
 
 void ABossCharacter::Tick(float DeltaTime)
@@ -395,7 +345,14 @@ void ABossCharacter::Multicast_OnBossEncounter_Implementation()
 {
 	DEBUG_LOG(TEXT("Multicast_OnBossEncounter called"));
 
-	CreateAndAttachHealthWidget();
+	//로컬 PlayerController에 보스 HP바 표시 요청
+	AActionPracticePlayerController* PC = Cast<AActionPracticePlayerController>(
+		UGameplayStatics::GetPlayerController(GetWorld(), 0));
+	if (PC)
+	{
+		PC->ShowBossHealth(this);
+	}
+
 	PlayBossBGM();
 }
 
@@ -403,6 +360,13 @@ void ABossCharacter::Multicast_OnBossDisengage_Implementation()
 {
 	DEBUG_LOG(TEXT("Multicast_OnBossDisengage called"));
 
-	RemoveHealthWidget();
+	//로컬 PlayerController에 보스 HP바 숨김 요청
+	AActionPracticePlayerController* PC = Cast<AActionPracticePlayerController>(
+		UGameplayStatics::GetPlayerController(GetWorld(), 0));
+	if (PC)
+	{
+		PC->HideBossHealth();
+	}
+
 	StopBossBGM();
 }
