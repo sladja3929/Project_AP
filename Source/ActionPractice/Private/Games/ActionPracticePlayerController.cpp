@@ -133,6 +133,12 @@ void AActionPracticePlayerController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 	CachedCharacter = Cast<AActionPracticeCharacter>(InPawn);
 
+	//서버: 기본 리스폰 Bonfire 초기화 (아직 설정되지 않은 경우에만)
+	if (HasAuthority())
+	{
+		InitializeDefaultBonfire();
+	}
+
 	if (IsLocalController())
 	{
 		InitializeMasterHUD();
@@ -256,6 +262,46 @@ void AActionPracticePlayerController::SetLastActivatedBonfire(ABonfire* NewBonfi
 {
 	LastActivatedBonfire = NewBonfire;
 	DEBUG_LOG(TEXT("SetLastActivatedBonfire: %s"), *GetNameSafe(NewBonfire));
+}
+
+void AActionPracticePlayerController::InitializeDefaultBonfire()
+{
+	//이미 설정된 경우 덮어쓰지 않음 (휴식 이후 리스폰 시 재진입 방지)
+	if (LastActivatedBonfire.IsValid()) return;
+
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	TArray<AActor*> FoundBonfires;
+	UGameplayStatics::GetAllActorsOfClass(World, ABonfire::StaticClass(), FoundBonfires);
+
+	ABonfire* Fallback = nullptr;
+	for (AActor* Actor : FoundBonfires)
+	{
+		ABonfire* Bonfire = Cast<ABonfire>(Actor);
+		if (!Bonfire) continue;
+
+		//bIsDefaultSpawnPoint 우선
+		if (Bonfire->IsDefaultSpawnPoint())
+		{
+			LastActivatedBonfire = Bonfire;
+			DEBUG_LOG(TEXT("InitializeDefaultBonfire: Default spawn point set to %s"), *GetNameSafe(Bonfire));
+			return;
+		}
+
+		//폴백 후보 (첫 번째)
+		if (!Fallback)
+		{
+			Fallback = Bonfire;
+		}
+	}
+
+	//bIsDefaultSpawnPoint 지정 Bonfire 없으면 첫 번째 Bonfire 사용
+	if (Fallback)
+	{
+		LastActivatedBonfire = Fallback;
+		DEBUG_LOG(TEXT("InitializeDefaultBonfire: Fallback to first Bonfire %s"), *GetNameSafe(Fallback));
+	}
 }
 
 void AActionPracticePlayerController::OnInteractInput()

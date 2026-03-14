@@ -4,6 +4,8 @@
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "Characters/ActionPracticeCharacter.h"
 #include "Characters/InteractionComponent.h"
+#include "Characters/WeaponManagerComponent.h"
+#include "Items/Weapon.h"
 #include "Interaction/Bonfire.h"
 #include "Games/ActionPracticePlayerController.h"
 #include "Games/ActionPracticeGameMode.h"
@@ -65,6 +67,9 @@ void URestAbility::ActivateAbility(
 	//이동 비활성화
 	DisableCharacterMovement();
 
+	//무기 숨김 (어빌리티 전 구간)
+	SetWeaponsVisibility(false);
+
 	//Bonfire 방향으로 회전
 	if (CachedBonfire.IsValid())
 	{
@@ -109,6 +114,7 @@ void URestAbility::SetUpPlayMontageWithEventsTask()
 		return;
 	}
 
+	PlayMontageWithEventsTask->OnMontageBlendOut.AddDynamic(this, &URestAbility::OnTaskMontageBlendOut);
 	PlayMontageWithEventsTask->OnMontageCompleted.AddDynamic(this, &URestAbility::OnTaskMontageCompleted);
 	PlayMontageWithEventsTask->OnMontageInterrupted.AddDynamic(this, &URestAbility::OnTaskMontageInterrupted);
 }
@@ -144,6 +150,17 @@ void URestAbility::StartMontageWithEventsTask()
 	PlayMontageWithEventsTask->ReadyForActivation();
 }
 
+void URestAbility::OnTaskMontageBlendOut()
+{
+	DEBUG_LOG(TEXT("OnTaskMontageBlendOut - State: %d"), (int32)CurrentRestState);
+
+	//Sit → Loop 전환: BlendOut 시점에 Loop 몽타주 시작하여 ABP 상태머신 포즈 노출 방지
+	if (CurrentRestState == ERestState::EnteringRest)
+	{
+		TransitionToLoopMontage();
+	}
+}
+
 void URestAbility::OnTaskMontageCompleted()
 {
 	DEBUG_LOG(TEXT("OnTaskMontageCompleted - State: %d"), (int32)CurrentRestState);
@@ -151,6 +168,7 @@ void URestAbility::OnTaskMontageCompleted()
 	switch (CurrentRestState)
 	{
 	case ERestState::EnteringRest:
+		//BlendOut 없이 즉시 완료된 경우 폴백
 		TransitionToLoopMontage();
 		break;
 
@@ -217,6 +235,27 @@ void URestAbility::StartStandMontage()
 #pragma endregion
 
 #pragma region "Helper"
+
+void URestAbility::SetWeaponsVisibility(bool bVisible)
+{
+	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
+	if (!Character) return;
+
+	UWeaponManagerComponent* WeaponManager = Character->GetWeaponManagerComponent();
+	if (!WeaponManager) return;
+
+	if (AWeapon* LeftWeapon = WeaponManager->GetLeftWeapon())
+	{
+		LeftWeapon->SetActorHiddenInGame(!bVisible);
+	}
+
+	if (AWeapon* RightWeapon = WeaponManager->GetRightWeapon())
+	{
+		RightWeapon->SetActorHiddenInGame(!bVisible);
+	}
+
+	DEBUG_LOG(TEXT("SetWeaponsVisibility: %s"), bVisible ? TEXT("Visible") : TEXT("Hidden"));
+}
 
 void URestAbility::AcquireBonfire(const FGameplayEventData* TriggerEventData)
 {
@@ -342,8 +381,9 @@ void URestAbility::EndAbility(
 	bool bReplicateEndAbility,
 	bool bWasCancelled)
 {
-	//취소/인터럽트 포함 이동 복구 보장
+	//취소/인터럽트 포함 이동 복구 및 무기 복구 보장
 	RestoreCharacterMovement();
+	SetWeaponsVisibility(true);
 
 	//태스크 정리
 	if (PlayMontageWithEventsTask)

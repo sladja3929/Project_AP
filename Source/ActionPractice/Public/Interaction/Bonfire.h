@@ -28,6 +28,7 @@ public:
 	virtual void Interact(AActor* InInstigator) override;
 	virtual FText GetInteractionPrompt() const override;
 
+	FORCEINLINE bool IsDefaultSpawnPoint() const { return bIsDefaultSpawnPoint; }
 	FORCEINLINE FVector GetRespawnLocation() const { return RespawnPoint->GetComponentLocation(); }
 	FORCEINLINE FRotator GetRespawnRotation() const { return RespawnPoint->GetComponentRotation(); }
 	FORCEINLINE FTransform GetRespawnTransform() const { return RespawnPoint->GetComponentTransform(); }
@@ -36,6 +37,10 @@ public:
 
 protected:
 #pragma region "Protected Variables"
+
+	//게임 시작 시 기본 리스폰 포인트로 사용할 Bonfire 지정 (맵당 1개)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bonfire")
+	bool bIsDefaultSpawnPoint = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComponent = nullptr;

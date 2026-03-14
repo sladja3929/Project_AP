@@ -136,6 +136,10 @@ protected:
 	void UpdateLockOnCamera();
 	void OnInteractInput();
 
+	// ===== Bonfire =====
+	//게임 시작 시 LastActivatedBonfire가 없으면 맵에서 기본 Bonfire를 탐색해 설정
+	void InitializeDefaultBonfire();
+
 	// ===== UI =====
 	void InitializeMasterHUD();
 	void BindPlayerHUDData();

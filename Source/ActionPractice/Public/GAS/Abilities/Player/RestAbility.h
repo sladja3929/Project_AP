@@ -76,12 +76,16 @@ protected:
 	UFUNCTION()
 	virtual void OnTaskMontageInterrupted() override;
 
+	UFUNCTION()
+	void OnTaskMontageBlendOut();
+
 	// ===== 흐름 제어 =====
 	void StartSitMontage();
 	void TransitionToLoopMontage();
 	void StartStandMontage();
 
 	// ===== 헬퍼 =====
+	void SetWeaponsVisibility(bool bVisible);
 	void AcquireBonfire(const FGameplayEventData* TriggerEventData);
 	void UpdateLastActivatedBonfire();
 	void DisableCharacterMovement();
