@@ -42,6 +42,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bonfire")
 	bool bIsDefaultSpawnPoint = false;
 
+	//상호작용 프롬프트 텍스트 — BP에서 수정 가능, 다국어 대응
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bonfire")
+	FText InteractionPromptText = NSLOCTEXT("Bonfire", "DefaultPrompt", "휴식");
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComponent = nullptr;
 

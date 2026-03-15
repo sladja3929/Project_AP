@@ -3,6 +3,7 @@
 #include "UI/EquipmentSlotWidget.h"
 #include "UI/BossHealthWidget.h"
 #include "UI/DeathScreenWidget.h"
+#include "UI/InteractionPromptWidget.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 
@@ -25,6 +26,10 @@ void UMasterHUDWidget::CreateChildWidgets()
 {
 	APlayerController* PC = GetOwningPlayer();
 	if (!PC) return;
+
+	//[주의] 모든 자식 위젯의 OverlaySlot은 반드시 HAlign_Fill + VAlign_Fill로 설정할 것.
+	//위젯 내부 레이아웃(앵커, 위치, 여백 등)은 WBP 디자이너에서 전적으로 담당한다.
+	//C++에서 HAlign_Center/VAlign_Bottom 같은 특정 정렬을 강제하면 WBP에서 설정한 위치가 무시된다.
 
 	//BaseLayer — PlayerStats
 	if (PlayerStatsWidgetClass && BaseLayer)
@@ -90,6 +95,39 @@ void UMasterHUDWidget::CreateChildWidgets()
 			DeathScreenWidget->SetDeathScreenVisibility(false);
 			DEBUG_LOG(TEXT("DeathScreenWidget created in ModalLayer (Hidden)"));
 		}
+	}
+
+	//BaseLayer — InteractionPrompt (초기 Collapsed)
+	if (InteractionPromptWidgetClass && BaseLayer)
+	{
+		InteractionPromptWidget = CreateWidget<UInteractionPromptWidget>(PC, InteractionPromptWidgetClass);
+		if (InteractionPromptWidget)
+		{
+			UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(BaseLayer->AddChild(InteractionPromptWidget));
+			if (OverlaySlot)
+			{
+				OverlaySlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Fill);
+				OverlaySlot->SetVerticalAlignment(EVerticalAlignment::VAlign_Fill);
+			}
+			InteractionPromptWidget->HidePrompt();
+			DEBUG_LOG(TEXT("InteractionPromptWidget created in BaseLayer (Collapsed)"));
+		}
+	}
+}
+
+void UMasterHUDWidget::ShowInteractionPrompt(const FText& InPromptText)
+{
+	if (InteractionPromptWidget)
+	{
+		InteractionPromptWidget->ShowPrompt(InPromptText);
+	}
+}
+
+void UMasterHUDWidget::HideInteractionPrompt()
+{
+	if (InteractionPromptWidget)
+	{
+		InteractionPromptWidget->HidePrompt();
 	}
 }
 

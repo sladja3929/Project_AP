@@ -149,6 +149,14 @@ protected:
 	void RefreshDeathScreenVisibilityFromASC();
 	void HandleDeadTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 
+	//InteractionComponent 델리게이트 바인딩/해제
+	void BindInteractionPromptEvent();
+	void UnbindInteractionPromptEvent();
+
+	//OnInteractableChanged 콜백
+	UFUNCTION()
+	void OnInteractableChanged(AActor* NewInteractable);
+
 #pragma endregion
 
 private:

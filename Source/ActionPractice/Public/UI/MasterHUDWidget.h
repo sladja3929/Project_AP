@@ -9,6 +9,7 @@ class UPlayerStatsWidget;
 class UEquipmentSlotWidget;
 class UBossHealthWidget;
 class UDeathScreenWidget;
+class UInteractionPromptWidget;
 class UActionPracticeAttributeSet;
 class UBossAttributeSet;
 class UWeaponManagerComponent;
@@ -39,8 +40,13 @@ public:
 	void HandleDeadStateFinish();
 	void SetDeathScreenVisibility(bool bShow);
 
+	//상호작용 프롬프트 표시/숨김
+	void ShowInteractionPrompt(const FText& InPromptText);
+	void HideInteractionPrompt();
+
 	//위젯 접근자 (외부에서 직접 접근이 필요한 경우 대비)
 	FORCEINLINE UDeathScreenWidget* GetDeathScreenWidget() const { return DeathScreenWidget; }
+	FORCEINLINE UInteractionPromptWidget* GetInteractionPromptWidget() const { return InteractionPromptWidget; }
 
 	//AddToViewport 이후 컨트롤러에서 명시적으로 호출 — NativeConstruct 안에서 호출하지 않음
 	void CreateChildWidgets();
@@ -73,6 +79,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	TSubclassOf<UDeathScreenWidget> DeathScreenWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UInteractionPromptWidget> InteractionPromptWidgetClass;
+
 	//생성된 위젯 인스턴스
 	UPROPERTY()
 	TObjectPtr<UPlayerStatsWidget> PlayerStatsWidget;
@@ -85,6 +94,9 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UDeathScreenWidget> DeathScreenWidget;
+
+	UPROPERTY()
+	TObjectPtr<UInteractionPromptWidget> InteractionPromptWidget;
 
 #pragma endregion
 

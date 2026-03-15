@@ -11,6 +11,7 @@
 #include "Characters/ItemManagerComponent.h"
 #include "Characters/InteractionComponent.h"
 #include "Interaction/Bonfire.h"
+#include "Interaction/IInteractable.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "UI/MasterHUDWidget.h"
@@ -142,6 +143,7 @@ void AActionPracticePlayerController::OnPossess(APawn* InPawn)
 	if (IsLocalController())
 	{
 		InitializeMasterHUD();
+		BindInteractionPromptEvent();
 		//PIE 초기화 시 AddDynamic 크래시 방지 — 다음 틱으로 지연
 		GetWorldTimerManager().SetTimer(BindHUDTimerHandle, this, &AActionPracticePlayerController::BindPlayerHUDData, 0.01f, false);
 		BindDeathStateTagEvent();
@@ -152,6 +154,7 @@ void AActionPracticePlayerController::OnUnPossess()
 {
 	GetWorldTimerManager().ClearTimer(BindHUDTimerHandle);
 	UnbindDeathStateTagEvent();
+	UnbindInteractionPromptEvent();
 	CachedCharacter = nullptr;
 	Super::OnUnPossess();
 }
@@ -163,6 +166,7 @@ void AActionPracticePlayerController::AcknowledgePossession(APawn* P)
 	DEBUG_LOG(TEXT("AcknowledgePossession: CachedCharacter = %s"), *GetNameSafe(CachedCharacter));
 
 	InitializeMasterHUD();
+	BindInteractionPromptEvent();
 	GetWorldTimerManager().SetTimer(BindHUDTimerHandle, this, &AActionPracticePlayerController::BindPlayerHUDData, 0.01f, false);
 	BindDeathStateTagEvent();
 }
@@ -174,6 +178,7 @@ void AActionPracticePlayerController::OnRep_Pawn()
 	DEBUG_LOG(TEXT("OnRep_Pawn: CachedCharacter = %s"), *GetNameSafe(CachedCharacter));
 
 	InitializeMasterHUD();
+	BindInteractionPromptEvent();
 	GetWorldTimerManager().SetTimer(BindHUDTimerHandle, this, &AActionPracticePlayerController::BindPlayerHUDData, 0.01f, false);
 	BindDeathStateTagEvent();
 }
@@ -436,6 +441,49 @@ void AActionPracticePlayerController::HandleDeadTagChanged(const FGameplayTag Ca
 		MasterHUDWidget->HandleDeadStateFinish();
 		DEBUG_LOG(TEXT("HandleDeadTagChanged: Hide"));
 	}
+}
+
+void AActionPracticePlayerController::BindInteractionPromptEvent()
+{
+	if (!CachedCharacter) return;
+
+	UInteractionComponent* InteractionComp = CachedCharacter->FindComponentByClass<UInteractionComponent>();
+	if (!InteractionComp) return;
+
+	InteractionComp->OnInteractableChanged.RemoveDynamic(this, &AActionPracticePlayerController::OnInteractableChanged);
+	InteractionComp->OnInteractableChanged.AddDynamic(this, &AActionPracticePlayerController::OnInteractableChanged);
+	DEBUG_LOG(TEXT("BindInteractionPromptEvent: Bound"));
+}
+
+void AActionPracticePlayerController::UnbindInteractionPromptEvent()
+{
+	if (!CachedCharacter) return;
+
+	UInteractionComponent* InteractionComp = CachedCharacter->FindComponentByClass<UInteractionComponent>();
+	if (!InteractionComp) return;
+
+	InteractionComp->OnInteractableChanged.RemoveDynamic(this, &AActionPracticePlayerController::OnInteractableChanged);
+	DEBUG_LOG(TEXT("UnbindInteractionPromptEvent: Unbound"));
+}
+
+void AActionPracticePlayerController::OnInteractableChanged(AActor* NewInteractable)
+{
+	if (!MasterHUDWidget) return;
+
+	if (NewInteractable)
+	{
+		IInteractable* InteractableInterface = Cast<IInteractable>(NewInteractable);
+		if (InteractableInterface)
+		{
+			const FText PromptText = InteractableInterface->GetInteractionPrompt();
+			MasterHUDWidget->ShowInteractionPrompt(PromptText);
+			DEBUG_LOG(TEXT("OnInteractableChanged: Show prompt — %s"), *PromptText.ToString());
+			return;
+		}
+	}
+
+	MasterHUDWidget->HideInteractionPrompt();
+	DEBUG_LOG(TEXT("OnInteractableChanged: Hide prompt"));
 }
 
 #pragma endregion

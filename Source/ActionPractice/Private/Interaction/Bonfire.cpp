@@ -96,5 +96,5 @@ void ABonfire::Interact(AActor* InInstigator)
 
 FText ABonfire::GetInteractionPrompt() const
 {
-	return FText::FromString(TEXT("휴식"));
+	return InteractionPromptText;
 }
