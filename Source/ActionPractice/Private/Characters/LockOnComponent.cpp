@@ -3,6 +3,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Components/WidgetComponent.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -16,6 +17,24 @@
 ULockOnComponent::ULockOnComponent()
 {
 	SetIsReplicatedByDefault(true);
+}
+
+void ULockOnComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	//로컬 플레이어에게만 마커 위젯 컴포넌트 생성
+	APawn* OwnerPawn = GetOwner<APawn>();
+	if (!OwnerPawn || !OwnerPawn->IsLocallyControlled()) return;
+	if (!LockOnMarkerWidgetClass) return;
+
+	LockOnMarkerWidget = NewObject<UWidgetComponent>(GetOwner(), UWidgetComponent::StaticClass(), TEXT("LockOnMarker"));
+	LockOnMarkerWidget->SetWidgetClass(LockOnMarkerWidgetClass);
+	LockOnMarkerWidget->SetWidgetSpace(EWidgetSpace::Screen);
+	LockOnMarkerWidget->SetDrawSize(LockOnMarkerDrawSize);
+	LockOnMarkerWidget->SetVisibility(false);
+	LockOnMarkerWidget->RegisterComponent();
+	LockOnMarkerWidget->AttachToComponent(GetOwner()->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
 }
 
 void ULockOnComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -34,11 +53,13 @@ void ULockOnComponent::SetLockedOnTarget(AActor* NewTarget)
 	if (bIsLockOn)
 	{
 		SetRotationMode(false, true);
+		ShowLockOnMarker(NewTarget);
 		DEBUG_LOG(TEXT("Lock-On Target: %s"), *NewTarget->GetName());
 	}
 	else
 	{
 		SetRotationMode(true, false);
+		HideLockOnMarker();
 		DEBUG_LOG(TEXT("Lock-On Released"));
 	}
 
@@ -135,4 +156,37 @@ void ULockOnComponent::ToggleLockOn()
 			SetLockedOnTarget(NearestTarget);
 		}
 	}
+}
+
+void ULockOnComponent::ShowLockOnMarker(AActor* Target)
+{
+	if (!LockOnMarkerWidget || !Target) return;
+
+	//스켈레탈 메시 소켓에 부착 시도, 실패 시 루트 컴포넌트로 폴백
+	USceneComponent* AttachTarget = Target->GetRootComponent();
+	if (!LockOnMarkerSocketName.IsNone())
+	{
+		if (ACharacter* TargetCharacter = Cast<ACharacter>(Target))
+		{
+			USkeletalMeshComponent* Mesh = TargetCharacter->GetMesh();
+			if (Mesh && Mesh->DoesSocketExist(LockOnMarkerSocketName))
+			{
+				AttachTarget = Mesh;
+			}
+		}
+	}
+
+	FAttachmentTransformRules AttachRules = FAttachmentTransformRules::SnapToTargetNotIncludingScale;
+	LockOnMarkerWidget->AttachToComponent(AttachTarget, AttachRules, LockOnMarkerSocketName);
+	LockOnMarkerWidget->SetRelativeLocation(LockOnMarkerOffset);
+	LockOnMarkerWidget->SetVisibility(true);
+}
+
+void ULockOnComponent::HideLockOnMarker()
+{
+	if (!LockOnMarkerWidget) return;
+
+	LockOnMarkerWidget->SetVisibility(false);
+	LockOnMarkerWidget->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+	LockOnMarkerWidget->AttachToComponent(GetOwner()->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
 }
