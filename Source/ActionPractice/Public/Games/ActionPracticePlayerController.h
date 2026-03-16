@@ -13,6 +13,7 @@ class ABonfire;
 class UMasterHUDWidget;
 class UAbilitySystemComponent;
 class ABossCharacter;
+class UBaseItemDataAsset;
 
 /**
  *  PlayerController for ActionPractice
@@ -41,6 +42,10 @@ public:
 	//보스 캐릭터에서 호출 — 로컬 HUD에 보스 HP바 표시/숨김
 	void ShowBossHealth(ABossCharacter* Boss);
 	void HideBossHealth();
+
+	//아이템 획득 알림을 소유 클라이언트에 전달 — 서버에서 호출
+	UFUNCTION(Client, Reliable)
+	void Client_NotifyItemAcquired(UBaseItemDataAsset* InItemDA, int32 InCount);
 
 #pragma endregion
 
@@ -113,6 +118,16 @@ protected:
 	//BindPlayerHUDData 지연 호출용 — 동일 핸들 재사용으로 중복 방지
 	FTimerHandle BindHUDTimerHandle;
 
+	// ===== Interaction Prompt Dimming =====
+	UPROPERTY()
+	TObjectPtr<UAbilitySystemComponent> CachedRecoveringUIASC = nullptr;
+
+	FGameplayTag StateRecoveringLocalTag;
+	FDelegateHandle RecoveringTagChangedHandle;
+
+	//프롬프트 표시 상태 추적
+	bool bIsInteractionPromptVisible = false;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -156,6 +171,11 @@ protected:
 	//OnInteractableChanged 콜백
 	UFUNCTION()
 	void OnInteractableChanged(AActor* NewInteractable);
+
+	// ===== Recovering Tag → Interaction Prompt Dimming =====
+	void BindRecoveringTagEvent();
+	void UnbindRecoveringTagEvent();
+	void HandleRecoveringTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 
 #pragma endregion
 

@@ -26,6 +26,8 @@ void UEquipmentSlotWidget::NativeConstruct()
 	if (RightWeaponIcon) SetSlotIcon(RightWeaponIcon, nullptr);
 	if (UsableItemIcon) SetSlotIcon(UsableItemIcon, nullptr);
 	if (UsableItemCountText) UsableItemCountText->SetText(FText::GetEmpty());
+	if (NextUsableItemIcon1) SetSlotIcon(NextUsableItemIcon1, nullptr);
+	if (NextUsableItemIcon2) SetSlotIcon(NextUsableItemIcon2, nullptr);
 }
 
 void UEquipmentSlotWidget::NativeDestruct()
@@ -94,13 +96,40 @@ void UEquipmentSlotWidget::RefreshItemSlot()
 	//수량 (무제한 아이템이면 비표시, 그 외에는 숫자)
 	if (UsableItemCountText)
 	{
-		if (CurrentSlot.IsValid() && CurrentSlot.ItemDA && !CurrentSlot.ItemDA->IsUnlimited())
+		if (CurrentSlot.IsValid() && CurrentSlot.ItemDA && CurrentSlot.ItemDA->HasCount())
 		{
 			UsableItemCountText->SetText(FText::AsNumber(CurrentSlot.CurrentCount));
 		}
 		else
 		{
 			UsableItemCountText->SetText(FText::GetEmpty());
+		}
+	}
+
+	//프리뷰 슬롯 갱신 (슬롯이 2개 이하이면 프리뷰 의미 없음)
+	if (NextUsableItemIcon1)
+	{
+		if (ItemManager->GetSlotCount() > 1)
+		{
+			const FUsableItemSlot& NextSlot1 = ItemManager->GetSlotAtOffset(1);
+			SetSlotIcon(NextUsableItemIcon1, NextSlot1.ItemDA);
+		}
+		else
+		{
+			SetSlotIcon(NextUsableItemIcon1, nullptr);
+		}
+	}
+
+	if (NextUsableItemIcon2)
+	{
+		if (ItemManager->GetSlotCount() > 2)
+		{
+			const FUsableItemSlot& NextSlot2 = ItemManager->GetSlotAtOffset(2);
+			SetSlotIcon(NextUsableItemIcon2, NextSlot2.ItemDA);
+		}
+		else
+		{
+			SetSlotIcon(NextUsableItemIcon2, nullptr);
 		}
 	}
 }

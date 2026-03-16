@@ -10,10 +10,12 @@ class UEquipmentSlotWidget;
 class UBossHealthWidget;
 class UDeathScreenWidget;
 class UInteractionPromptWidget;
+class UInteractionResultWidget;
 class UActionPracticeAttributeSet;
 class UBossAttributeSet;
 class UWeaponManagerComponent;
 class UItemManagerComponent;
+class UBaseItemDataAsset;
 
 UCLASS()
 class ACTIONPRACTICE_API UMasterHUDWidget : public UUserWidget
@@ -43,6 +45,12 @@ public:
 	//상호작용 프롬프트 표시/숨김
 	void ShowInteractionPrompt(const FText& InPromptText);
 	void HideInteractionPrompt();
+
+	//상호작용 프롬프트 디밍 제어
+	void SetInteractionPromptDimmed(bool bDimmed);
+
+	//아이템 획득 알림 — InteractionResultWidget으로 전달
+	void ShowItemAcquisition(const UBaseItemDataAsset* InItemDA, int32 InCount);
 
 	//위젯 접근자 (외부에서 직접 접근이 필요한 경우 대비)
 	FORCEINLINE UDeathScreenWidget* GetDeathScreenWidget() const { return DeathScreenWidget; }
@@ -82,6 +90,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	TSubclassOf<UInteractionPromptWidget> InteractionPromptWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UInteractionResultWidget> InteractionResultWidgetClass;
+
 	//생성된 위젯 인스턴스
 	UPROPERTY()
 	TObjectPtr<UPlayerStatsWidget> PlayerStatsWidget;
@@ -97,6 +108,9 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UInteractionPromptWidget> InteractionPromptWidget;
+
+	UPROPERTY()
+	TObjectPtr<UInteractionResultWidget> InteractionResultWidget;
 
 #pragma endregion
 

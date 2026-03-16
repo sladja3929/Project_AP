@@ -2,6 +2,9 @@
 #include "Interaction/IInteractable.h"
 #include "TimerManager.h"
 #include "Engine/OverlapResult.h"
+#include "AbilitySystemInterface.h"
+#include "AbilitySystemComponent.h"
+#include "GAS/GameplayTagsSubsystem.h"
 
 #define ENABLE_DEBUG_LOG 1
 
@@ -34,6 +37,23 @@ void UInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void UInteractionComponent::TryInteract()
 {
 	if (!CurrentInteractable.IsValid()) return;
+
+	//Owner의 Recovering 상태 확인 — 모든 IInteractable에 공통 적용
+	AActor* Owner = GetOwner();
+	if (Owner)
+	{
+		if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(Owner))
+		{
+			if (UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent())
+			{
+				if (ASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRecoveringLocalTag()))
+				{
+					DEBUG_LOG(TEXT("TryInteract: Blocked by State.Recovering.Local tag"));
+					return;
+				}
+			}
+		}
+	}
 
 	AActor* Interactable = CurrentInteractable.Get();
 	IInteractable* InteractableInterface = Cast<IInteractable>(Interactable);

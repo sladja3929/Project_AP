@@ -30,3 +30,9 @@ void UInteractionPromptWidget::HidePrompt()
 	SetVisibility(ESlateVisibility::Collapsed);
 	DEBUG_LOG(TEXT("HidePrompt"));
 }
+
+void UInteractionPromptWidget::SetDimmed(bool bDimmed)
+{
+	SetRenderOpacity(bDimmed ? DimmedOpacity : 1.0f);
+	DEBUG_LOG(TEXT("SetDimmed: %s (Opacity=%.2f)"), bDimmed ? TEXT("true") : TEXT("false"), GetRenderOpacity());
+}

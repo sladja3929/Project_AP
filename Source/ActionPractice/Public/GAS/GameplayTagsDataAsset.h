@@ -76,6 +76,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
 	FGameplayTag AbilityDeath;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
+	FGameplayTag Ability_GetItem;
+
 #pragma endregion
 
 #pragma region "State Tags"
@@ -121,6 +124,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
 	FGameplayTag State_CanMove;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
+	FGameplayTag State_CantMove;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
 	FGameplayTag StateDead;

@@ -164,6 +164,7 @@ protected:
 	FGameplayTag EventActionAttackInputTag;
 	FGameplayTag EventActionCancelAttackTag;
 	FGameplayTag StateCanMoveTag;
+	FGameplayTag StateCantMoveTag;
 	FGameplayTag StateUndetectableTag;
 
 	// AttackSequenceAbility auto-activation gate

@@ -19,11 +19,15 @@ ABonfire::ABonfire()
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
 
-	//루트 컴포넌트 설정
-	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
-	SetRootComponent(MeshComponent);
+	//루트 컴포넌트 — 액터 자체 Transform/Scale 조절용
+	RootSceneComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootSceneComponent"));
+	SetRootComponent(RootSceneComponent);
 
-	//상호작용 감지용 구체 콜리전
+	//메시 — 루트와 독립적으로 스케일 조절 가능
+	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
+	MeshComponent->SetupAttachment(RootComponent);
+
+	//상호작용 감지용 구체 콜리전 — 메시 스케일과 무관하게 반경 고정
 	InteractionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionSphere"));
 	InteractionSphere->SetupAttachment(RootComponent);
 	InteractionSphere->SetSphereRadius(150.f);

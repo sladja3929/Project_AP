@@ -1,4 +1,5 @@
 #include "GAS/Abilities/Player/RestAbility.h"
+#include "Characters/ItemManagerComponent.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
@@ -347,6 +348,18 @@ void URestAbility::ApplyRestRecovery()
 
 	ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 	DEBUG_LOG(TEXT("ApplyRestRecovery: GE applied"));
+
+	//Refillable 아이템 리필
+	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
+	if (Character)
+	{
+		UItemManagerComponent* ItemManager = Character->GetItemManagerComponent();
+		if (ItemManager)
+		{
+			ItemManager->RefillAllSlots();
+			DEBUG_LOG(TEXT("ApplyRestRecovery: Refillable items refilled"));
+		}
+	}
 }
 
 void URestAbility::RequestEnemyReset()

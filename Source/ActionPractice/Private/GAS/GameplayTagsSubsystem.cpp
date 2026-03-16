@@ -210,6 +210,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityDeathTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityGetItemTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetAbilityGetItemTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Static State Tags"
@@ -335,6 +344,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateCanMoveTag()
 	if (UGameplayTagsSubsystem* Subsystem = Get())
 	{
 		return Subsystem->GetStateCanMoveTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateCantMoveTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateCantMoveTagInternal();
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -760,6 +778,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityDeathTagInternal() const
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityGetItemTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Ability_GetItem;
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Internal State Tags"
@@ -885,6 +912,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateCanMoveTagInternal() const
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->State_CanMove;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateCantMoveTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->State_CantMove;
 	}
 	return FGameplayTag::EmptyTag;
 }

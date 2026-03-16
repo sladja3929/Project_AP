@@ -104,6 +104,7 @@ void AActionPracticeCharacter::BeginPlay()
 	EventActionAttackInputTag = UGameplayTagsSubsystem::GetEventActionAttackInputTag();
 	EventActionCancelAttackTag = UGameplayTagsSubsystem::GetEventActionCancelAttackTag();
 	StateCanMoveTag = UGameplayTagsSubsystem::GetStateCanMoveTag();
+	StateCantMoveTag = UGameplayTagsSubsystem::GetStateCantMoveTag();
 	StateUndetectableTag = UGameplayTagsSubsystem::GetStateUndetectableTag();
 
 	if (!StateRecoveringLocalTag.IsValid())
@@ -157,6 +158,12 @@ void AActionPracticeCharacter::ExecuteMove(const FVector2D& MovementVector)
 	if (MovementVector.Size() > 0.1f)
 	{
 		CancelActionForMove();
+	}
+
+	//CantMove 태그가 있으면 무조건 이동 차단
+	if (AbilitySystemComponent->HasMatchingGameplayTag(StateCantMoveTag))
+	{
+		return;
 	}
 
 	bool bIsRecovering = AbilitySystemComponent->HasMatchingGameplayTag(StateRecoveringLocalTag);

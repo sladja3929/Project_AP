@@ -38,6 +38,7 @@ public:
 	static const FGameplayTag& GetAbilityWeaponSwitchTag();
 	static const FGameplayTag& GetAbilityRestTag();
 	static const FGameplayTag& GetAbilityDeathTag();
+	static const FGameplayTag& GetAbilityGetItemTag();
 #pragma endregion
 
 #pragma region "Static State Tags"
@@ -55,6 +56,7 @@ public:
 	static const FGameplayTag& GetStateInvincibleTag();
 	static const FGameplayTag& GetStateStaminaRegenBlockedTag();
 	static const FGameplayTag& GetStateCanMoveTag();
+	static const FGameplayTag& GetStateCantMoveTag();
 	static const FGameplayTag& GetStateDeadTag();
 	static const FGameplayTag& GetStateRestingTag();
 	static const FGameplayTag& GetStateUndetectableTag();
@@ -117,6 +119,7 @@ private:
 	const FGameplayTag& GetAbilityWeaponSwitchTagInternal() const;
 	const FGameplayTag& GetAbilityRestTagInternal() const;
 	const FGameplayTag& GetAbilityDeathTagInternal() const;
+	const FGameplayTag& GetAbilityGetItemTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal State Tags"
@@ -134,6 +137,7 @@ private:
 	const FGameplayTag& GetStateInvincibleTagInternal() const;
 	const FGameplayTag& GetStateStaminaRegenBlockedTagInternal() const;
 	const FGameplayTag& GetStateCanMoveTagInternal() const;
+	const FGameplayTag& GetStateCantMoveTagInternal() const;
 	const FGameplayTag& GetStateDeadTagInternal() const;
 	const FGameplayTag& GetStateRestingTagInternal() const;
 	const FGameplayTag& GetStateUndetectableTagInternal() const;

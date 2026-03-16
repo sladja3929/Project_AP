@@ -113,8 +113,115 @@ bool UItemManagerComponent::ConsumeEquippedItem()
 	}
 
 	DEBUG_LOG(TEXT("ConsumeEquippedItem: Consumed. Remaining=%d"), Slot.CurrentCount);
+
+	//Consumable이고 수량 0이면 슬롯 제거
+	if (Slot.ItemDA && Slot.ItemDA->IsConsumable() && Slot.CurrentCount <= 0)
+	{
+		DEBUG_LOG(TEXT("ConsumeEquippedItem: Consumable depleted — removing slot at index %d"), EquippedIndex);
+		Slots.RemoveAt(EquippedIndex);
+
+		//EquippedIndex 보정
+		if (Slots.Num() == 0)
+		{
+			EquippedIndex = 0;
+		}
+		else if (EquippedIndex >= Slots.Num())
+		{
+			EquippedIndex = 0;
+		}
+		//같은 인덱스면 다음 아이템이 자동으로 장착됨 — 추가 보정 불필요
+	}
+
 	OnEquippedItemChanged.Broadcast();
 	return true;
+}
+
+void UItemManagerComponent::RefillAllSlots()
+{
+	if (!GetOwner()->HasAuthority())
+	{
+		DEBUG_LOG(TEXT("RefillAllSlots: Called on client — ignored"));
+		return;
+	}
+
+	bool bAnyRefilled = false;
+	for (FUsableItemSlot& Slot : Slots)
+	{
+		if (Slot.ItemDA && Slot.ItemDA->IsRefillable())
+		{
+			const int32 PreviousCount = Slot.CurrentCount;
+			Slot.Refill();
+			if (PreviousCount != Slot.CurrentCount)
+			{
+				bAnyRefilled = true;
+				DEBUG_LOG(TEXT("RefillAllSlots: %s refilled %d → %d"), *Slot.ItemDA->DisplayName.ToString(), PreviousCount, Slot.CurrentCount);
+			}
+		}
+	}
+
+	if (bAnyRefilled)
+	{
+		OnEquippedItemChanged.Broadcast();
+	}
+}
+
+bool UItemManagerComponent::AddUsableItem(const UUsableItemDataAsset* InItemDA, int32 InCount)
+{
+	if (!GetOwner()->HasAuthority())
+	{
+		DEBUG_LOG(TEXT("AddUsableItem: Called on client — ignored"));
+		return false;
+	}
+
+	if (!InItemDA || InCount <= 0)
+	{
+		DEBUG_LOG(TEXT("AddUsableItem: Invalid params — DA=%s, Count=%d"), *GetNameSafe(InItemDA), InCount);
+		return false;
+	}
+
+	//기존 슬롯에서 동일 DA 탐색
+	for (FUsableItemSlot& Slot : Slots)
+	{
+		if (Slot.ItemDA == InItemDA)
+		{
+			//무제한 아이템이면 수량 변경 불필요
+			if (InItemDA->IsTool())
+			{
+				DEBUG_LOG(TEXT("AddUsableItem: %s is unlimited — no count change"), *InItemDA->DisplayName.ToString());
+				return true;
+			}
+
+			const int32 PreviousCount = Slot.CurrentCount;
+			Slot.CurrentCount = FMath::Min(Slot.CurrentCount + InCount, InItemDA->MaxStackCount);
+			OnEquippedItemChanged.Broadcast();
+			DEBUG_LOG(TEXT("AddUsableItem: %s count %d → %d"), *InItemDA->DisplayName.ToString(), PreviousCount, Slot.CurrentCount);
+			return true;
+		}
+	}
+
+	//새 슬롯 생성
+	FUsableItemSlot NewSlot;
+	NewSlot.ItemDA = const_cast<UUsableItemDataAsset*>(InItemDA);
+	NewSlot.CurrentCount = InItemDA->IsTool() ? 0 : FMath::Min(InCount, InItemDA->MaxStackCount);
+	Slots.Add(NewSlot);
+	OnEquippedItemChanged.Broadcast();
+	DEBUG_LOG(TEXT("AddUsableItem: New slot created — %s, Count=%d"), *InItemDA->DisplayName.ToString(), NewSlot.CurrentCount);
+	return true;
+}
+
+const FUsableItemSlot& UItemManagerComponent::GetSlotAtOffset(int32 Offset) const
+{
+	static const FUsableItemSlot EmptySlot;
+	if (Slots.Num() == 0) return EmptySlot;
+
+	const int32 TargetIndex = (EquippedIndex + Offset) % Slots.Num();
+	if (!Slots.IsValidIndex(TargetIndex)) return EmptySlot;
+	return Slots[TargetIndex];
+}
+
+int32 UItemManagerComponent::GetSlotCount() const
+{
+	return Slots.Num();
 }
 
 void UItemManagerComponent::OnRep_Slots()

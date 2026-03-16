@@ -47,6 +47,9 @@ protected:
 	FText InteractionPromptText = NSLOCTEXT("Bonfire", "DefaultPrompt", "휴식");
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<USceneComponent> RootSceneComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComponent = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

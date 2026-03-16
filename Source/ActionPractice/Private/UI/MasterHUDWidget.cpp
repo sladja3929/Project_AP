@@ -4,6 +4,7 @@
 #include "UI/BossHealthWidget.h"
 #include "UI/DeathScreenWidget.h"
 #include "UI/InteractionPromptWidget.h"
+#include "UI/InteractionResultWidget.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 
@@ -113,6 +114,30 @@ void UMasterHUDWidget::CreateChildWidgets()
 			DEBUG_LOG(TEXT("InteractionPromptWidget created in BaseLayer (Collapsed)"));
 		}
 	}
+
+	//BaseLayer — InteractionResult (상호작용 결과 UI 컨테이너)
+	if (InteractionResultWidgetClass && BaseLayer)
+	{
+		InteractionResultWidget = CreateWidget<UInteractionResultWidget>(PC, InteractionResultWidgetClass);
+		if (InteractionResultWidget)
+		{
+			UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(BaseLayer->AddChild(InteractionResultWidget));
+			if (OverlaySlot)
+			{
+				OverlaySlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Fill);
+				OverlaySlot->SetVerticalAlignment(EVerticalAlignment::VAlign_Fill);
+			}
+			DEBUG_LOG(TEXT("InteractionResultWidget created in BaseLayer"));
+		}
+	}
+}
+
+void UMasterHUDWidget::ShowItemAcquisition(const UBaseItemDataAsset* InItemDA, int32 InCount)
+{
+	if (InteractionResultWidget)
+	{
+		InteractionResultWidget->AddItemAcquisitionNotification(InItemDA, InCount);
+	}
 }
 
 void UMasterHUDWidget::ShowInteractionPrompt(const FText& InPromptText)
@@ -128,6 +153,14 @@ void UMasterHUDWidget::HideInteractionPrompt()
 	if (InteractionPromptWidget)
 	{
 		InteractionPromptWidget->HidePrompt();
+	}
+}
+
+void UMasterHUDWidget::SetInteractionPromptDimmed(bool bDimmed)
+{
+	if (InteractionPromptWidget)
+	{
+		InteractionPromptWidget->SetDimmed(bDimmed);
 	}
 }
 

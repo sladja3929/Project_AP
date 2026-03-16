@@ -54,6 +54,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool ConsumeEquippedItem();
 
+	//UsableItem을 슬롯에 추가 — 서버에서만 호출
+	//동일 DA 슬롯이 이미 있으면 수량 추가, 없으면 새 슬롯 생성
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool AddUsableItem(const UUsableItemDataAsset* InItemDA, int32 InCount);
+
+	//Refillable 아이템 전체 리필 — 서버에서만 호출 (휴식 시 사용)
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void RefillAllSlots();
+
+	//EquippedIndex 기준 상대 오프셋 슬롯 반환 (0=현재, 1=다음, 2=다다음...)
+	//Slots가 비거나 범위 밖이면 빈 슬롯 반환
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory")
+	const FUsableItemSlot& GetSlotAtOffset(int32 Offset) const;
+
+	//전체 슬롯 수 반환
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory")
+	int32 GetSlotCount() const;
+
 #pragma endregion
 
 protected:

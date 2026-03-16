@@ -10,6 +10,14 @@
 class UAnimMontage;
 class UStaticMesh;
 
+UENUM(BlueprintType)
+enum class EUsableItemType : uint8
+{
+	Tool        UMETA(DisplayName = "도구"),
+	Consumable  UMETA(DisplayName = "소모품"),
+	Refillable  UMETA(DisplayName = "리필"),
+};
+
 UCLASS(BlueprintType)
 class ACTIONPRACTICE_API UUsableItemDataAsset : public UBaseItemDataAsset
 {
@@ -18,8 +26,12 @@ class ACTIONPRACTICE_API UUsableItemDataAsset : public UBaseItemDataAsset
 public:
 #pragma region "Public Variables"
 
-	//최대 보유 수 (-1이면 무제한, 도구형)
+	//아이템 타입
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Info")
+	EUsableItemType ItemType = EUsableItemType::Consumable;
+
+	//최대 보유 수 — Consumable, Refillable에서만 사용
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Info", meta = (EditCondition = "ItemType != EUsableItemType::Tool", EditConditionHides, ClampMin = 1))
 	int32 MaxStackCount = 1;
 
 	//사용 몽타주 (비동기 로딩용 Soft)
@@ -63,8 +75,12 @@ public:
 	//몽타주 프리로드
 	void PreloadMontage();
 
-	//무제한 아이템 여부
-	FORCEINLINE bool IsUnlimited() const { return MaxStackCount < 0; }
+	FORCEINLINE bool IsTool() const { return ItemType == EUsableItemType::Tool; }
+	FORCEINLINE bool IsConsumable() const { return ItemType == EUsableItemType::Consumable; }
+	FORCEINLINE bool IsRefillable() const { return ItemType == EUsableItemType::Refillable; }
+
+	//수량 표시가 필요한 타입인지 여부
+	FORCEINLINE bool HasCount() const { return ItemType != EUsableItemType::Tool; }
 
 #pragma endregion
 
@@ -99,21 +115,29 @@ struct FUsableItemSlot
 	//유효한 슬롯인지 확인
 	bool IsValid() const { return ItemDA != nullptr; }
 
-	//사용 가능 여부 (수량 남아있거나 무제한 아이템)
+	//사용 가능 여부 (수량 남아있거나 도구형)
 	bool CanUse() const
 	{
 		if (!ItemDA) return false;
-		if (ItemDA->IsUnlimited()) return true;
+		if (ItemDA->IsTool()) return true;
 		return CurrentCount > 0;
 	}
 
-	//수량 차감 (무제한이면 차감하지 않음, 성공 여부 반환)
+	//수량 차감 (도구형이면 차감하지 않음, 성공 여부 반환)
 	bool ConsumeOne()
 	{
 		if (!ItemDA) return false;
-		if (ItemDA->IsUnlimited()) return true;
+		if (ItemDA->IsTool()) return true;
 		if (CurrentCount <= 0) return false;
 		CurrentCount--;
 		return true;
+	}
+
+	//Refillable 타입일 때 최대 수량으로 복원
+	void Refill()
+	{
+		if (!ItemDA) return;
+		if (!ItemDA->IsRefillable()) return;
+		CurrentCount = ItemDA->MaxStackCount;
 	}
 };

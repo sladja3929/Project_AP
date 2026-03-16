@@ -35,6 +35,14 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> UsableItemCountText;
 
+	//다음 아이템 프리뷰 슬롯 1 (EquippedIndex+1)
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> NextUsableItemIcon1;
+
+	//다음 아이템 프리뷰 슬롯 2 (EquippedIndex+2)
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> NextUsableItemIcon2;
+
 #pragma endregion
 
 #pragma region "Public Functions"

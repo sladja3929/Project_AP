@@ -1,5 +1,6 @@
 
 #include "Public/Games/ActionPracticePlayerController.h"
+#include "Items/BaseItemDataAsset.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
 #include "Engine/LocalPlayer.h"
@@ -147,6 +148,7 @@ void AActionPracticePlayerController::OnPossess(APawn* InPawn)
 		//PIE 초기화 시 AddDynamic 크래시 방지 — 다음 틱으로 지연
 		GetWorldTimerManager().SetTimer(BindHUDTimerHandle, this, &AActionPracticePlayerController::BindPlayerHUDData, 0.01f, false);
 		BindDeathStateTagEvent();
+		BindRecoveringTagEvent();
 	}
 }
 
@@ -154,6 +156,7 @@ void AActionPracticePlayerController::OnUnPossess()
 {
 	GetWorldTimerManager().ClearTimer(BindHUDTimerHandle);
 	UnbindDeathStateTagEvent();
+	UnbindRecoveringTagEvent();
 	UnbindInteractionPromptEvent();
 	CachedCharacter = nullptr;
 	Super::OnUnPossess();
@@ -169,6 +172,7 @@ void AActionPracticePlayerController::AcknowledgePossession(APawn* P)
 	BindInteractionPromptEvent();
 	GetWorldTimerManager().SetTimer(BindHUDTimerHandle, this, &AActionPracticePlayerController::BindPlayerHUDData, 0.01f, false);
 	BindDeathStateTagEvent();
+	BindRecoveringTagEvent();
 }
 
 void AActionPracticePlayerController::OnRep_Pawn()
@@ -181,6 +185,7 @@ void AActionPracticePlayerController::OnRep_Pawn()
 	BindInteractionPromptEvent();
 	GetWorldTimerManager().SetTimer(BindHUDTimerHandle, this, &AActionPracticePlayerController::BindPlayerHUDData, 0.01f, false);
 	BindDeathStateTagEvent();
+	BindRecoveringTagEvent();
 }
 
 void AActionPracticePlayerController::PlayerTick(float DeltaTime)
@@ -477,16 +482,75 @@ void AActionPracticePlayerController::OnInteractableChanged(AActor* NewInteracta
 		{
 			const FText PromptText = InteractableInterface->GetInteractionPrompt();
 			MasterHUDWidget->ShowInteractionPrompt(PromptText);
+			bIsInteractionPromptVisible = true;
+
+			//현재 Recovering 태그 상태 즉시 반영 (UI 뜰 때 이미 태그가 있는 경우)
+			if (CachedRecoveringUIASC)
+			{
+				const bool bIsRecovering = CachedRecoveringUIASC->HasMatchingGameplayTag(StateRecoveringLocalTag);
+				MasterHUDWidget->SetInteractionPromptDimmed(bIsRecovering);
+			}
+
 			DEBUG_LOG(TEXT("OnInteractableChanged: Show prompt — %s"), *PromptText.ToString());
 			return;
 		}
 	}
 
 	MasterHUDWidget->HideInteractionPrompt();
+	bIsInteractionPromptVisible = false;
 	DEBUG_LOG(TEXT("OnInteractableChanged: Hide prompt"));
 }
 
+void AActionPracticePlayerController::BindRecoveringTagEvent()
+{
+	if (!CachedCharacter) return;
+
+	UAbilitySystemComponent* ASC = CachedCharacter->GetAbilitySystemComponent();
+	if (!ASC) return;
+
+	if (!StateRecoveringLocalTag.IsValid())
+	{
+		StateRecoveringLocalTag = UGameplayTagsSubsystem::GetStateRecoveringLocalTag();
+	}
+	if (!StateRecoveringLocalTag.IsValid()) return;
+
+	CachedRecoveringUIASC = ASC;
+	RecoveringTagChangedHandle = ASC->RegisterGameplayTagEvent(StateRecoveringLocalTag, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &AActionPracticePlayerController::HandleRecoveringTagChanged);
+
+	DEBUG_LOG(TEXT("BindRecoveringTagEvent: Bound to ASC %s"), *GetNameSafe(ASC));
+}
+
+void AActionPracticePlayerController::UnbindRecoveringTagEvent()
+{
+	if (CachedRecoveringUIASC && RecoveringTagChangedHandle.IsValid())
+	{
+		CachedRecoveringUIASC->UnregisterGameplayTagEvent(RecoveringTagChangedHandle, StateRecoveringLocalTag, EGameplayTagEventType::NewOrRemoved);
+		RecoveringTagChangedHandle.Reset();
+		DEBUG_LOG(TEXT("UnbindRecoveringTagEvent: Unbound"));
+	}
+	CachedRecoveringUIASC = nullptr;
+}
+
+void AActionPracticePlayerController::HandleRecoveringTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
+{
+	if (!MasterHUDWidget) return;
+	if (!bIsInteractionPromptVisible) return;
+
+	MasterHUDWidget->SetInteractionPromptDimmed(NewCount > 0);
+	DEBUG_LOG(TEXT("HandleRecoveringTagChanged: Dimmed=%s (Count=%d)"), NewCount > 0 ? TEXT("true") : TEXT("false"), NewCount);
+}
+
 #pragma endregion
+
+void AActionPracticePlayerController::Client_NotifyItemAcquired_Implementation(UBaseItemDataAsset* InItemDA, int32 InCount)
+{
+	if (!MasterHUDWidget) return;
+	if (!InItemDA) return;
+
+	MasterHUDWidget->ShowItemAcquisition(InItemDA, InCount);
+	DEBUG_LOG(TEXT("Client_NotifyItemAcquired: %s x%d"), *InItemDA->DisplayName.ToString(), InCount);
+}
 
 void AActionPracticePlayerController::UpdateLockOnCamera()
 {
