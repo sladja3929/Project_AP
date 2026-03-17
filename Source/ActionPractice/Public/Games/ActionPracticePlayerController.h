@@ -187,14 +187,15 @@ private:
 
 	TWeakObjectPtr<ABonfire> LastActivatedBonfire = nullptr;
 
+	bool bIsSprintPressed = false;
 #pragma endregion
 
 #pragma region "Private Functions"
 
 	// ===== GAS Input Binding Wrappers =====
 	void OnJumpPressed()          { HandleGASInputPressed(IA_Jump); }
-	void OnSprintPressed()        { HandleGASInputPressed(IA_Sprint); }
-	void OnSprintReleased()       { HandleGASInputReleased(IA_Sprint); }
+	void OnSprintPressed();		//Triggered이지만 입력을 시작 시 한 번만 받도록
+	void OnSprintReleased();     
 	void OnCrouchPressed()        { HandleGASInputPressed(IA_Crouch); }
 	void OnRollPressed()          { HandleGASInputPressed(IA_Roll); }
 	void OnAttackPressed()        { HandleGASInputPressed(IA_Attack); }

@@ -5,7 +5,7 @@
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/AbilitySystemComponent/BaseAbilitySystemComponent.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogBonfire, Log, All);

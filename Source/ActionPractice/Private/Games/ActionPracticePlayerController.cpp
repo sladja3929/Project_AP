@@ -194,6 +194,7 @@ void AActionPracticePlayerController::PlayerTick(float DeltaTime)
 	UpdateLockOnCamera();
 }
 
+#pragma region "Non Gas Handler"
 void AActionPracticePlayerController::HandleMove(const FInputActionValue& Value)
 {
 	if (CachedCharacter)
@@ -235,7 +236,9 @@ void AActionPracticePlayerController::HandleCycleQuickSlot(const FInputActionVal
 		}
 	}
 }
+#pragma endregion
 
+#pragma region "Gas Handler"
 void AActionPracticePlayerController::HandleCycleWeapon(const FInputActionValue& Value)
 {
 	//Shift+휠 위(양수): 오른손 무기 순환
@@ -250,6 +253,27 @@ void AActionPracticePlayerController::HandleCycleWeapon(const FInputActionValue&
 	{
 		HandleGASInputPressed(IA_CycleLeftWeapon);
 	}
+}
+
+void AActionPracticePlayerController::OnSprintPressed()
+{
+	/*if (!CachedCharacter) return;
+
+	UAbilitySystemComponent* ASC = CachedCharacter->GetAbilitySystemComponent();
+	if (ASC && ASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateAbilitySprintingTag()))
+	{
+		return;
+	}*/
+	if (bIsSprintPressed) return;
+	
+	bIsSprintPressed = true;
+	HandleGASInputPressed(IA_Sprint);
+}
+
+void AActionPracticePlayerController::OnSprintReleased()
+{
+	bIsSprintPressed = false;
+	HandleGASInputReleased(IA_Sprint);
 }
 
 void AActionPracticePlayerController::HandleGASInputPressed(const UInputAction* InputAction)
@@ -267,6 +291,7 @@ void AActionPracticePlayerController::HandleGASInputReleased(const UInputAction*
 		CachedCharacter->GASInputReleased(InputAction);
 	}
 }
+#pragma endregion
 
 void AActionPracticePlayerController::SetLastActivatedBonfire(ABonfire* NewBonfire)
 {
