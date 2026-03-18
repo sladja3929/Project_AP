@@ -179,7 +179,7 @@ void UMasterHUDWidget::BindPlayerData(UActionPracticeAttributeSet* InAttributeSe
 	}
 }
 
-void UMasterHUDWidget::ShowBossHealth(UBossAttributeSet* InBossAttributeSet, const FName& InBossName)
+void UMasterHUDWidget::ShowBossHealth(UEnemyAttributeSet* InBossAttributeSet, const FName& InBossName)
 {
 	if (!BossHealthWidget) return;
 

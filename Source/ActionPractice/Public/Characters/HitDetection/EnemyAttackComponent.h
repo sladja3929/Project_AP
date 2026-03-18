@@ -4,7 +4,7 @@
 #include "Characters/HitDetection/AttackTraceComponent.h"
 #include "EnemyAttackComponent.generated.h"
 
-class ABossCharacter;
+class AEnemyCharacter;
 class USkeletalMeshComponent;
 class UAbilitySystemComponent;
 
@@ -29,7 +29,7 @@ protected:
 #pragma region "Protected Variables"
 
 	UPROPERTY()
-	TObjectPtr<ABossCharacter> OwnerEnemy = nullptr;
+	TObjectPtr<AEnemyCharacter> OwnerEnemy = nullptr;
 
 #pragma endregion
 

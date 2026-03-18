@@ -1,5 +1,5 @@
 #include "Public/Games/ActionPracticeGameMode.h"
-#include "Characters/BossCharacter.h"
+#include "Characters/EnemyCharacter.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -18,7 +18,7 @@ void AActionPracticeGameMode::BeginPlay()
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-		SpawnedBoss = GetWorld()->SpawnActor<ABossCharacter>(
+		SpawnedBoss = GetWorld()->SpawnActor<AEnemyCharacter>(
 			BossClass,
 			BossSpawnLocation,
 			BossSpawnRotation,
@@ -40,12 +40,12 @@ void AActionPracticeGameMode::ResetAllEnemies()
 	if (!World) return;
 
 	TArray<AActor*> FoundEnemies;
-	UGameplayStatics::GetAllActorsOfClass(World, ABossCharacter::StaticClass(), FoundEnemies);
+	UGameplayStatics::GetAllActorsOfClass(World, AEnemyCharacter::StaticClass(), FoundEnemies);
 
 	int32 ResetCount = 0;
 	for (AActor* Actor : FoundEnemies)
 	{
-		ABossCharacter* Enemy = Cast<ABossCharacter>(Actor);
+		AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Actor);
 		if (!Enemy || !IsValid(Enemy)) continue;
 
 		Enemy->ResetEnemy();

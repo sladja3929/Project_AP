@@ -18,7 +18,7 @@
 #include "UI/MasterHUDWidget.h"
 #include "UI/DeathScreenWidget.h"
 #include "Characters/BossCharacter.h"
-#include "GAS/AttributeSet/BossAttributeSet.h"
+#include "GAS/AttributeSet/EnemyAttributeSet.h"
 #include "GAS/AttributeSet/ActionPracticeAttributeSet.h"
 #include "Characters/WeaponManagerComponent.h"
 #include "Characters/ItemManagerComponent.h"
@@ -396,7 +396,7 @@ void AActionPracticePlayerController::ShowBossHealth(ABossCharacter* Boss)
 {
 	if (!MasterHUDWidget || !Boss) return;
 
-	UBossAttributeSet* BossAttrSet = Boss->GetAttributeSet();
+	UEnemyAttributeSet* BossAttrSet = Boss->GetAttributeSet();
 	MasterHUDWidget->ShowBossHealth(BossAttrSet, Boss->EnemyName);
 	DEBUG_LOG(TEXT("ShowBossHealth: %s"), *Boss->EnemyName.ToString());
 }

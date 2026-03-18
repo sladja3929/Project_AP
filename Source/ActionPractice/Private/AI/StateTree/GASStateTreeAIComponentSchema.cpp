@@ -7,15 +7,15 @@
 #include "StateTreeExecutionContext.h"
 #include "StateTreeTaskBase.h"
 #include "AI/EnemyAIController.h"
-#include "Characters/BossCharacter.h"
-#include "GAS/AbilitySystemComponent/BossAbilitySystemComponent.h"
+#include "Characters/EnemyCharacter.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "AbilitySystemComponent.h"
 
 
 #define ENABLE_DEBUG_LOG 0
 #if ENABLE_DEBUG_LOG
-	DEFINE_LOG_CATEGORY_STATIC(LogBossStateTreeSchema, Log, All);
-#define DEBUG_LOG(Format, ...) UE_LOG(LogBossStateTreeSchema, Warning, Format, ##__VA_ARGS__)
+	DEFINE_LOG_CATEGORY_STATIC(LogEnemyStateTreeSchema, Log, All);
+#define DEBUG_LOG(Format, ...) UE_LOG(LogEnemyStateTreeSchema, Warning, Format, ##__VA_ARGS__)
 #else
 #define DEBUG_LOG(Format, ...)
 #endif
@@ -30,9 +30,9 @@ bool UGASStateTreeAIComponentSchema::IsStructAllowed(const UScriptStruct* InScri
 
 bool UGASStateTreeAIComponentSchema::IsClassAllowed(const UClass* InClass) const
 {
-	//BossAIController, BossCharacter, Actor 허용
+	//EnemyAIController, EnemyCharacter, Actor 허용
 	return InClass->IsChildOf(AEnemyAIController::StaticClass()) ||
-		   InClass->IsChildOf(ABossCharacter::StaticClass()) ||
+		   InClass->IsChildOf(AEnemyCharacter::StaticClass()) ||
 		   InClass->IsChildOf(AActor::StaticClass());
 }
 

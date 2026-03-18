@@ -12,7 +12,7 @@ class UDeathScreenWidget;
 class UInteractionPromptWidget;
 class UInteractionResultWidget;
 class UActionPracticeAttributeSet;
-class UBossAttributeSet;
+class UEnemyAttributeSet;
 class UWeaponManagerComponent;
 class UItemManagerComponent;
 class UBaseItemDataAsset;
@@ -32,7 +32,7 @@ public:
 	void BindPlayerData(UActionPracticeAttributeSet* InAttributeSet, UWeaponManagerComponent* InWeaponManager, UItemManagerComponent* InItemManager);
 
 	//보스 HP바 표시
-	void ShowBossHealth(UBossAttributeSet* InBossAttributeSet, const FName& InBossName);
+	void ShowBossHealth(UEnemyAttributeSet* InBossAttributeSet, const FName& InBossName);
 
 	//보스 HP바 숨김
 	void HideBossHealth();

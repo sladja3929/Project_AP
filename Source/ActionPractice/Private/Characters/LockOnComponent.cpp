@@ -1,4 +1,5 @@
 #include "Public/Characters/LockOnComponent.h"
+#include "Characters/EnemyCharacter.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -47,6 +48,9 @@ void ULockOnComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 
 void ULockOnComponent::SetLockedOnTarget(AActor* NewTarget)
 {
+	//이전 타겟 HP바 해제
+	AActor* PreviousTarget = LockedOnTarget;
+
 	bIsLockOn = (NewTarget != nullptr);
 	LockedOnTarget = NewTarget;
 
@@ -54,6 +58,13 @@ void ULockOnComponent::SetLockedOnTarget(AActor* NewTarget)
 	{
 		SetRotationMode(false, true);
 		ShowLockOnMarker(NewTarget);
+
+		//새 타겟이 EnemyCharacter이면 HP바 표시
+		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(NewTarget))
+		{
+			Enemy->SetLockedOnByPlayer(true);
+		}
+
 		DEBUG_LOG(TEXT("Lock-On Target: %s"), *NewTarget->GetName());
 	}
 	else
@@ -61,6 +72,15 @@ void ULockOnComponent::SetLockedOnTarget(AActor* NewTarget)
 		SetRotationMode(true, false);
 		HideLockOnMarker();
 		DEBUG_LOG(TEXT("Lock-On Released"));
+	}
+
+	//이전 타겟 HP바 락온 해제 (새 타겟과 다를 때만)
+	if (PreviousTarget && PreviousTarget != NewTarget)
+	{
+		if (AEnemyCharacter* PrevEnemy = Cast<AEnemyCharacter>(PreviousTarget))
+		{
+			PrevEnemy->SetLockedOnByPlayer(false);
+		}
 	}
 
 	if (!GetOwner()->HasAuthority())

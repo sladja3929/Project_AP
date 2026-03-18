@@ -97,7 +97,7 @@ protected:
 	// ===== 설정 / 초기화 =====
 	virtual void ActivateInitSettings() override;
 	void CacheGameplayTags();
-	void CacheBossData();
+	void CacheEnemyData();
 	void BindHitDetectionSetter();
 
 	// ===== 실행 로직 =====

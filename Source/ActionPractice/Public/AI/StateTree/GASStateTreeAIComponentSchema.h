@@ -4,7 +4,7 @@
 #include "GASStateTreeAIComponentSchema.generated.h"
 
 /*
- *BossAIController에서 사용하는 커스텀 State Tree Schema (기본 구조 설정)
+ *EnemyAIController에서 사용하는 커스텀 State Tree Schema (기본 구조 설정)
  */
 
 UCLASS(BlueprintType, EditInlineNew, CollapseCategories, meta = (DisplayName = "GAS AI Schema"))

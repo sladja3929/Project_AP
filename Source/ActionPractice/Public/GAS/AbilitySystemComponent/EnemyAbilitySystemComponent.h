@@ -2,13 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "GAS/AbilitySystemComponent/BaseAbilitySystemComponent.h"
-#include "BossAbilitySystemComponent.generated.h"
+#include "EnemyAbilitySystemComponent.generated.h"
 
-class ABossCharacter;
-class UBossAttributeSet;
+class AEnemyCharacter;
+class UEnemyAttributeSet;
 
 UCLASS()
-class ACTIONPRACTICE_API UBossAbilitySystemComponent : public UBaseAbilitySystemComponent
+class ACTIONPRACTICE_API UEnemyAbilitySystemComponent : public UBaseAbilitySystemComponent
 {
 	GENERATED_BODY()
 
@@ -19,12 +19,12 @@ public:
 
 #pragma region "Public Functions"
 
-	UBossAbilitySystemComponent();
+	UEnemyAbilitySystemComponent();
 
 	virtual void InitAbilityActorInfo(AActor* InOwnerActor, AActor* InAvatarActor) override;
 
 	UFUNCTION(BlueprintPure, Category="Attributes")
-	const UBossAttributeSet* GetBossAttributeSet() const;
+	const UEnemyAttributeSet* GetEnemyAttributeSet() const;
 
 	//===== Death =====
 	virtual void HandleDeath() override;
@@ -34,7 +34,7 @@ public:
 protected:
 #pragma region "Protected Variables"
 
-	TWeakObjectPtr<ABossCharacter> CachedBossCharacter;
+	TWeakObjectPtr<AEnemyCharacter> CachedEnemyCharacter;
 
 #pragma endregion
 

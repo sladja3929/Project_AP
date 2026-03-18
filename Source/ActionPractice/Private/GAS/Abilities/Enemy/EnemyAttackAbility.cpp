@@ -2,9 +2,9 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
-#include "Characters/BossCharacter.h"
+#include "Characters/EnemyCharacter.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
-#include "GAS/AbilitySystemComponent/BossAbilitySystemComponent.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "Items/AttackData.h"
@@ -53,7 +53,7 @@ void UEnemyAttackAbility::ActivateInitSettings()
 	Super::ActivateInitSettings();
 
 	//보스 데이터 캐싱
-	CacheBossData();
+	CacheEnemyData();
 
 	//HitDetectionSetter 바인딩
 	BindHitDetectionSetter();
@@ -80,26 +80,26 @@ void UEnemyAttackAbility::CacheGameplayTags()
 	}
 }
 
-void UEnemyAttackAbility::CacheBossData()
+void UEnemyAttackAbility::CacheEnemyData()
 {
-	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
-	if (!BossCharacter)
+	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	if (!EnemyCharacter)
 	{
-		DEBUG_LOG(TEXT("CacheBossData: BossCharacter is nullptr. Ability=%s"), *GetName());
+		DEBUG_LOG(TEXT("CacheEnemyData: EnemyCharacter is nullptr. Ability=%s"), *GetName());
 		return;
 	}
 
-	const UEnemyDataAsset* EnemyData = BossCharacter->GetEnemyData();
+	const UEnemyDataAsset* EnemyData = EnemyCharacter->GetEnemyData();
 	if (!EnemyData)
 	{
-		DEBUG_LOG(TEXT("CacheBossData: EnemyData is nullptr. Ability=%s"), *GetName());
+		DEBUG_LOG(TEXT("CacheEnemyData: EnemyData is nullptr. Ability=%s"), *GetName());
 		return;
 	}
 
 	EnemyAttackData = EnemyData->NamedAttackData.Find(AttackName);
 	if (!EnemyAttackData || EnemyAttackData->ComboSequence.Num() == 0)
 	{
-		DEBUG_LOG(TEXT("CacheBossData: Attack data not found for name: %s"), *AttackName.ToString());
+		DEBUG_LOG(TEXT("CacheEnemyData: Attack data not found for name: %s"), *AttackName.ToString());
 		return;
 	}
 
@@ -112,20 +112,20 @@ void UEnemyAttackAbility::CacheBossData()
 		CachedTargetInfo = AIController->GetCurrentTarget();
 	}
 
-	DEBUG_LOG(TEXT("CacheBossData: Cached AttackName=%s, MaxComboCount=%d"), *AttackName.ToString(), MaxComboCount);
+	DEBUG_LOG(TEXT("CacheEnemyData: Cached AttackName=%s, MaxComboCount=%d"), *AttackName.ToString(), MaxComboCount);
 }
 
 void UEnemyAttackAbility::BindHitDetectionSetter()
 {
-	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
-	if (!BossCharacter)
+	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	if (!EnemyCharacter)
 	{
-		DEBUG_LOG(TEXT("BindHitDetectionSetter: No BossCharacter"));
+		DEBUG_LOG(TEXT("BindHitDetectionSetter: No EnemyCharacter"));
 		return;
 	}
 
 	//HitDetectionSetter 초기화
-	if (!HitDetectionSetter.Init(BossCharacter->GetHitDetectionInterface()))
+	if (!HitDetectionSetter.Init(EnemyCharacter->GetHitDetectionInterface()))
 	{
 		DEBUG_LOG(TEXT("BindHitDetectionSetter: Failed to init HitDetectionSetter"));
 		return;
@@ -178,7 +178,7 @@ void UEnemyAttackAbility::SetHitDetectionConfig()
 void UEnemyAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& HitResult, FFinalAttackData AttackData)
 {
 	//Source ASC (공격자, AttackAbility 소유자)
-	UBossAbilitySystemComponent* SourceASC = GetBossAbilitySystemComponentFromActorInfo();
+	UEnemyAbilitySystemComponent* SourceASC = GetEnemyAbilitySystemComponentFromActorInfo();
 	if (!HitActor || !SourceASC) return;
 
 	//Target ASC (피격자)
@@ -311,10 +311,10 @@ void UEnemyAttackAbility::OnTaskMontageInterrupted()
 
 void UEnemyAttackAbility::OnEventRotateToTarget(FGameplayEventData Payload)
 {
-	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
-	if (!BossCharacter)
+	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	if (!EnemyCharacter)
 	{
-		DEBUG_LOG(TEXT("OnEventRotateToTarget: No BossCharacter"));
+		DEBUG_LOG(TEXT("OnEventRotateToTarget: No EnemyCharacter"));
 		return;
 	}
 
@@ -333,7 +333,7 @@ void UEnemyAttackAbility::OnEventRotateToTarget(FGameplayEventData Payload)
 	}
 
 	//타겟을 향해 회전
-	BossCharacter->RotateToTarget(TargetActor, RotateTime);
+	EnemyCharacter->RotateToTarget(TargetActor, RotateTime);
 	DEBUG_LOG(TEXT("OnEventRotateToTarget: Rotating to %s"),	*TargetActor->GetName());
 }
 

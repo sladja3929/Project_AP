@@ -4,7 +4,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "ActionPracticeGameMode.generated.h"
 
-class ABossCharacter;
+class AEnemyCharacter;
 
 /**
  *  Simple GameMode for a third person game
@@ -16,7 +16,7 @@ class AActionPracticeGameMode : public AGameModeBase
 
 public:
 	UPROPERTY(EditDefaultsOnly, Category = "Boss")
-	TSubclassOf<ABossCharacter> BossClass;
+	TSubclassOf<AEnemyCharacter> BossClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Boss")
 	FVector BossSpawnLocation = FVector(0, 0, 100);
@@ -35,7 +35,7 @@ public:
 
 protected:
 	UPROPERTY()
-	TObjectPtr<ABossCharacter> SpawnedBoss = nullptr;
+	TObjectPtr<AEnemyCharacter> SpawnedBoss = nullptr;
 };
 
 

@@ -5,8 +5,9 @@
 #include "GameplayTagContainer.h"
 #include "EnemyAbility.generated.h"
 
-class UBossAbilitySystemComponent;
-class UBossAttributeSet;
+class UEnemyAbilitySystemComponent;
+class UEnemyAttributeSet;
+class AEnemyCharacter;
 class ABossCharacter;
 class AEnemyAIController;
 
@@ -40,7 +41,13 @@ protected:
 #pragma region "Protected Functions"
 
 	UFUNCTION(BlueprintPure, Category = "Ability")
-	UBossAbilitySystemComponent* GetBossAbilitySystemComponentFromActorInfo() const;
+	UEnemyAbilitySystemComponent* GetEnemyAbilitySystemComponentFromActorInfo() const;
+
+	UFUNCTION(BlueprintPure, Category = "Ability")
+	AEnemyCharacter* GetEnemyCharacterFromActorInfo() const;
+
+	//멤버변수 Actor Info 활성화 전 사용 (CanActivateAbility 등)
+	AEnemyCharacter* GetEnemyCharacterFromActorInfo(const FGameplayAbilityActorInfo* ActorInfo) const;
 
 	UFUNCTION(BlueprintPure, Category = "Ability")
 	ABossCharacter* GetBossCharacterFromActorInfo() const;
@@ -49,10 +56,10 @@ protected:
 	ABossCharacter* GetBossCharacterFromActorInfo(const FGameplayAbilityActorInfo* ActorInfo) const;
 
 	UFUNCTION(BlueprintPure, Category = "Ability")
-	UBossAttributeSet* GetBossAttributeSetFromActorInfo() const;
+	UEnemyAttributeSet* GetEnemyAttributeSetFromActorInfo() const;
 
 	//멤버변수 Actor Info 활성화 전 사용 (CanActivateAbility 등)
-	UBossAttributeSet* GetBossAttributeSetFromActorInfo(const FGameplayAbilityActorInfo* ActorInfo) const;
+	UEnemyAttributeSet* GetEnemyAttributeSetFromActorInfo(const FGameplayAbilityActorInfo* ActorInfo) const;
 
 	UFUNCTION(BlueprintPure, Category = "Ability")
 	AEnemyAIController* GetEnemyAIControllerFromActorInfo() const;

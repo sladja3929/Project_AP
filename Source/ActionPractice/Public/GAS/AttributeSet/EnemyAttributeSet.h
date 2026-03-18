@@ -1,9 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GAS/AttributeSet/BaseAttributeSet.h"
 #include "AbilitySystemComponent.h"
-#include "BossAttributeSet.generated.h"
+#include "EnemyAttributeSet.generated.h"
 
 #define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
 		GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
@@ -12,7 +12,7 @@
 		GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
 UCLASS()
-class ACTIONPRACTICE_API UBossAttributeSet : public UBaseAttributeSet
+class ACTIONPRACTICE_API UEnemyAttributeSet : public UBaseAttributeSet
 {
 	GENERATED_BODY()
 
@@ -20,18 +20,18 @@ public:
 #pragma region "Public Variables"
 
 	// ===== Base Attributes =====
-	
+
 	// ===== Calculated Attributes =====
 	UPROPERTY(BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_PhysicalAttackPower)
 	FGameplayAttributeData PhysicalAttackPower;
-	ATTRIBUTE_ACCESSORS(UBossAttributeSet, PhysicalAttackPower)
+	ATTRIBUTE_ACCESSORS(UEnemyAttributeSet, PhysicalAttackPower)
 
 	// ===== Meta Attributes =====
-	
+
 #pragma endregion
 
 #pragma region "Public Functions"
-	UBossAttributeSet();
+	UEnemyAttributeSet();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

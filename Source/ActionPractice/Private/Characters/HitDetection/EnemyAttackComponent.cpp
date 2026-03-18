@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Characters/HitDetection/EnemyAttackComponent.h"
-#include "Characters/BossCharacter.h"
+#include "Characters/EnemyCharacter.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
 #include "Items/AttackData.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -23,7 +23,7 @@ UEnemyAttackComponent::UEnemyAttackComponent()
 
 void UEnemyAttackComponent::BeginPlay()
 {
-	OwnerEnemy = Cast<ABossCharacter>(GetOwner());
+	OwnerEnemy = Cast<AEnemyCharacter>(GetOwner());
 	if (!OwnerEnemy)
 	{
 		DEBUG_LOG(TEXT("EnemyAttackComponent: Owner is not an Enemy!"));
