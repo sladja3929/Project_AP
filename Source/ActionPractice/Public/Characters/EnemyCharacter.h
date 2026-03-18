@@ -64,6 +64,10 @@ public:
 	//락온 상태 설정 (LockOnComponent에서 호출)
 	void SetLockedOnByPlayer(bool bLocked);
 
+	//사망 시 모든 클라이언트에서 이 적을 타깃으로 한 락온 해제
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_ReleaseLockOn();
+
 	// ===== Replication =====
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

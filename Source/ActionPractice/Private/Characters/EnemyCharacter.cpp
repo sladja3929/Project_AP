@@ -19,6 +19,7 @@
 #include "Components/WidgetComponent.h"
 #include "UI/EnemyHealthBarWidget.h"
 #include "TimerManager.h"
+#include "Characters/LockOnComponent.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -51,8 +52,7 @@ AEnemyCharacter::AEnemyCharacter()
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
-	GetCharacterMovement()->bUseAccelerationForPaths = true;
-
+	//GetCharacterMovement()->bUseAcc
 	//Actor Tag
 	Tags.Add(FName("Enemy"));
 
@@ -215,6 +215,24 @@ void AEnemyCharacter::SetLockedOnByPlayer(bool bLocked)
 			HealthBarVisibilityDuration,
 			false
 		);
+	}
+}
+
+void AEnemyCharacter::Multicast_ReleaseLockOn_Implementation()
+{
+	//로컬 플레이어의 LockOnComponent가 이 적을 타깃으로 하고 있으면 해제
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!PC) return;
+
+	APawn* PlayerPawn = PC->GetPawn();
+	if (!PlayerPawn) return;
+
+	ULockOnComponent* LockOnComp = PlayerPawn->FindComponentByClass<ULockOnComponent>();
+	if (!LockOnComp) return;
+
+	if (LockOnComp->GetLockOnTarget() == this)
+	{
+		LockOnComp->SetLockedOnTarget(nullptr);
 	}
 }
 

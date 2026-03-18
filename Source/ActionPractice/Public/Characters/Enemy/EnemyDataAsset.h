@@ -38,6 +38,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack Definitions")
     TMap<FName, FNamedAttackData> NamedAttackData;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Death")
+    TSoftObjectPtr<UAnimMontage> DeathMontage;
+
     //GetOptions용 함수 - HitSocketInfo에서 소켓 그룹 이름들을 반환
     UFUNCTION()
     TArray<FString> GetSocketGroupNames() const
@@ -73,6 +76,12 @@ public:
                     AssetsToLoad.Add(ComboUnit.SubAttackMontage.ToSoftObjectPath());
                 }
             }
+        }
+
+        //사망 몽타주 프리로드
+        if (!DeathMontage.IsNull())
+        {
+            AssetsToLoad.Add(DeathMontage.ToSoftObjectPath());
         }
 
         //Asset Manager를 통한 로딩

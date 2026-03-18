@@ -23,6 +23,14 @@ public:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+	// ===== Network =====
+	//모든 클라이언트에서 보스 조우 연출 (BGM, UI)
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnBossEncounter();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnBossDisengage();
+
 	// ===== Enemy Reset (보스 전용 추가) =====
 	virtual void ResetEnemy() override;
 
@@ -54,14 +62,6 @@ protected:
 	// ===== Audio =====
 	void PlayBossBGM();
 	void StopBossBGM();
-
-	// ===== Network =====
-	//모든 클라이언트에서 보스 조우 연출 (BGM, UI)
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_OnBossEncounter();
-
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_OnBossDisengage();
 
 #pragma endregion
 

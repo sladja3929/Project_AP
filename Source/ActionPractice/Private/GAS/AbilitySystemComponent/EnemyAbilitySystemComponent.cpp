@@ -3,9 +3,8 @@
 #include "GameFramework/Actor.h"
 #include "Characters/EnemyCharacter.h"
 #include "GAS/AttributeSet/EnemyAttributeSet.h"
-#include "AI/EnemyAIController.h"
-#include "BrainComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
+#include "GAS/GameplayTagsSubsystem.h"
+#include "AbilitySystemComponent.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -51,21 +50,34 @@ void UEnemyAbilitySystemComponent::HandleDeath()
 
 	if (!CachedEnemyCharacter.IsValid()) return;
 
-	//이동 정지
-	if (UCharacterMovementComponent* MoveComp = CachedEnemyCharacter->GetCharacterMovement())
+	//서버 권한에서만 Death Ability 활성화
+	if (!CachedEnemyCharacter->HasAuthority()) return;
+
+	//AbilityDeath 태그로 스펙 조회
+	const FGameplayTag AbilityDeathTag = UGameplayTagsSubsystem::GetAbilityDeathTag();
+	if (!AbilityDeathTag.IsValid())
 	{
-		MoveComp->StopMovementImmediately();
-		MoveComp->DisableMovement();
+		DEBUG_LOG(TEXT("EnemyASC::HandleDeath - AbilityDeathTag is not valid"));
+		return;
 	}
 
-	//AI 로직 정지
-	if (AEnemyAIController* AIController = CachedEnemyCharacter->GetEnemyAIController())
+	TArray<FGameplayAbilitySpec*> DeathSpecs;
+	GetActivatableGameplayAbilitySpecsByAllMatchingTags(FGameplayTagContainer(AbilityDeathTag), DeathSpecs);
+	if (DeathSpecs.IsEmpty())
 	{
-		if (UBrainComponent* Brain = AIController->GetBrainComponent())
-		{
-			Brain->StopLogic(TEXT("Death"));
-		}
+		DEBUG_LOG(TEXT("EnemyASC::HandleDeath - No Death ability spec found"));
+		return;
 	}
 
-	DEBUG_LOG(TEXT("EnemyASC::HandleDeath - Movement and AI stopped"));
+	//이미 활성화 중이면 중복 방지
+	if (DeathSpecs[0]->IsActive())
+	{
+		DEBUG_LOG(TEXT("EnemyASC::HandleDeath - EnemyDeathAbility already active"));
+		return;
+	}
+
+	if (!TryActivateAbilityWithEventData(DeathSpecs[0]->Handle, nullptr))
+	{
+		DEBUG_LOG(TEXT("EnemyASC::HandleDeath - Failed to activate EnemyDeathAbility"));
+	}
 }
