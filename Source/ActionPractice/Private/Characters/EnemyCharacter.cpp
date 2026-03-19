@@ -57,8 +57,8 @@ AEnemyCharacter::AEnemyCharacter()
 	Tags.Add(FName("Enemy"));
 
 	//Collision Settings
-	GetCapsuleComponent()->SetCollisionProfileName(TEXT("EnemyPhysics"));
-	GetMesh()->SetCollisionProfileName(TEXT("EnemyMesh"));
+	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Pawn"));
+	GetMesh()->SetCollisionProfileName(TEXT("HitDetectionPhysics"));
 
 	CreateAbilitySystemComponent();
 	CreateAttributeSet();

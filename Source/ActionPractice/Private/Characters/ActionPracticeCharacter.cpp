@@ -60,6 +60,10 @@ AActionPracticeCharacter::AActionPracticeCharacter()
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
+	//Collision Settings
+	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Pawn"));
+	GetMesh()->SetCollisionProfileName(TEXT("HitDetectionPhysics"));
+	
 	//Camera Boom Settings
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);

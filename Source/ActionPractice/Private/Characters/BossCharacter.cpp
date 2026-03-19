@@ -6,6 +6,7 @@
 #include "Perception/AISense_Sight.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "GAS/AbilitySystemComponent/BaseAbilitySystemComponent.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -78,6 +79,10 @@ void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
 		if (Stimulus.WasSuccessfullySensed())
 		{
 			DEBUG_LOG(TEXT("Player detected by Boss: %s"), *Actor->GetName());
+
+			//보스가 이미 사망한 경우 조우 연출 재실행 방지
+			UBaseAbilitySystemComponent* BaseASC = Cast<UBaseAbilitySystemComponent>(AbilitySystemComponent);
+			if (BaseASC && BaseASC->IsDeathHandled()) return;
 
 			if (!bBossEncountered)
 			{

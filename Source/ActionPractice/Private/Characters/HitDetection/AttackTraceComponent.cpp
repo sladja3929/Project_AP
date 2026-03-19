@@ -577,12 +577,12 @@ ECollisionChannel UAttackTraceComponent::GetTraceChannel() const
 {
 	//프로젝트 설정에서 커스텀 채널 사용
 	//DefaultEngine.ini에서 설정 필요
-	return ECC_GameTraceChannel1;  //WeaponTrace 채널
+	return ECC_GameTraceChannel1;  //HitDetection 채널
 }
 
 FCollisionQueryParams UAttackTraceComponent::GetCollisionQueryParams() const
 {
-	FCollisionQueryParams Params(TEXT("AttackTrace"), false);
+	FCollisionQueryParams Params(TEXT("HitDetection"), false);
 
 	AddIgnoredActors(Params);
 

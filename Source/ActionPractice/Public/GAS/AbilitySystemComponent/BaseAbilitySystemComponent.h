@@ -63,6 +63,9 @@ public:
 	//리스폰 후 다시 사망 가능 상태로 복구
 	void ResetDeathHandled();
 
+	//사망 처리 완료 여부 조회
+	bool IsDeathHandled() const { return bDeathHandled; }
+
 	//===== Defense Policy Interface =====
 	UFUNCTION()
 	virtual void OnDamaged(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
