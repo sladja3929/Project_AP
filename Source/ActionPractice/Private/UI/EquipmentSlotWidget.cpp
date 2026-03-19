@@ -26,6 +26,7 @@ void UEquipmentSlotWidget::NativeConstruct()
 	if (RightWeaponIcon) SetSlotIcon(RightWeaponIcon, nullptr);
 	if (UsableItemIcon) SetSlotIcon(UsableItemIcon, nullptr);
 	if (UsableItemCountText) UsableItemCountText->SetText(FText::GetEmpty());
+	if (UsableItemNameText) UsableItemNameText->SetText(FText::GetEmpty());
 	if (NextUsableItemIcon1) SetSlotIcon(NextUsableItemIcon1, nullptr);
 	if (NextUsableItemIcon2) SetSlotIcon(NextUsableItemIcon2, nullptr);
 }
@@ -103,6 +104,19 @@ void UEquipmentSlotWidget::RefreshItemSlot()
 		else
 		{
 			UsableItemCountText->SetText(FText::GetEmpty());
+		}
+	}
+
+	//아이템 이름 갱신
+	if (UsableItemNameText)
+	{
+		if (CurrentSlot.IsValid() && CurrentSlot.ItemDA)
+		{
+			UsableItemNameText->SetText(CurrentSlot.ItemDA->DisplayName);
+		}
+		else
+		{
+			UsableItemNameText->SetText(FText::GetEmpty());
 		}
 	}
 

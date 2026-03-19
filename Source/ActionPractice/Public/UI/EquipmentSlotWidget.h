@@ -35,6 +35,10 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> UsableItemCountText;
 
+	//현재 장착 아이템 이름
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> UsableItemNameText;
+
 	//다음 아이템 프리뷰 슬롯 1 (EquippedIndex+1)
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> NextUsableItemIcon1;
