@@ -77,6 +77,15 @@ public:
 	FGameplayTag AbilityDeath;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
+	FGameplayTag EnemyAbility_Death;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
+	FGameplayTag EnemyAbility_HitReaction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
+	FGameplayTag EnemyAbility_Groggy;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
 	FGameplayTag Ability_GetItem;
 
 #pragma endregion
@@ -136,6 +145,12 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
 	FGameplayTag StateUndetectable;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
+	FGameplayTag State_HitReaction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
+	FGameplayTag State_Groggy;
 
 #pragma endregion
 
@@ -216,5 +231,11 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect Tags")
 	FGameplayTag Effect_UsableItem_Duration;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect Tags")
+	FGameplayTag Effect_StateTree_Magnitude;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect Tags")
+	FGameplayTag Effect_StateTree_Duration;
 #pragma endregion
 };

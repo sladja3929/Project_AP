@@ -38,6 +38,9 @@ public:
 	static const FGameplayTag& GetAbilityWeaponSwitchTag();
 	static const FGameplayTag& GetAbilityRestTag();
 	static const FGameplayTag& GetAbilityDeathTag();
+	static const FGameplayTag& GetEnemyAbilityDeathTag();
+	static const FGameplayTag& GetEnemyAbilityHitReactionTag();
+	static const FGameplayTag& GetEnemyAbilityGroggyTag();
 	static const FGameplayTag& GetAbilityGetItemTag();
 #pragma endregion
 
@@ -60,6 +63,8 @@ public:
 	static const FGameplayTag& GetStateDeadTag();
 	static const FGameplayTag& GetStateRestingTag();
 	static const FGameplayTag& GetStateUndetectableTag();
+	static const FGameplayTag& GetStateHitReactionTag();
+	static const FGameplayTag& GetStateGroggyTag();
 #pragma endregion
 
 #pragma region "Static Event Tags"
@@ -90,6 +95,8 @@ public:
 	static const FGameplayTag& GetEffectCooldownDurationTag();
 	static const FGameplayTag& GetEffectUsableItemMagnitudeTag();
 	static const FGameplayTag& GetEffectUsableItemDurationTag();
+	static const FGameplayTag& GetEffectStateTreeMagnitudeTag();
+	static const FGameplayTag& GetEffectStateTreeDurationTag();
 #pragma endregion
 
 private:
@@ -119,6 +126,9 @@ private:
 	const FGameplayTag& GetAbilityWeaponSwitchTagInternal() const;
 	const FGameplayTag& GetAbilityRestTagInternal() const;
 	const FGameplayTag& GetAbilityDeathTagInternal() const;
+	const FGameplayTag& GetEnemyAbilityDeathTagInternal() const;
+	const FGameplayTag& GetEnemyAbilityHitReactionTagInternal() const;
+	const FGameplayTag& GetEnemyAbilityGroggyTagInternal() const;
 	const FGameplayTag& GetAbilityGetItemTagInternal() const;
 #pragma endregion
 
@@ -141,6 +151,8 @@ private:
 	const FGameplayTag& GetStateDeadTagInternal() const;
 	const FGameplayTag& GetStateRestingTagInternal() const;
 	const FGameplayTag& GetStateUndetectableTagInternal() const;
+	const FGameplayTag& GetStateHitReactionTagInternal() const;
+	const FGameplayTag& GetStateGroggyTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal Event Tags"
@@ -171,6 +183,8 @@ private:
 	const FGameplayTag& GetEffectCooldownDurationTagInternal() const;
 	const FGameplayTag& GetEffectUsableItemMagnitudeTagInternal() const;
 	const FGameplayTag& GetEffectUsableItemDurationTagInternal() const;
+	const FGameplayTag& GetEffectStateTreeMagnitudeTagInternal() const;
+	const FGameplayTag& GetEffectStateTreeDurationTagInternal() const;
 #pragma endregion
 	
 protected:

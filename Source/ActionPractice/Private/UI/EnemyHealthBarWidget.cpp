@@ -11,6 +11,21 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+void UEnemyHealthBarWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	if (HealthBar)
+	{
+		HealthBar->SetPercent(1.0f);
+	}
+
+	if (HealthDamageBar)
+	{
+		HealthDamageBar->SetPercent(1.0f);
+	}
+}
+
 void UEnemyHealthBarWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
@@ -20,8 +35,46 @@ void UEnemyHealthBarWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 	const float MaxHealth = CachedAttributeSet->GetMaxHealth();
 	if (MaxHealth <= 0.0f) return;
 
-	const float Percent = CachedAttributeSet->GetHealth() / MaxHealth;
-	HealthBar->SetPercent(FMath::Clamp(Percent, 0.0f, 1.0f));
+	const float NewPercent = FMath::Clamp(CachedAttributeSet->GetHealth() / MaxHealth, 0.0f, 1.0f);
+
+	//HP 감소
+	if (NewPercent < CurrentHealthPercent)
+	{
+		HealthBar->SetPercent(NewPercent);
+		TargetHealthDamagePercent = NewPercent;
+		HealthDamageDelayTimer = 0.0f;
+	}
+	//HP 증가
+	else if (NewPercent > CurrentHealthPercent)
+	{
+		HealthBar->SetPercent(NewPercent);
+
+		if (HealthDamageBar)
+		{
+			HealthDamageBar->SetPercent(NewPercent);
+		}
+
+		TargetHealthDamagePercent = NewPercent;
+	}
+
+	CurrentHealthPercent = NewPercent;
+
+	UpdateDamageBars(InDeltaTime);
+}
+
+void UEnemyHealthBarWidget::UpdateDamageBars(float DeltaTime)
+{
+	if (HealthDamageBar && HealthDamageBar->GetPercent() > TargetHealthDamagePercent)
+	{
+		HealthDamageDelayTimer += DeltaTime;
+
+		if (HealthDamageDelayTimer >= DamageBarDelayTime)
+		{
+			const float CurrentPercent = HealthDamageBar->GetPercent();
+			const float NewPercent = FMath::FInterpTo(CurrentPercent, TargetHealthDamagePercent, DeltaTime, DamageBarLerpSpeed);
+			HealthDamageBar->SetPercent(NewPercent);
+		}
+	}
 }
 
 void UEnemyHealthBarWidget::SetAttributeSet(UEnemyAttributeSet* InAttributeSet)

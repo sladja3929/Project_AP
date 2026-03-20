@@ -211,6 +211,33 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityDeathTag()
 	return FGameplayTag::EmptyTag;
 }
 
+const FGameplayTag& UGameplayTagsSubsystem::GetEnemyAbilityDeathTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEnemyAbilityDeathTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEnemyAbilityHitReactionTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEnemyAbilityHitReactionTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEnemyAbilityGroggyTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEnemyAbilityGroggyTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
 const FGameplayTag& UGameplayTagsSubsystem::GetAbilityGetItemTag()
 {
 	if (UGameplayTagsSubsystem* Subsystem = Get())
@@ -380,6 +407,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateUndetectableTag()
 	if (UGameplayTagsSubsystem* Subsystem = Get())
 	{
 		return Subsystem->GetStateUndetectableTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateHitReactionTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateHitReactionTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateGroggyTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateGroggyTagInternal();
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -603,6 +648,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEffectUsableItemDurationTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEffectStateTreeMagnitudeTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEffectStateTreeMagnitudeTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEffectStateTreeDurationTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEffectStateTreeDurationTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Internal Input Tags"
@@ -779,6 +842,33 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityDeathTagInternal() const
 	return FGameplayTag::EmptyTag;
 }
 
+const FGameplayTag& UGameplayTagsSubsystem::GetEnemyAbilityDeathTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->EnemyAbility_Death;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEnemyAbilityHitReactionTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->EnemyAbility_HitReaction;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEnemyAbilityGroggyTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->EnemyAbility_Groggy;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
 const FGameplayTag& UGameplayTagsSubsystem::GetAbilityGetItemTagInternal() const
 {
 	if (GameplayTagsDataAsset)
@@ -948,6 +1038,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateUndetectableTagInternal() co
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->StateUndetectable;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateHitReactionTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->State_HitReaction;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateGroggyTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->State_Groggy;
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -1168,6 +1276,24 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEffectUsableItemDurationTagIntern
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Effect_UsableItem_Duration;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEffectStateTreeMagnitudeTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Effect_StateTree_Magnitude;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEffectStateTreeDurationTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Effect_StateTree_Duration;
 	}
 	return FGameplayTag::EmptyTag;
 }

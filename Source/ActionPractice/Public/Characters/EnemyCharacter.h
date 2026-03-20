@@ -89,10 +89,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UWidgetComponent> EnemyHealthBarWidgetComponent;
 
-	//HP바 위젯 클래스 (BP에서 설정)
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<UEnemyHealthBarWidget> EnemyHealthBarWidgetClass;
-
 #pragma endregion
 
 #pragma region "Protected Functions"

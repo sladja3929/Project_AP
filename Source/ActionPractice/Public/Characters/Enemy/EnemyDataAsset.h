@@ -74,6 +74,35 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Death")
     TSoftObjectPtr<UAnimMontage> DeathMontage;
 
+    // ===== HitReaction Montages =====
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HitReaction")
+    TSoftObjectPtr<UAnimMontage> HitReactionLightMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HitReaction")
+    TSoftObjectPtr<UAnimMontage> HitReactionMiddleMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HitReaction")
+    TSoftObjectPtr<UAnimMontage> HitReactionHeavyMontage;
+
+    // ===== Groggy Montages =====
+
+    //그로기 시작 (쓰러짐)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy")
+    TSoftObjectPtr<UAnimMontage> GroggyStartMontage;
+
+    //그로기 루프 (바닥에서 대기, 루프 몽타주)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy")
+    TSoftObjectPtr<UAnimMontage> GroggyLoopMontage;
+
+    //그로기 종료 (일어남)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy")
+    TSoftObjectPtr<UAnimMontage> GroggyEndMontage;
+
+    //그로기 루프 지속 시간 (초)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy")
+    float GroggyLoopDuration = 3.0f;
+
     //AttackTags와 일치하는 공격 데이터를 반환
     const FEnemyTaggedAttackData* GetAttackDataByTags(const FGameplayTagContainer& AttackTags) const
     {

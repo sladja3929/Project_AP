@@ -134,11 +134,8 @@ void AEnemyCharacter::BeginPlay()
 	CacheInitialEnemyState();
 
 	//HP바 위젯 초기화 (로컬에서만 의미 있음)
-	if (EnemyHealthBarWidgetClass && EnemyHealthBarWidgetComponent)
+	if (EnemyHealthBarWidgetComponent)
 	{
-		EnemyHealthBarWidgetComponent->SetWidgetClass(EnemyHealthBarWidgetClass);
-		EnemyHealthBarWidgetComponent->InitWidget();
-
 		if (UEnemyHealthBarWidget* HealthBarWidget = Cast<UEnemyHealthBarWidget>(EnemyHealthBarWidgetComponent->GetWidget()))
 		{
 			HealthBarWidget->SetAttributeSet(GetAttributeSet());
