@@ -65,10 +65,10 @@ UAbilitySystemComponent* UEnemyAttackComponent::GetOwnerASC() const
 }
 
 #pragma region "Trace Config Functions"
-bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 ComboIndex)
+bool UEnemyAttackComponent::LoadTraceConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex)
 {
-	DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig: AttackName=%s, ComboIndex=%d"),
-		*AttackName.ToString(), ComboIndex);
+	DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig: AttackTags=%s, ComboIndex=%d"),
+		*AttackTags.ToStringSimple(), ComboIndex);
 
 	if (!OwnerEnemy)
 	{
@@ -84,7 +84,7 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 Combo
 		return false;
 	}
 
-	const FNamedAttackData* AttackData = EnemyData->NamedAttackData.Find(AttackName);
+	const FEnemyTaggedAttackData* AttackData = EnemyData->GetAttackDataByTags(AttackTags);
 	if (!AttackData || AttackData->ComboSequence.Num() == 0)
 	{
 		DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig FAILED"));
@@ -93,7 +93,7 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 Combo
 
 	//콤보 인덱스 유효성 검사
 	ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboSequence.Num() - 1);
-	const FAttackStats& AttackInfo = AttackData->ComboSequence[ComboIndex].AttackData;
+	const FAttackStats& AttackInfo = AttackData->ComboSequence[ComboIndex].ComboData.AttackData;
 
 	UsingHitSocketGroups.Empty();
 

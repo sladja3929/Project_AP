@@ -10,15 +10,48 @@
 
 class UAnimMontage;
 
-//FName으로 식별되는 공격 데이터
+//적 전용 콤보 단위 (공용 FComboAttackUnit + 적 전용 설정)
 USTRUCT(BlueprintType)
-struct FNamedAttackData
+struct FEnemyComboAttackUnit
 {
     GENERATED_BODY()
 
-    //콤보 시퀀스 (1번 공격, 2번 공격, 3번 공격...)
+    //공용 콤보 데이터 (몽타주, 공격 스탯, 보조 몽타주)
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combo")
-    TArray<FComboAttackUnit> ComboSequence;
+    FComboAttackUnit ComboData;
+
+    // ===== 적 전용 콤보별 설정 =====
+
+    //타겟 회전 시간 (초)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
+    float RotateTime = 0.1f;
+
+    //콤보 연계 최대 거리
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
+    float MaxTargetDistance = 150.0f;
+
+    //콤보 연계 최대 각도
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
+    float MaxTargetAngle = 60.0f;
+};
+
+//GameplayTag로 식별되는 적 공격 데이터
+USTRUCT(BlueprintType)
+struct FEnemyTaggedAttackData
+{
+    GENERATED_BODY()
+
+    //이 공격을 식별하는 태그 (어빌리티의 Asset Tag와 매칭)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tags")
+    FGameplayTagContainer AttackTags;
+
+    //콤보 시퀀스
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combo")
+    TArray<FEnemyComboAttackUnit> ComboSequence;
+
+    //공격별 쿨다운 (0이면 쿨다운 없음)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
+    float CooldownDuration = 0.0f;
 };
 
 UCLASS(BlueprintType)
@@ -35,11 +68,24 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy Info")
     TArray<FHitSocketInfo> HitSocketInfo;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack Definitions")
-    TMap<FName, FNamedAttackData> NamedAttackData;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack Definitions", meta = (TitleProperty = "AttackTags"))
+    TArray<FEnemyTaggedAttackData> TaggedAttackData;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Death")
     TSoftObjectPtr<UAnimMontage> DeathMontage;
+
+    //AttackTags와 일치하는 공격 데이터를 반환
+    const FEnemyTaggedAttackData* GetAttackDataByTags(const FGameplayTagContainer& AttackTags) const
+    {
+        for (const FEnemyTaggedAttackData& Data : TaggedAttackData)
+        {
+            if (Data.AttackTags == AttackTags)
+            {
+                return &Data;
+            }
+        }
+        return nullptr;
+    }
 
     //GetOptions용 함수 - HitSocketInfo에서 소켓 그룹 이름들을 반환
     UFUNCTION()
@@ -60,20 +106,18 @@ public:
     {
         TArray<FSoftObjectPath> AssetsToLoad;
 
-        for (const TPair<FName, FNamedAttackData>& Pair : NamedAttackData)
+        for (const FEnemyTaggedAttackData& AttackData : TaggedAttackData)
         {
-            const FNamedAttackData& AttackData = Pair.Value;
-
-            for (const FComboAttackUnit& ComboUnit : AttackData.ComboSequence)
+            for (const FEnemyComboAttackUnit& EnemyCombo : AttackData.ComboSequence)
             {
-                if (!ComboUnit.AttackMontage.IsNull())
+                if (!EnemyCombo.ComboData.AttackMontage.IsNull())
                 {
-                    AssetsToLoad.Add(ComboUnit.AttackMontage.ToSoftObjectPath());
+                    AssetsToLoad.Add(EnemyCombo.ComboData.AttackMontage.ToSoftObjectPath());
                 }
 
-                if (!ComboUnit.SubAttackMontage.IsNull())
+                if (!EnemyCombo.ComboData.SubAttackMontage.IsNull())
                 {
-                    AssetsToLoad.Add(ComboUnit.SubAttackMontage.ToSoftObjectPath());
+                    AssetsToLoad.Add(EnemyCombo.ComboData.SubAttackMontage.ToSoftObjectPath());
                 }
             }
         }

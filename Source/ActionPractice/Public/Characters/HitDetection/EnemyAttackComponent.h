@@ -35,7 +35,7 @@ protected:
 
 #pragma region "Protected Functions"
 	
-	virtual bool LoadTraceConfig(const FName& AttackName, int32 ComboIndex) override;
+	virtual bool LoadTraceConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex) override;
 
 	virtual void SetOwnerMesh() override;
 

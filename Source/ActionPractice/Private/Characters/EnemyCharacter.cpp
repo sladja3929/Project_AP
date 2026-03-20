@@ -108,12 +108,6 @@ void AEnemyCharacter::BeginPlay()
 		DEBUG_LOG(TEXT("EnemyCharacter::BeginPlay: EnemyData is nullptr"));
 	}
 
-	DEBUG_LOG(TEXT("EnemyCharacter::BeginPlay: StartAbilities count=%d"), StartAbilities.Num());
-	for (const TSubclassOf<UGameplayAbility>& AbilityClass : StartAbilities)
-	{
-		DEBUG_LOG(TEXT("  StartAbility: %s"), *GetNameSafe(AbilityClass));
-	}
-
 	//EnemyData의 모든 몽타주 프리로드
 	if (EnemyData)
 	{
@@ -309,8 +303,8 @@ void AEnemyCharacter::ResetEnemy()
 	//초기 위치로 텔레포트
 	SetActorTransform(InitialTransform, false, nullptr, ETeleportType::TeleportPhysics);
 
-	//HP/스탯 GE 기반 회복
-	ApplyEnemyResetEffect();
+	//DA 기반 어트리뷰트 재초기화
+	ApplyInitialAttributes();
 
 	//AI 재시작
 	RestartEnemyAI();
