@@ -8,7 +8,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackTraceComponent, Log, All);
@@ -583,9 +583,8 @@ ECollisionChannel UAttackTraceComponent::GetTraceChannel() const
 FCollisionQueryParams UAttackTraceComponent::GetCollisionQueryParams() const
 {
 	FCollisionQueryParams Params(TEXT("HitDetection"), false);
-
+	Params.bReturnPhysicalMaterial = true;
 	AddIgnoredActors(Params);
-
 	return Params;
 }
 

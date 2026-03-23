@@ -96,7 +96,8 @@ FGameplayEffectSpecHandle UBaseAbilitySystemComponent::CreateAttackGameplayEffec
 	TSubclassOf<UGameplayEffect> GameplayEffectClass,
 	float Level,
 	UObject* SourceObject,
-	const FFinalAttackData& FinalAttackData)
+	const FFinalAttackData& FinalAttackData,
+	const FHitResult* HitResult)
 {
 	//기본 Spec 생성
 	FGameplayEffectSpecHandle SpecHandle = CreateGameplayEffectSpec(GameplayEffectClass, Level, SourceObject);
@@ -110,7 +111,7 @@ FGameplayEffectSpecHandle UBaseAbilitySystemComponent::CreateAttackGameplayEffec
 	//Incoming Damage Attribute Magnitude 설정
 	SetSpecSetByCallerMagnitude(SpecHandle, UGameplayTagsSubsystem::GetEffectDamageIncomingDamageTag(), FinalAttackData.FinalDamage);
 
-	//ActionPracticeGameplayEffectContext 추출하여 DamageType, PoiseDamage 설정
+	//ActionPracticeGameplayEffectContext 추출하여 DamageType, PoiseDamage, HitResult 설정
 	FGameplayEffectContext* Context = SpecHandle.Data.Get()->GetContext().Get();
 	FActionPracticeGameplayEffectContext* APContext = static_cast<FActionPracticeGameplayEffectContext*>(Context);
 
@@ -118,6 +119,12 @@ FGameplayEffectSpecHandle UBaseAbilitySystemComponent::CreateAttackGameplayEffec
 	{
 		APContext->SetAttackDamageType(FinalAttackData.DamageType);
 		APContext->SetPoiseDamage(FinalAttackData.PoiseDamage);
+
+		//HitResult를 Context에 추가 — GAS가 Cue 파라미터에 Location/Normal을 자동 매핑
+		if (HitResult)
+		{
+			APContext->AddHitResult(*HitResult, true);
+		}
 	}
 	else
 	{
@@ -179,11 +186,14 @@ void UBaseAbilitySystemComponent::ResetDeathHandled()
 
 void UBaseAbilitySystemComponent::OnDamaged(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
 {
-	//방어력 계산 및 Attribute 설정
+	//1단계: 어트리뷰트에 대미지 적용 (HP, Poise 등 — 음수 허용)
 	CalculateAndSetAttributes(SourceActor, FinalAttackData);
 
-	//피격 로직 트리거
+	//2단계: 피격 반응 판정 및 실행 (사망 > 그로기 > 히트리액션)
 	HandleOnDamagedResolved(SourceActor, FinalAttackData);
+
+	//3단계: 브레이크 게이지 리셋 (사용 완료된 음수 게이지를 최대치로 복원)
+	ResetBreakGauges();
 }
 
 void UBaseAbilitySystemComponent::CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
@@ -209,11 +219,11 @@ void UBaseAbilitySystemComponent::CalculateAndSetAttributes(AActor* SourceActor,
 	const float OldHealth = BaseAttributeSet->GetHealth();
 	BaseAttributeSet->SetHealth(FMath::Clamp(OldHealth - FinalDamage, 0.0f, BaseAttributeSet->GetMaxHealth()));
 
-	//포이즈 대미지 적용
+	//포이즈 대미지 적용 (하한 클램핑 없음 — 음수값이 HitReaction 강도 판정에 사용됨)
 	if (FinalAttackData.PoiseDamage > 0.0f)
 	{
 		const float OldPoise = BaseAttributeSet->GetPoise();
-		BaseAttributeSet->SetPoise(FMath::Clamp(OldPoise - FinalAttackData.PoiseDamage, 0.0f, BaseAttributeSet->GetMaxPoise()));
+		BaseAttributeSet->SetPoise(OldPoise - FinalAttackData.PoiseDamage);
 	}
 
 	DEBUG_LOG(TEXT("OnDamaged: Damage=%.1f, FinalDamage=%.1f, Health=%.1f/%.1f, Poise=%.1f/%.1f"),
@@ -293,7 +303,23 @@ void UBaseAbilitySystemComponent::PrepareHitReactionEventData(FGameplayEventData
 	UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
 	if (BaseAttributeSet)
 	{
-		OutEventData.EventMagnitude = BaseAttributeSet->GetPoise(); // 음수값
+		OutEventData.EventMagnitude = BaseAttributeSet->GetPoise(); //음수값
 		OutEventData.EventTag = AbilityHitReactionTag;
+	}
+}
+
+void UBaseAbilitySystemComponent::ResetBreakGauges()
+{
+	UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(GetAttributeSet(UBaseAttributeSet::StaticClass()));
+	UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
+	if (!BaseAttributeSet)
+	{
+		return;
+	}
+
+	if (BaseAttributeSet->GetPoise() <= 0.0f)
+	{
+		BaseAttributeSet->SetPoise(BaseAttributeSet->GetMaxPoise());
+		DEBUG_LOG(TEXT("ResetBreakGauges: Poise reset to %.1f"), BaseAttributeSet->GetMaxPoise());
 	}
 }

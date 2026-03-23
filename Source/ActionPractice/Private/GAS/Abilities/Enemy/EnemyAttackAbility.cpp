@@ -11,7 +11,7 @@
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAttackAbility, Log, All);
@@ -206,8 +206,8 @@ void UEnemyAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& HitR
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
 	if (!TargetASC) return;
 
-	//Source ASC에서 GE Spec 생성
-	FGameplayEffectSpecHandle SpecHandle = SourceASC->CreateAttackGameplayEffectSpec(DamageInstantEffect, GetAbilityLevel(), this, AttackData);
+	//Source ASC에서 GE Spec 생성 (HitResult 포함 — Cue에 피격 위치/방향 전달)
+	FGameplayEffectSpecHandle SpecHandle = SourceASC->CreateAttackGameplayEffectSpec(DamageInstantEffect, GetAbilityLevel(), this, AttackData, &HitResult);
 
 	if (SpecHandle.IsValid())
 	{

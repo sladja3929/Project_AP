@@ -6,6 +6,7 @@
 
 class AEnemyCharacter;
 class UEnemyAttributeSet;
+struct FStateTreeEvent;
 
 UCLASS()
 class ACTIONPRACTICE_API UEnemyAbilitySystemComponent : public UBaseAbilitySystemComponent
@@ -51,6 +52,8 @@ protected:
 
 	virtual void BeginPlay() override;
 
+	virtual void ResetBreakGauges() override;
+
 	//그로기 발동 여부 체크
 	bool ShouldActivateGroggy() const;
 
@@ -66,6 +69,9 @@ private:
 #pragma endregion
 
 #pragma region "Private Functions"
+
+	//StateTree에 이벤트 전송 헬퍼
+	void SendStateTreeEvent(const FGameplayTag& EventTag);
 
 #pragma endregion
 };

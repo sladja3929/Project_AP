@@ -8,8 +8,11 @@
 #include "Characters/BaseCharacter.h"
 #include "AbilitySystemComponent.h"
 #include "Items/AttackData.h"
+#include "AI/EnemyAIController.h"
+#include "AI/StateTree/GASStateTreeAIComponent.h"
+#include "StateTreeTypes.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAbilitySystemComponent, Log, All);
@@ -57,20 +60,20 @@ void UEnemyAbilitySystemComponent::CalculateAndSetAttributes(AActor* SourceActor
 	//BaseASC의 기본 계산 (HP, Poise 적용)
 	Super::CalculateAndSetAttributes(SourceActor, FinalAttackData);
 
-	//Poise 대미지의 일정 비율을 Stamina(그로기 게이지)에도 적용
+	//Poise 대미지의 일정 비율을 Stance(그로기 게이지)에도 적용
 	if (FinalAttackData.PoiseDamage > 0.0f)
 	{
-		UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(GetAttributeSet(UBaseAttributeSet::StaticClass()));
-		UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
-		if (BaseAttributeSet)
+		const UEnemyAttributeSet* EnemyAttributeSet = GetEnemyAttributeSet();
+		if (EnemyAttributeSet)
 		{
-			const float GroggyDamage = FinalAttackData.PoiseDamage * GroggyDamageRate;
-			const float OldStamina = BaseAttributeSet->GetStamina();
-			const float NewStamina = FMath::Max(0.0f, OldStamina - GroggyDamage);
-			BaseAttributeSet->SetStamina(NewStamina);
+			UEnemyAttributeSet* MutableSet = const_cast<UEnemyAttributeSet*>(EnemyAttributeSet);
 
-			DEBUG_LOG(TEXT("EnemyASC Groggy: PoiseDmg=%.1f, Rate=%.1f, GroggyDmg=%.1f, Stamina=%.1f->%.1f"),
-				FinalAttackData.PoiseDamage, GroggyDamageRate, GroggyDamage, OldStamina, NewStamina);
+			const float StanceDamage = FinalAttackData.PoiseDamage * GroggyDamageRate;
+			const float OldStance = MutableSet->GetStance();
+			MutableSet->SetStance(OldStance - StanceDamage);
+
+			DEBUG_LOG(TEXT("EnemyASC Stance: PoiseDmg=%.1f, Rate=%.1f, StanceDmg=%.1f, Stance=%.1f->%.1f"),
+				FinalAttackData.PoiseDamage, GroggyDamageRate, StanceDamage, OldStance, MutableSet->GetStance());
 		}
 	}
 }
@@ -121,6 +124,9 @@ void UEnemyAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, 
 				if (TryActivateAbilityWithEventData(HitReactionSpecs[0]->Handle, &EventData))
 				{
 					DEBUG_LOG(TEXT("EnemyHitReaction activated with Poise=%.1f"), EventData.EventMagnitude);
+
+					//ST 이벤트 전송
+					SendStateTreeEvent(AbilityHitReactionTag);
 				}
 				else
 				{
@@ -133,14 +139,13 @@ void UEnemyAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, 
 
 bool UEnemyAbilitySystemComponent::ShouldActivateGroggy() const
 {
-	UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(GetAttributeSet(UBaseAttributeSet::StaticClass()));
-	const UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
-	if (!BaseAttributeSet)
+	const UEnemyAttributeSet* EnemyAttributeSet = GetEnemyAttributeSet();
+	if (!EnemyAttributeSet)
 	{
 		return false;
 	}
 
-	return BaseAttributeSet->GetStamina() <= 0.0f;
+	return EnemyAttributeSet->GetStance() <= 0.0f;
 }
 
 void UEnemyAbilitySystemComponent::ActivateGroggyAbility(const FFinalAttackData& FinalAttackData)
@@ -167,10 +172,59 @@ void UEnemyAbilitySystemComponent::ActivateGroggyAbility(const FFinalAttackData&
 		return;
 	}
 
-	if (!TryActivateAbilityWithEventData(GroggySpecs[0]->Handle, nullptr))
+	if (TryActivateAbilityWithEventData(GroggySpecs[0]->Handle, nullptr))
+	{
+		//ST 이벤트 전송
+		SendStateTreeEvent(EnemyAbilityGroggyTag);
+	}
+	else
 	{
 		DEBUG_LOG(TEXT("ActivateGroggyAbility: Failed to activate"));
 	}
+}
+
+void UEnemyAbilitySystemComponent::ResetBreakGauges()
+{
+	//Poise 리셋
+	Super::ResetBreakGauges();
+
+	//Stance 리셋
+	const UEnemyAttributeSet* EnemyAttributeSet = GetEnemyAttributeSet();
+	if (EnemyAttributeSet)
+	{
+		UEnemyAttributeSet* MutableSet = const_cast<UEnemyAttributeSet*>(EnemyAttributeSet);
+		if (MutableSet->GetStance() <= 0.0f)
+		{
+			MutableSet->SetStance(MutableSet->GetMaxStance());
+			DEBUG_LOG(TEXT("ResetBreakGauges: Stance reset to %.1f"), MutableSet->GetMaxStance());
+		}
+	}
+}
+
+void UEnemyAbilitySystemComponent::SendStateTreeEvent(const FGameplayTag& EventTag)
+{
+	if (!EventTag.IsValid() || !CachedEnemyCharacter.IsValid())
+	{
+		return;
+	}
+
+	AEnemyAIController* AIC = CachedEnemyCharacter->GetEnemyAIController();
+	if (!AIC)
+	{
+		return;
+	}
+
+	UGASStateTreeAIComponent* STComp = AIC->GetStateTreeComponent();
+	if (!STComp)
+	{
+		return;
+	}
+
+	FStateTreeEvent Event;
+	Event.Tag = EventTag;
+	STComp->SendStateTreeEvent(Event);
+
+	DEBUG_LOG(TEXT("Sent StateTree event: %s"), *EventTag.ToString());
 }
 
 void UEnemyAbilitySystemComponent::HandleDeath()

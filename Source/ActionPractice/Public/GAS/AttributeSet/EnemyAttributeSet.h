@@ -21,6 +21,20 @@ public:
 
 	// ===== Base Attributes =====
 
+	// ===== Stance (Groggy Gauge) =====
+
+	UPROPERTY(BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_Stance)
+	FGameplayAttributeData Stance;
+	ATTRIBUTE_ACCESSORS(UEnemyAttributeSet, Stance)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_MaxStance)
+	FGameplayAttributeData MaxStance;
+	ATTRIBUTE_ACCESSORS(UEnemyAttributeSet, MaxStance)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_StanceRegenRate)
+	FGameplayAttributeData StanceRegenRate;
+	ATTRIBUTE_ACCESSORS(UEnemyAttributeSet, StanceRegenRate)
+
 	// ===== Calculated Attributes =====
 	UPROPERTY(BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_PhysicalAttackPower)
 	FGameplayAttributeData PhysicalAttackPower;
@@ -48,6 +62,15 @@ public:
 
 protected:
 #pragma region "Protected Functions"
+
+	UFUNCTION()
+	virtual void OnRep_Stance(const FGameplayAttributeData& OldStance);
+
+	UFUNCTION()
+	virtual void OnRep_MaxStance(const FGameplayAttributeData& OldMaxStance);
+
+	UFUNCTION()
+	virtual void OnRep_StanceRegenRate(const FGameplayAttributeData& OldStanceRegenRate);
 
 	UFUNCTION()
 	virtual void OnRep_PhysicalAttackPower(const FGameplayAttributeData& OldPhysicalAttackPower);

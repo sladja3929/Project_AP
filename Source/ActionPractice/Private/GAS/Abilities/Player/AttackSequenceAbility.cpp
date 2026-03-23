@@ -13,7 +13,7 @@
 #include "AbilitySystemComponent.h"
 #include "GAS/Abilities/HitDetectionSetter.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackSequenceAbility, Log, All);
@@ -275,8 +275,8 @@ void UAttackSequenceAbility::OnHitDetected(AActor* HitActor, const FHitResult& H
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
 	if (!TargetASC) return;
     
-	//Source ASC에서 GE Spec 생성
-	FGameplayEffectSpecHandle SpecHandle = SourceASC->CreateAttackGameplayEffectSpec(DamageInstantEffect, GetAbilityLevel(), this, AttackData);
+	//Source ASC에서 GE Spec 생성 (HitResult 포함 — Cue에 피격 위치/방향 전달)
+	FGameplayEffectSpecHandle SpecHandle = SourceASC->CreateAttackGameplayEffectSpec(DamageInstantEffect, GetAbilityLevel(), this, AttackData, &HitResult);
     
 	if (SpecHandle.IsValid())
 	{        
@@ -381,13 +381,33 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 		//None: ComboCounter, MaxComboCount 0
 		ChangeAttackType(EAttackType::None);
 		CurrentChargeProgress = EChargeProgress::NoCharge;
-		AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, false);
-		StopMontageAndEndTask();
+
+		//스태미나 부족 캔슬일 경우
+		if (bPreserveMontage)
+		{
+			//스태미나 부족으로 복귀: 몽타주와 Attacking 태그 유지 (이동 캔슬 유지)
+			bPreserveMontage = false;
+
+			//이동으로 인한 후딜 취소 이벤트 리스닝
+			START_WAIT_EVENT_TASK(WaitCancelAttackEventTask, EventActionCancelAttackTag, OnEventCancelAttack, nullptr, true, true);
+		}
+		
+		else
+		{
+			AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, false);
+			StopMontageAndEndTask();
+		}
+		
 		break;
 
 	case EAttackSequenceState::Prepare:
-		//스테미나 부족시 아이들 상태로 복귀
-		if (!ConsumeStamina()) ChangeState(EAttackSequenceState::Idle);
+		//스테미나 부족시 Idle 복귀 (몽타주 유지)
+		if (!ConsumeStamina())
+		{
+			bPreserveMontage = true;
+			ChangeState(EAttackSequenceState::Idle);
+			break;
+		}
 		
 		CancelAbilitiesOnAttack();
 		StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
@@ -395,9 +415,14 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 		break;
 
 	case EAttackSequenceState::Attacking:
-		//스테미나 부족시 아이들 상태로 복귀
-		if (!ConsumeStamina()) ChangeState(EAttackSequenceState::Idle);
-
+		//스테미나 부족시 Idle 복귀 (몽타주 유지)
+		if (!ConsumeStamina())
+		{
+			bPreserveMontage = true;
+			ChangeState(EAttackSequenceState::Idle);
+			break;
+		}
+		
 		CancelAbilitiesOnAttack();
 		SetHitDetectionConfig();
 		AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, true);
@@ -655,6 +680,15 @@ void UAttackSequenceAbility::ConsumePendingBufferInput()
 void UAttackSequenceAbility::OnEventCancelAttack(FGameplayEventData Payload)
 {
 	DEBUG_LOG(TEXT("AttackSequenceAbility - CancelAttack Notify Received"));
+
+	//이미 Idle 상태(스태미나 부족 복귀)일 때는 ChangeState 가드에 걸리므로 직접 정리
+	if (CurrentState == EAttackSequenceState::Idle)
+	{
+		AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, false);
+		StopMontageAndEndTask();
+		return;
+	}
+
 	ChangeState(EAttackSequenceState::Idle);
 }
 

@@ -1,7 +1,6 @@
 #include "GAS/Abilities/Enemy/EnemyGroggyAbility.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "GAS/GameplayTagsSubsystem.h"
-#include "GAS/AttributeSet/BaseAttributeSet.h"
 #include "Characters/EnemyCharacter.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
 #include "AbilitySystemComponent.h"
@@ -83,9 +82,6 @@ void UEnemyGroggyAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 			World->GetTimerManager().ClearTimer(GroggyLoopTimerHandle);
 		}
 	}
-
-	//Stamina 복구
-	ResetStaminaToMax();
 
 	//상태 태그 제거
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
@@ -260,21 +256,3 @@ void UEnemyGroggyAbility::StartGroggyEnd()
 }
 #pragma endregion
 
-#pragma region "Helpers"
-void UEnemyGroggyAbility::ResetStaminaToMax()
-{
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
-	if (!ASC)
-	{
-		return;
-	}
-
-	UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(ASC->GetAttributeSet(UBaseAttributeSet::StaticClass()));
-	UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
-	if (BaseAttributeSet)
-	{
-		BaseAttributeSet->SetStamina(BaseAttributeSet->GetMaxStamina());
-		DEBUG_LOG(TEXT("Stamina reset to max: %.1f"), BaseAttributeSet->GetMaxStamina());
-	}
-}
-#pragma endregion

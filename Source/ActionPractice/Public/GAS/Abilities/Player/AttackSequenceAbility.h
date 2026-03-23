@@ -105,6 +105,9 @@ protected:
 	UPROPERTY()
 	FGameplayEventData PendingBufferPayload;
 
+	//스태미나 부족으로 Idle 복귀 시 몽타주 유지 플래그
+	bool bPreserveMontage = false;
+
 	// ===== 무기 데이터 =====
 	UPROPERTY()
 	TObjectPtr<const UWeaponDataAsset> CachedWeaponDataAsset = nullptr;

@@ -7,7 +7,7 @@
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionRecoveryAbility, Log, All);

@@ -39,13 +39,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ability|GameplayEffect")
 	FGameplayEffectSpecHandle CreateGameplayEffectSpec(TSubclassOf<UGameplayEffect> GameplayEffectClass, float Level, UObject* SourceObject = nullptr);
 
-	//공격 GE 생성
-	UFUNCTION(BlueprintCallable, Category = "Ability|GameplayEffect")
+	//공격 GE 생성 (C++ 전용 — FHitResult 포인터 파라미터로 UFUNCTION 불가)
 	FGameplayEffectSpecHandle CreateAttackGameplayEffectSpec(
 		TSubclassOf<UGameplayEffect> GameplayEffectClass,
 		float Level,
 		UObject* SourceObject,
-		const FFinalAttackData& FinalAttackData
+		const FFinalAttackData& FinalAttackData,
+		const FHitResult* HitResult = nullptr
 	);
 
 	//SetByCaller 설정
@@ -100,6 +100,11 @@ protected:
 	//HitReaction을 활성화할지 여부 (포이즈 브레이크 체크)
 	//파생 클래스에서 오버라이드하여 추가 조건을 포함할 수 있음
 	virtual bool ShouldActivateHitReaction() const;
+
+	//브레이크 게이지 리셋 (Poise 등)
+	//HandleOnDamagedResolved에서 음수값이 사용된 후 호출
+	//파생 클래스에서 오버라이드하여 추가 게이지(Stance 등) 리셋 가능
+	virtual void ResetBreakGauges();
 
 #pragma endregion
 

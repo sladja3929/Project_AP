@@ -16,6 +16,9 @@
 
 UEnemyAttributeSet::UEnemyAttributeSet()
 {
+	InitStance(200.0f);
+	InitMaxStance(200.0f);
+	InitStanceRegenRate(5.0f);
 	InitPhysicalAttackPower(50.0f);
 }
 
@@ -23,6 +26,9 @@ void UEnemyAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+	DOREPLIFETIME_CONDITION_NOTIFY(UEnemyAttributeSet, Stance, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UEnemyAttributeSet, MaxStance, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UEnemyAttributeSet, StanceRegenRate, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UEnemyAttributeSet, PhysicalAttackPower, COND_None, REPNOTIFY_Always);
 }
 
@@ -30,12 +36,36 @@ void UEnemyAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute,
 {
 	Super::PreAttributeChange(Attribute, NewValue);
 
+	if (Attribute == GetMaxStanceAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 0.0f);
+	}
+	else if (Attribute == GetStanceAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxStance());
+	}
+	else if (Attribute == GetStanceRegenRateAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 0.0f);
+	}
 }
 
 void UEnemyAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
 {
 	Super::PreAttributeBaseChange(Attribute, NewValue);
 
+	if (Attribute == GetMaxStanceAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 0.0f);
+	}
+	else if (Attribute == GetStanceAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxStance());
+	}
+	else if (Attribute == GetStanceRegenRateAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 0.0f);
+	}
 }
 
 void UEnemyAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
@@ -56,6 +86,21 @@ void UEnemyAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallb
 }
 
 // Rep Notify Functions
+void UEnemyAttributeSet::OnRep_Stance(const FGameplayAttributeData& OldStance)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UEnemyAttributeSet, Stance, OldStance);
+}
+
+void UEnemyAttributeSet::OnRep_MaxStance(const FGameplayAttributeData& OldMaxStance)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UEnemyAttributeSet, MaxStance, OldMaxStance);
+}
+
+void UEnemyAttributeSet::OnRep_StanceRegenRate(const FGameplayAttributeData& OldStanceRegenRate)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UEnemyAttributeSet, StanceRegenRate, OldStanceRegenRate);
+}
+
 void UEnemyAttributeSet::OnRep_PhysicalAttackPower(const FGameplayAttributeData& OldPhysicalAttackPower)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UEnemyAttributeSet, PhysicalAttackPower, OldPhysicalAttackPower);

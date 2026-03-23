@@ -25,7 +25,8 @@ public class ActionPractice : ModuleRules
 			"GameplayStateTreeModule",
 			"UMG",
 			"NetCore",
-			"Niagara"
+			"Niagara",
+			"PhysicsCore"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

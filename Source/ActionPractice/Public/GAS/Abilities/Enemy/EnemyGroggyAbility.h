@@ -82,9 +82,6 @@ protected:
 	void OnGroggyLoopTimerExpired();
 	void StartGroggyEnd();
 
-	// ===== Stamina 복구 =====
-	void ResetStaminaToMax();
-
 #pragma endregion
 
 private:
