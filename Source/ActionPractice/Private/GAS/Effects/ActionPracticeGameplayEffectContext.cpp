@@ -16,6 +16,14 @@ bool FActionPracticeGameplayEffectContext::NetSerialize(FArchive& Ar, UPackageMa
 	//PoiseDamage 직렬화
 	Ar << PoiseDamage;
 
+	//DefenseResult 직렬화
+	uint8 DefenseResultValue = static_cast<uint8>(DefenseResult);
+	Ar << DefenseResultValue;
+	if (Ar.IsLoading())
+	{
+		DefenseResult = static_cast<EDefenseResult>(DefenseResultValue);
+	}
+
 	bOutSuccess = true;
 	return true;
 }

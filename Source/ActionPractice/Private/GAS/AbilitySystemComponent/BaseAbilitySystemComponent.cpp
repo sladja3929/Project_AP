@@ -33,6 +33,9 @@ void UBaseAbilitySystemComponent::BeginPlay()
 
 	//HitReaction 태그 초기화
 	AbilityHitReactionTag = UGameplayTagsSubsystem::GetAbilityHitReactionTag();
+
+	//Impact Cue 태그 초기화
+	GameplayCueImpactTag = UGameplayTagsSubsystem::GetGameplayCueImpactTag();
 }
 
 void UBaseAbilitySystemComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -184,16 +187,60 @@ void UBaseAbilitySystemComponent::ResetDeathHandled()
 	DEBUG_LOG(TEXT("ResetDeathHandled: death guard cleared"));
 }
 
+void UBaseAbilitySystemComponent::CacheDamageEffectContext(const FGameplayEffectContextHandle& InContext)
+{
+	CachedDamageContext = InContext;
+}
+
 void UBaseAbilitySystemComponent::OnDamaged(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
 {
 	//1단계: 어트리뷰트에 대미지 적용 (HP, Poise 등 — 음수 허용)
 	CalculateAndSetAttributes(SourceActor, FinalAttackData);
 
-	//2단계: 피격 반응 판정 및 실행 (사망 > 그로기 > 히트리액션)
+	//2단계: 판정 결과 확정 후 Impact Cue 수동 발동
+	ExecuteImpactCue(FinalAttackData);
+
+	//3단계: 피격 반응 판정 및 실행 (사망 > 그로기 > 히트리액션)
 	HandleOnDamagedResolved(SourceActor, FinalAttackData);
 
-	//3단계: 브레이크 게이지 리셋 (사용 완료된 음수 게이지를 최대치로 복원)
+	//4단계: 브레이크 게이지 리셋 (사용 완료된 음수 게이지를 최대치로 복원)
 	ResetBreakGauges();
+}
+
+EDefenseResult UBaseAbilitySystemComponent::GetDefenseResult() const
+{
+	return EDefenseResult::None;
+}
+
+void UBaseAbilitySystemComponent::ExecuteImpactCue(const FFinalAttackData& FinalAttackData)
+{
+	if (!CachedDamageContext.IsValid())
+	{
+		DEBUG_LOG(TEXT("ExecuteImpactCue: No cached context"));
+		return;
+	}
+
+	if (!GameplayCueImpactTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("ExecuteImpactCue: ImpactCueTag is not valid"));
+		CachedDamageContext.Clear();
+		return;
+	}
+
+	//원본 Context를 복제하여 DefenseResult 주입 (원본 오염 방지)
+	FGameplayEffectContextHandle CueContext(CachedDamageContext.Get()->Duplicate());
+	FActionPracticeGameplayEffectContext* APContext = static_cast<FActionPracticeGameplayEffectContext*>(CueContext.Get());
+	if (APContext)
+	{
+		APContext->SetDefenseResult(GetDefenseResult());
+	}
+
+	FGameplayCueParameters CueParams;
+	CueParams.EffectContext = CueContext;
+
+	ExecuteGameplayCue(GameplayCueImpactTag, CueParams);
+
+	CachedDamageContext.Clear();
 }
 
 void UBaseAbilitySystemComponent::CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData)

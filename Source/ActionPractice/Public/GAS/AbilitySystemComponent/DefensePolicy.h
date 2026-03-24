@@ -8,6 +8,16 @@
 struct FFinalAttackData;
 struct FGameplayEventData;
 
+//방어 판정 결과 (Impact Cue 분기용)
+UENUM(BlueprintType)
+enum class EDefenseResult : uint8
+{
+	None,         //일반 피격
+	Blocked,      //가드 성공
+	GuardBroken,  //가드 브레이크
+	//Parried,    //패리 성공 (추후 추가)
+};
+
 UINTERFACE(MinimalAPI, Blueprintable)
 class UDefensePolicy : public UInterface
 {

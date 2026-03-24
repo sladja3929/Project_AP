@@ -9,14 +9,23 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
-const FImpactResponseData& UImpactResponseDataAsset::GetResponse(EPhysicalSurface SurfaceType, bool bIsBlocked) const
+const FImpactResponseData& UImpactResponseDataAsset::GetResponse(EPhysicalSurface SurfaceType, EDefenseResult InDefenseResult) const
 {
-	if (bIsBlocked)
+	switch (InDefenseResult)
 	{
+	case EDefenseResult::GuardBroken:
+		DEBUG_LOG(TEXT("GetResponse - GuardBroken → GuardBreakResponse"));
+		return GuardBreakResponse;
+
+	case EDefenseResult::Blocked:
 		DEBUG_LOG(TEXT("GetResponse - Blocked → BlockedResponse"));
 		return BlockedResponse;
+
+	default:
+		break;
 	}
 
+	//None(일반 피격): SurfaceType 분기
 	const FImpactResponseData* Found = NormalResponses.Find(SurfaceType);
 	if (Found)
 	{

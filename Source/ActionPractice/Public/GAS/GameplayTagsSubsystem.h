@@ -85,6 +85,10 @@ public:
 	static const FGameplayTag& GetEventActionCancelAttackTag();
 #pragma endregion
 
+#pragma region "Static GameplayCue Tags"
+	static const FGameplayTag& GetGameplayCueImpactTag();
+#pragma endregion
+
 #pragma region "Static Effect Tags"
 	static const FGameplayTag& GetEffectInvincibilityDurationTag();
 	static const FGameplayTag& GetEffectJustRolledDurationTag();
@@ -171,6 +175,10 @@ private:
 	const FGameplayTag& GetEventActionPlayBufferTagInternal() const;
 	const FGameplayTag& GetEventActionAttackInputTagInternal() const;
 	const FGameplayTag& GetEventActionCancelAttackTagInternal() const;
+#pragma endregion
+
+#pragma region "Internal GameplayCue Tags"
+	const FGameplayTag& GetGameplayCueImpactTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal Effect Tags"

@@ -82,6 +82,8 @@ protected:
 	//포이즈 브레이크 + 가드 브레이크 시 HitReaction 활성화
 	virtual bool ShouldActivateHitReaction() const override;
 
+	virtual EDefenseResult GetDefenseResult() const override;
+
 #pragma endregion
 
 private:

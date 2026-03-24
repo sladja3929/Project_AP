@@ -1,10 +1,11 @@
 #include "GAS/GameplayCues/APGameplayCueNotify_Impact.h"
+
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "AbilitySystemBlueprintLibrary.h"
-#include "AbilitySystemComponent.h"
 #include "GAS/Effects/ActionPracticeGameplayEffectContext.h"
+#include "GAS/AbilitySystemComponent/DefensePolicy.h"
 #include "GAS/GameplayTagsSubsystem.h"
 
 #define ENABLE_DEBUG_LOG 0
@@ -89,34 +90,44 @@ bool UAPGameplayCueNotify_Impact::OnExecute_Implementation(AActor* MyTarget, con
 
 void UAPGameplayCueNotify_Impact::GetSpawnTransform_Implementation(AActor* TargetActor, const FGameplayCueParameters& Parameters, FVector& OutLocation, FRotator& OutRotation) const
 {
-	//Parameters에 유효한 Location이 있으면 피격 위치 사용
-	if (!Parameters.Location.IsNearlyZero())
-	{
-		OutLocation = Parameters.Location;
-	}
-	else if (TargetActor)
-	{
-		//폴백: 타겟 액터 위치
-		OutLocation = TargetActor->GetActorLocation();
-	}
-	else
-	{
-		OutLocation = FVector::ZeroVector;
-	}
+	//EffectContext의 HitResult에서 피격 위치/방향을 직접 읽는다
+	//GAS는 AddHitResult로 넣은 HitResult를 Parameters.Location/Normal에 자동 매핑하지 않으므로
+	const FGameplayEffectContext* Context = Parameters.EffectContext.Get();
+	const FHitResult* HitResult = Context ? Context->GetHitResult() : nullptr;
 
-	//방향 결정
-	if (bAlignToNormal && !Parameters.Normal.IsNearlyZero())
+	if (HitResult)
 	{
-		OutRotation = Parameters.Normal.Rotation() + RotationOffset;
+		OutLocation = HitResult->ImpactPoint;
+
+		if (bAlignToNormal)
+		{
+			OutRotation = HitResult->ImpactNormal.Rotation() + RotationOffset;
+		}
+		else if (TargetActor)
+		{
+			OutRotation = TargetActor->GetActorRotation() + RotationOffset;
+		}
+		else
+		{
+			OutRotation = RotationOffset;
+		}
 	}
 	else if (TargetActor)
 	{
+		//폴백: HitResult가 없으면 타겟 액터 위치
+		OutLocation = TargetActor->GetActorLocation();
 		OutRotation = TargetActor->GetActorRotation() + RotationOffset;
 	}
 	else
 	{
+		OutLocation = FVector::ZeroVector;
 		OutRotation = RotationOffset;
 	}
+
+	DEBUG_LOG(TEXT("GetSpawnTransform - OutLocation: %s, OutRotation: %s, HasHitResult: %s"),
+		*OutLocation.ToString(),
+		*OutRotation.ToString(),
+		HitResult ? TEXT("true") : TEXT("false"));
 }
 
 void UAPGameplayCueNotify_Impact::ResolveEffectByContext_Implementation(const FGameplayCueParameters& Parameters, UNiagaraSystem*& OutNiagara, USoundBase*& OutSound) const
@@ -130,41 +141,20 @@ void UAPGameplayCueNotify_Impact::ResolveEffectByContext_Implementation(const FG
 		return;
 	}
 
-	// ===== 가드 여부 확인 =====
-	bool bIsBlocked = false;
-	AActor* TargetActor = Parameters.TargetAttachComponent.IsValid()
-		? Parameters.TargetAttachComponent->GetOwner()
-		: nullptr;
-
-	//Parameters에서 타겟을 못 가져오면 EffectContext에서 시도
-	if (!TargetActor)
+	// ===== DefenseResult 확인 (ASC 판정 결과) =====
+	EDefenseResult DefResult = EDefenseResult::None;
+	const FGameplayEffectContext* Context = Parameters.EffectContext.Get();
+	if (Context)
 	{
-		const FGameplayEffectContext* Context = Parameters.EffectContext.Get();
-		if (Context)
+		const FActionPracticeGameplayEffectContext* APContext = static_cast<const FActionPracticeGameplayEffectContext*>(Context);
+		if (APContext)
 		{
-			const FHitResult* HitResult = Context->GetHitResult();
-			if (HitResult)
-			{
-				TargetActor = HitResult->GetActor();
-			}
-		}
-	}
-
-	if (TargetActor)
-	{
-		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
-		if (TargetASC && TargetASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateAbilityBlockingTag()))
-		{
-			bIsBlocked = true;
+			DefResult = APContext->GetDefenseResult();
 		}
 	}
 
 	// ===== 표면 재질 확인 =====
 	EPhysicalSurface SurfaceType = EPhysicalSurface::SurfaceType_Default;
-
-	//GAS는 HitResult의 PhysMaterial을 Parameters.PhysicalMaterial에 자동 매핑하지 않으므로,
-	//EffectContext의 HitResult에서 직접 읽는다.
-	const FGameplayEffectContext* Context = Parameters.EffectContext.Get();
 	if (Context)
 	{
 		const FHitResult* HitResult = Context->GetHitResult();
@@ -175,14 +165,14 @@ void UAPGameplayCueNotify_Impact::ResolveEffectByContext_Implementation(const FG
 	}
 
 	// ===== DA 룩업 =====
-	const FImpactResponseData& ResponseData = ImpactResponseDA->GetResponse(SurfaceType, bIsBlocked);
+	const FImpactResponseData& ResponseData = ImpactResponseDA->GetResponse(SurfaceType, DefResult);
 
 	OutNiagara = ResponseData.NiagaraEffect.Get();
 	OutSound = ResponseData.Sound.Get();
 
-	DEBUG_LOG(TEXT("ResolveEffectByContext - SurfaceType: %d, Blocked: %s, Niagara: %s, Sound: %s"),
+	DEBUG_LOG(TEXT("ResolveEffectByContext - SurfaceType: %d, DefenseResult: %d, Niagara: %s, Sound: %s"),
 		static_cast<int32>(SurfaceType),
-		bIsBlocked ? TEXT("True") : TEXT("False"),
+		static_cast<int32>(DefResult),
 		OutNiagara ? *OutNiagara->GetName() : TEXT("NULL (fallback)"),
 		OutSound ? *OutSound->GetName() : TEXT("NULL (fallback)"));
 }

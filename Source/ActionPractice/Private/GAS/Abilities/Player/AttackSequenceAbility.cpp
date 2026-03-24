@@ -13,7 +13,7 @@
 #include "AbilitySystemComponent.h"
 #include "GAS/Abilities/HitDetectionSetter.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackSequenceAbility, Log, All);
@@ -270,11 +270,11 @@ void UAttackSequenceAbility::OnHitDetected(AActor* HitActor, const FHitResult& H
 	//Source ASC (공격자, AttackAbility 소유자)
 	UActionPracticeAbilitySystemComponent* SourceASC = GetActionPracticeAbilitySystemComponentFromActorInfo();
 	if (!HitActor || !SourceASC) return;
-    
+
 	//Target ASC (피격자)
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
 	if (!TargetASC) return;
-    
+
 	//Source ASC에서 GE Spec 생성 (HitResult 포함 — Cue에 피격 위치/방향 전달)
 	FGameplayEffectSpecHandle SpecHandle = SourceASC->CreateAttackGameplayEffectSpec(DamageInstantEffect, GetAbilityLevel(), this, AttackData, &HitResult);
     

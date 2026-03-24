@@ -1,7 +1,10 @@
 #include "Public/Characters/LockOnComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
 #include "Characters/EnemyCharacter.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GAS/GameplayTagsSubsystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "Components/WidgetComponent.h"
@@ -143,21 +146,46 @@ AActor* ULockOnComponent::FindNearestTarget()
 	AActor* Owner = GetOwner();
 	if (!Owner) return nullptr;
 
+	APawn* OwnerPawn = Cast<APawn>(Owner);
+	APlayerController* PC = OwnerPawn ? OwnerPawn->GetController<APlayerController>() : nullptr;
+	if (!PC) return nullptr;
+
 	TArray<AActor*> FoundTargets;
 	UGameplayStatics::GetAllActorsWithTag(GetWorld(), TargetActorTag, FoundTargets);
+
+	int32 ViewportSizeX, ViewportSizeY;
+	PC->GetViewportSize(ViewportSizeX, ViewportSizeY);
 
 	AActor* NearestTarget = nullptr;
 	float NearestDistance = FLT_MAX;
 
 	for (AActor* PotentialTarget : FoundTargets)
 	{
+		//사망한 대상 제외
+		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(PotentialTarget);
+		if (TargetASC && TargetASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateDeadTag())) continue;
+
 		float Distance = FVector::Dist(Owner->GetActorLocation(), PotentialTarget->GetActorLocation());
-		if (Distance < NearestDistance && Distance < LockOnMaxDistance)
+		if (Distance >= LockOnMaxDistance || Distance >= NearestDistance) continue;
+
+		//화면 내 존재 여부 확인
+		FVector2D ScreenLocation;
+		bool bOnScreen = PC->ProjectWorldLocationToScreen(PotentialTarget->GetActorLocation(), ScreenLocation, true);
+		if (!bOnScreen) continue;
+
+		//뷰포트 범위 내인지 확인
+		if (ScreenLocation.X < 0.0f || ScreenLocation.X > static_cast<float>(ViewportSizeX) ||
+			ScreenLocation.Y < 0.0f || ScreenLocation.Y > static_cast<float>(ViewportSizeY))
 		{
-			NearestDistance = Distance;
-			NearestTarget = PotentialTarget;
+			continue;
 		}
+
+		NearestDistance = Distance;
+		NearestTarget = PotentialTarget;
 	}
+
+	DEBUG_LOG(TEXT("FindNearestTarget: %s (Distance: %.1f)"),
+		NearestTarget ? *NearestTarget->GetName() : TEXT("None"), NearestDistance);
 
 	return NearestTarget;
 }

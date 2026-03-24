@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameplayEffectTypes.h"
 #include "Items/AttackData.h"
+#include "GAS/AbilitySystemComponent/DefensePolicy.h"
 #include "ActionPracticeGameplayEffectContext.generated.h"
 
 USTRUCT()
@@ -10,7 +11,7 @@ struct ACTIONPRACTICE_API FActionPracticeGameplayEffectContext : public FGamepla
 {
 	GENERATED_BODY()
 
-	FActionPracticeGameplayEffectContext(): Super(), AttackDamageType(EAttackDamageType::None), PoiseDamage(0.0f) {}
+	FActionPracticeGameplayEffectContext(): Super(), AttackDamageType(EAttackDamageType::None), PoiseDamage(0.0f), DefenseResult(EDefenseResult::None) {}
 	virtual ~FActionPracticeGameplayEffectContext()	{}
 
 	//오버라이드 필수 Functions
@@ -25,6 +26,8 @@ struct ACTIONPRACTICE_API FActionPracticeGameplayEffectContext : public FGamepla
 	//Setter
 	void SetAttackDamageType(EAttackDamageType InAttackDamageType) { AttackDamageType = InAttackDamageType;	}
 	void SetPoiseDamage(float InPoiseDamage) { PoiseDamage = InPoiseDamage; }
+	EDefenseResult GetDefenseResult() const { return DefenseResult; }
+	void SetDefenseResult(EDefenseResult InDefenseResult) { DefenseResult = InDefenseResult; }
 
 	//다운캐스팅 헬퍼 함수
 	static FActionPracticeGameplayEffectContext* GetActionPracticeEffectContext(FGameplayEffectContextHandle& Handle);
@@ -37,6 +40,9 @@ protected:
 
 	UPROPERTY()
 	float PoiseDamage;
+
+	UPROPERTY()
+	EDefenseResult DefenseResult = EDefenseResult::None;
 
 };
 

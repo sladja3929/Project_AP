@@ -314,6 +314,19 @@ void UActionPracticeAbilitySystemComponent::PrepareHitReactionEventData(FGamepla
 	}
 }
 
+EDefenseResult UActionPracticeAbilitySystemComponent::GetDefenseResult() const
+{
+	if (bGuardBroken)
+	{
+		return EDefenseResult::GuardBroken;
+	}
+	if (bBlockedLastAttack)
+	{
+		return EDefenseResult::Blocked;
+	}
+	return EDefenseResult::None;
+}
+
 bool UActionPracticeAbilitySystemComponent::ShouldActivateHitReaction() const
 {
 	//가드 + 가드 브레이크 시 즉시 활성화

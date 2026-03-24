@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
+#include "GAS/AbilitySystemComponent/DefensePolicy.h"
 #include "ImpactResponseDataAsset.generated.h"
 
 class UNiagaraSystem;
@@ -35,6 +36,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Impact|Block")
 	FImpactResponseData BlockedResponse;
 
+	//가드 브레이크 시 응답
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Impact|GuardBreak")
+	FImpactResponseData GuardBreakResponse;
+
 	//Surface Type별 일반 피격 응답
 	//에디터에서 Physical Surface 이름("Flesh", "Metal" 등)으로 표시된다
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Impact|Normal")
@@ -50,7 +55,7 @@ public:
 
 	//가드 여부와 SurfaceType으로 응답 데이터를 반환한다.
 	//bIsBlocked면 BlockedResponse, 아니면 NormalResponses 룩업 (없으면 DefaultNormalResponse).
-	const FImpactResponseData& GetResponse(EPhysicalSurface SurfaceType, bool bIsBlocked) const;
+	const FImpactResponseData& GetResponse(EPhysicalSurface SurfaceType, EDefenseResult InDefenseResult) const;
 
 #pragma endregion
 };

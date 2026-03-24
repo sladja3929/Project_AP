@@ -567,6 +567,17 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEventActionCancelAttackTag()
 }
 #pragma endregion
 
+#pragma region "Static GameplayCue Tags"
+const FGameplayTag& UGameplayTagsSubsystem::GetGameplayCueImpactTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetGameplayCueImpactTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+#pragma endregion
+
 #pragma region "Static Effect Tags"
 const FGameplayTag& UGameplayTagsSubsystem::GetEffectInvincibilityDurationTag()
 {
@@ -1294,6 +1305,17 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEffectStateTreeDurationTagInterna
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Effect_StateTree_Duration;
+	}
+	return FGameplayTag::EmptyTag;
+}
+#pragma endregion
+
+#pragma region "Internal GameplayCue Tags"
+const FGameplayTag& UGameplayTagsSubsystem::GetGameplayCueImpactTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->GameplayCue_Impact;
 	}
 	return FGameplayTag::EmptyTag;
 }

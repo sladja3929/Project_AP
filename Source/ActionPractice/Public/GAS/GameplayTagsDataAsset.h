@@ -203,6 +203,13 @@ public:
 	
 #pragma endregion
 
+#pragma region "GameplayCue Tags"
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GameplayCue Tags")
+	FGameplayTag GameplayCue_Impact;
+
+#pragma endregion
+
 #pragma region "Effect Tags"
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effect Tags")

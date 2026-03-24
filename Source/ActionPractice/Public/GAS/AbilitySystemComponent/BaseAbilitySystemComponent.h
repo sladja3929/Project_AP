@@ -67,6 +67,10 @@ public:
 	bool IsDeathHandled() const { return bDeathHandled; }
 
 	//===== Defense Policy Interface =====
+
+	//PostGameplayEffectExecute에서 호출 — Cue용 EffectContext 캐싱
+	void CacheDamageEffectContext(const FGameplayEffectContextHandle& InContext);
+
 	UFUNCTION()
 	virtual void OnDamaged(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
 
@@ -90,6 +94,12 @@ protected:
 	//죽음 중복 진입 방지 가드
 	bool bDeathHandled = false;
 
+	//Impact Cue 수동 발동용 — PostGameplayEffectExecute에서 캐싱, ExecuteImpactCue에서 소비
+	FGameplayEffectContextHandle CachedDamageContext;
+
+	//Impact Cue 태그
+	FGameplayTag GameplayCueImpactTag;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -105,6 +115,14 @@ protected:
 	//HandleOnDamagedResolved에서 음수값이 사용된 후 호출
 	//파생 클래스에서 오버라이드하여 추가 게이지(Stance 등) 리셋 가능
 	virtual void ResetBreakGauges();
+
+	//판정 결과 확정 후 Impact Cue 수동 발동
+	//파생 클래스에서 GetDefenseResult를 오버라이드하여 결과를 전달
+	virtual void ExecuteImpactCue(const FFinalAttackData& FinalAttackData);
+
+	//현재 프레임의 방어 판정 결과를 반환
+	//기본: EDefenseResult::None (일반 피격)
+	virtual EDefenseResult GetDefenseResult() const;
 
 #pragma endregion
 
