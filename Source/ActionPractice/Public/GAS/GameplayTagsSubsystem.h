@@ -21,6 +21,7 @@ public:
 	static const FGameplayTag& GetInputUseItemTag();
 	static const FGameplayTag& GetInputCycleRightWeaponTag();
 	static const FGameplayTag& GetInputCycleLeftWeaponTag();
+	static const FGameplayTag& GetInputSpecialActionTag();
 #pragma endregion
 
 #pragma region "Static Ability Tags"
@@ -42,6 +43,7 @@ public:
 	static const FGameplayTag& GetEnemyAbilityHitReactionTag();
 	static const FGameplayTag& GetEnemyAbilityGroggyTag();
 	static const FGameplayTag& GetAbilityGetItemTag();
+	static const FGameplayTag& GetAbilityParryTag();
 #pragma endregion
 
 #pragma region "Static State Tags"
@@ -65,6 +67,7 @@ public:
 	static const FGameplayTag& GetStateUndetectableTag();
 	static const FGameplayTag& GetStateHitReactionTag();
 	static const FGameplayTag& GetStateGroggyTag();
+	static const FGameplayTag& GetStateParryingTag();
 #pragma endregion
 
 #pragma region "Static Event Tags"
@@ -113,6 +116,7 @@ private:
 	const FGameplayTag& GetInputUseItemTagInternal() const;
 	const FGameplayTag& GetInputCycleRightWeaponTagInternal() const;
 	const FGameplayTag& GetInputCycleLeftWeaponTagInternal() const;
+	const FGameplayTag& GetInputSpecialActionTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal Ability Tags"
@@ -134,6 +138,7 @@ private:
 	const FGameplayTag& GetEnemyAbilityHitReactionTagInternal() const;
 	const FGameplayTag& GetEnemyAbilityGroggyTagInternal() const;
 	const FGameplayTag& GetAbilityGetItemTagInternal() const;
+	const FGameplayTag& GetAbilityParryTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal State Tags"
@@ -157,6 +162,7 @@ private:
 	const FGameplayTag& GetStateUndetectableTagInternal() const;
 	const FGameplayTag& GetStateHitReactionTagInternal() const;
 	const FGameplayTag& GetStateGroggyTagInternal() const;
+	const FGameplayTag& GetStateParryingTagInternal() const;
 #pragma endregion
 
 #pragma region "Internal Event Tags"

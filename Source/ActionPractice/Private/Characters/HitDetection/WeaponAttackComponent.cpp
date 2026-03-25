@@ -123,6 +123,7 @@ bool UWeaponAttackComponent::LoadTraceConfig(const FGameplayTagContainer& Attack
 	CurrentAttackData.FinalDamage = OwnerWeapon->GetCalculatedDamage() * AttackInfo.DamageMultiplier;
 	CurrentAttackData.PoiseDamage = AttackInfo.PoiseDamage;
 	CurrentAttackData.DamageType = AttackInfo.DamageType;
+	CurrentAttackData.bUnparriable = AttackInfo.bUnparriable;
 
 	DEBUG_LOG(TEXT("LoadTraceConfig - SUCCESS: Added %d socket groups, FinalDamage: %.2f"),
 		UsingHitSocketGroups.Num(), CurrentAttackData.FinalDamage);

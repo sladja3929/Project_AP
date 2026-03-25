@@ -7,6 +7,17 @@
 class AActionPracticeCharacter;
 class UActionPracticeAttributeSet;
 
+//APASC 내부 방어 판정 상태
+enum class EPlayerDefenseState : uint8
+{
+	None,                    //방어 없음 (일반 피격)
+	Blocked,                 //가드 성공
+	GuardBroken,             //가드 브레이크
+	Parried,                 //패리 성공
+	ParryFallbackBlocked,    //패리 실패 → 가드 폴백 성공
+	ParryFallbackGuardBroken,//패리 실패 → 가드 폴백 → 가드 브레이크
+};
+
 USTRUCT()
 struct FGameplayEventData_NetPredicted
 {
@@ -71,6 +82,7 @@ protected:
 	FGameplayTag EffectStaminaRegenBlockDurationTag;
 	FGameplayTag StateAbilityBlockingTag;
 	FGameplayTag StateGuardBrokenTag;
+	FGameplayTag StateParryingTag;
 
 #pragma endregion
 
@@ -91,9 +103,8 @@ private:
 
 	FActiveGameplayEffectHandle StaminaRegenBlockHandle;
 
-	//블로킹 관련 변수
-	bool bBlockedLastAttack = false;
-	bool bGuardBroken = false;
+	//내부 방어 판정 상태
+	EPlayerDefenseState LastDefenseState = EPlayerDefenseState::None;
 
 #pragma endregion
 
@@ -102,8 +113,12 @@ private:
 	//HandleGameplayEvent 계열 태스크용 RPC
 	UFUNCTION(Server, Reliable)
 	void Server_HandleGameplayEvent(const FGameplayEventData_NetPredicted& Payload);
-	
+
 	void CheckBlockSuccess(AActor* SourceActor);
+	void CheckParrySuccess(AActor* SourceActor, const FFinalAttackData& FinalAttackData);
+
+	//패리 성공 시 적 강제 그로기 발동
+	void ForceEnemyGroggy(AActor* EnemyActor);
 
 #pragma endregion
 };

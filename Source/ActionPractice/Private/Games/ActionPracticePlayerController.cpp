@@ -121,6 +121,11 @@ void AActionPracticePlayerController::SetupInputComponent()
 			EIC->BindAction(IA_UseItem, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnUseItemPressed);
 		}
 
+		if (IA_SpecialAction)
+		{
+			EIC->BindAction(IA_SpecialAction, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnSpecialActionPressed);
+		}
+
 		//IA_CycleRightWeapon: Shift+휠 Axis1D → HandleCycleWeapon에서 부호로 좌/우 분기
 		//IA_CycleLeftWeapon: 바인딩 없음, GAS 키로만 사용
 		if (IA_CycleRightWeapon)

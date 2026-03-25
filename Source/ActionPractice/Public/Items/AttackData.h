@@ -48,6 +48,10 @@ struct FAttackStats
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack")
 	float StaminaCost = 10.0f;
+
+	//패리 불가 공격 여부
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack")
+	bool bUnparriable = false;
 	//필요에 따라 경직도, 사운드, 파티클 이펙트 등의 데이터를 여기에 추가
 };
 
@@ -83,6 +87,10 @@ struct FFinalAttackData
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack")
 	float PoiseDamage = 10.0f;
+
+	//패리 불가 공격 여부
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack")
+	bool bUnparriable = false;
 };
 
 //Hit Detection 소켓 정보

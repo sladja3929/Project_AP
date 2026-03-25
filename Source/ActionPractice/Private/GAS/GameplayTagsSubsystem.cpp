@@ -82,6 +82,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetInputCycleLeftWeaponTag()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetInputSpecialActionTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetInputSpecialActionTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Static Ability Tags"
@@ -243,6 +252,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityGetItemTag()
 	if (UGameplayTagsSubsystem* Subsystem = Get())
 	{
 		return Subsystem->GetAbilityGetItemTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityParryTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetAbilityParryTagInternal();
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -425,6 +443,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateGroggyTag()
 	if (UGameplayTagsSubsystem* Subsystem = Get())
 	{
 		return Subsystem->GetStateGroggyTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateParryingTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateParryingTagInternal();
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -724,6 +751,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetInputCycleLeftWeaponTagInternal()
 	}
 	return FGameplayTag::EmptyTag;
 }
+
+const FGameplayTag& UGameplayTagsSubsystem::GetInputSpecialActionTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Input_SpecialAction;
+	}
+	return FGameplayTag::EmptyTag;
+}
 #pragma endregion
 
 #pragma region "Internal Ability Tags"
@@ -885,6 +921,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetAbilityGetItemTagInternal() const
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Ability_GetItem;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetAbilityParryTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Ability_Parry;
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -1067,6 +1112,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateGroggyTagInternal() const
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->State_Groggy;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateParryingTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->State_Parrying;
 	}
 	return FGameplayTag::EmptyTag;
 }

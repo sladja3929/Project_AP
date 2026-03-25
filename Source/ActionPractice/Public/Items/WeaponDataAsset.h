@@ -56,6 +56,14 @@ struct FBlockActionData
     //높을수록 방어 시 스태미나 소모가 줄어든다
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Block", meta = (ClampMin = "0.0", ClampMax = "100.0"))
     float GuardStrength = 50.0f;
+
+    //패리 몽타주
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Parry")
+    TSoftObjectPtr<UAnimMontage> ParryMontage;
+
+    //패리 판정 각도 (가드 각도와 별도, 정면 기준 편측 각도)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Parry", meta = (ClampMin = "0.0", ClampMax = "180.0"))
+    float ParryAngle = 60.0f;
 };
 
 UCLASS(BlueprintType)

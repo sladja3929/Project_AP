@@ -119,6 +119,7 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FGameplayTagContainer& AttackT
 	CurrentAttackData.FinalDamage = EnemyData->BaseDamage * AttackInfo.DamageMultiplier;
 	CurrentAttackData.PoiseDamage = AttackInfo.PoiseDamage;
 	CurrentAttackData.DamageType = AttackInfo.DamageType;
+	CurrentAttackData.bUnparriable = AttackInfo.bUnparriable;
 
 	DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig SUCCESS (UsingSocketGroups=%d)"),
 		UsingHitSocketGroups.Num());

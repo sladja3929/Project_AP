@@ -99,6 +99,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputAction> IA_UseItem = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UInputAction> IA_SpecialAction = nullptr;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputAction> IA_CycleQuickSlot = nullptr;
 
@@ -204,6 +207,7 @@ private:
 	void OnChargeAttackPressed()  { HandleGASInputPressed(IA_ChargeAttack); }
 	void OnChargeAttackReleased()    { HandleGASInputReleased(IA_ChargeAttack); }
 	void OnUseItemPressed()          { HandleGASInputPressed(IA_UseItem); }
+	void OnSpecialActionPressed()    { HandleGASInputPressed(IA_SpecialAction); }
 
 #pragma endregion
 };

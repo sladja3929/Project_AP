@@ -34,6 +34,9 @@ public:
 	virtual void CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
 	virtual void HandleOnDamagedResolved(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
 
+	//Stance 게이지 무관 즉시 그로기 발동 (패리 성공 시 외부 호출)
+	void ForceActivateGroggy();
+
 #pragma endregion
 
 protected:

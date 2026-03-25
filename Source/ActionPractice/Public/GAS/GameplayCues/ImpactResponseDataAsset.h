@@ -40,6 +40,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Impact|GuardBreak")
 	FImpactResponseData GuardBreakResponse;
 
+	//패리 성공 시 응답
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Impact|Parry")
+	FImpactResponseData ParriedResponse;
+
 	//Surface Type별 일반 피격 응답
 	//에디터에서 Physical Surface 이름("Flesh", "Metal" 등)으로 표시된다
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Impact|Normal")

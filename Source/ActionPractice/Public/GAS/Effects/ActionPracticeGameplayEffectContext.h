@@ -11,7 +11,7 @@ struct ACTIONPRACTICE_API FActionPracticeGameplayEffectContext : public FGamepla
 {
 	GENERATED_BODY()
 
-	FActionPracticeGameplayEffectContext(): Super(), AttackDamageType(EAttackDamageType::None), PoiseDamage(0.0f), DefenseResult(EDefenseResult::None) {}
+	FActionPracticeGameplayEffectContext(): Super(), AttackDamageType(EAttackDamageType::None), PoiseDamage(0.0f), DefenseResult(EDefenseResult::None), bUnparriable(false) {}
 	virtual ~FActionPracticeGameplayEffectContext()	{}
 
 	//오버라이드 필수 Functions
@@ -28,6 +28,8 @@ struct ACTIONPRACTICE_API FActionPracticeGameplayEffectContext : public FGamepla
 	void SetPoiseDamage(float InPoiseDamage) { PoiseDamage = InPoiseDamage; }
 	EDefenseResult GetDefenseResult() const { return DefenseResult; }
 	void SetDefenseResult(EDefenseResult InDefenseResult) { DefenseResult = InDefenseResult; }
+	bool GetUnparriable() const { return bUnparriable; }
+	void SetUnparriable(bool bInUnparriable) { bUnparriable = bInUnparriable; }
 
 	//다운캐스팅 헬퍼 함수
 	static FActionPracticeGameplayEffectContext* GetActionPracticeEffectContext(FGameplayEffectContextHandle& Handle);
@@ -43,6 +45,9 @@ protected:
 
 	UPROPERTY()
 	EDefenseResult DefenseResult = EDefenseResult::None;
+
+	UPROPERTY()
+	bool bUnparriable = false;
 
 };
 

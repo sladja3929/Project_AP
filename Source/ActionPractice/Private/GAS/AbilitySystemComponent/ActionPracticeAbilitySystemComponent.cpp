@@ -7,8 +7,10 @@
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
 #include "Items/AttackData.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionPracticeAbilitySystemComponent, Log, All);
@@ -46,6 +48,12 @@ void UActionPracticeAbilitySystemComponent::BeginPlay()
 	if (!StateGuardBrokenTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("StateGuardBrokenTag is Invalid"));
+	}
+
+	StateParryingTag = UGameplayTagsSubsystem::GetStateParryingTag();
+	if (!StateParryingTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("StateParryingTag is Invalid"));
 	}
 }
 
@@ -233,41 +241,66 @@ const UActionPracticeAttributeSet* UActionPracticeAbilitySystemComponent::GetAct
 
 void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
 {
+	LastDefenseState = EPlayerDefenseState::None;
+
+	//패리 → 가드 → 일반 피격 우선순위
+	CheckParrySuccess(SourceActor, FinalAttackData);
+	if (LastDefenseState == EPlayerDefenseState::Parried)
+	{
+		DEBUG_LOG(TEXT("CalculateAndSetAttributes: Parried — all damage ignored, forcing enemy groggy"));
+		ForceEnemyGroggy(SourceActor);
+		return;
+	}
+
 	CheckBlockSuccess(SourceActor);
-	bGuardBroken = false;
-
-	if (!OwnerCharacter)
+	if (LastDefenseState != EPlayerDefenseState::None)
 	{
-		Super::CalculateAndSetAttributes(SourceActor, FinalAttackData);
-		return;
-	}
+		//패리 어빌리티 활성 중인지 확인 → 폴백 여부 판정
+		bool bIsParryActive = false;
+		const FGameplayTag AbilityParryTag = UGameplayTagsSubsystem::GetAbilityParryTag();
+		if (AbilityParryTag.IsValid())
+		{
+			for (const FGameplayAbilitySpec& Spec : GetActivatableAbilities())
+			{
+				if (Spec.IsActive() && Spec.Ability && Spec.Ability->AbilityTags.HasTag(AbilityParryTag))
+				{
+					bIsParryActive = true;
+					break;
+				}
+			}
+		}
 
-	UActionPracticeAttributeSet* APAttributeSet = const_cast<UActionPracticeAttributeSet*>(GetActionPracticeAttributeSet());
-	if (!APAttributeSet)
-	{
-		Super::CalculateAndSetAttributes(SourceActor, FinalAttackData);
-		return;
-	}
+		if (!OwnerCharacter)
+		{
+			Super::CalculateAndSetAttributes(SourceActor, FinalAttackData);
+			return;
+		}
 
-	//방어 성공 시 계산
-	if (bBlockedLastAttack)
-	{
+		UActionPracticeAttributeSet* APAttributeSet = const_cast<UActionPracticeAttributeSet*>(GetActionPracticeAttributeSet());
+		if (!APAttributeSet)
+		{
+			Super::CalculateAndSetAttributes(SourceActor, FinalAttackData);
+			return;
+		}
+
 		AWeapon* LeftWeapon = OwnerCharacter->GetLeftWeapon();
 		const FBlockActionData* BlockData = LeftWeapon ? LeftWeapon->GetWeaponBlockData() : nullptr;
 		const float DamageReduction = BlockData ? BlockData->DamageReduction : 0.0f;
 		const float FinalDamage = FinalAttackData.FinalDamage * (1.0f - DamageReduction / 100.0f);
 
-		//HP 적용
+		//HP 적용 
 		const float OldHealth = APAttributeSet->GetHealth();
 		APAttributeSet->SetHealth(FMath::Clamp(OldHealth - FinalDamage, 0.0f, APAttributeSet->GetMaxHealth()));
 
 		//가드 성공 시 포이즈 대미지는 적용하지 않음
 
 		//===== 가드 스태미나 소모 (엘든링 Guard Boost 공식) =====
+		bool bGuardBroken = false;
 		if (FinalAttackData.PoiseDamage > 0.0f && BlockData)
 		{
 			const float GuardStrength = FMath::Clamp(BlockData->GuardStrength, 0.0f, 100.0f);
-			const float StaminaCost = FinalAttackData.PoiseDamage * (1.0f - GuardStrength / 100.0f);
+			const float ParryFallbackMultiplier = bIsParryActive ? 4.0f : 1.0f;
+			const float StaminaCost = FinalAttackData.PoiseDamage * (1.0f - GuardStrength / 100.0f) * ParryFallbackMultiplier;
 
 			if (StaminaCost > 0.0f)
 			{
@@ -286,9 +319,19 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 			}
 		}
 
-		DEBUG_LOG(TEXT("Blocked: Damage=%.1f, FinalDamage=%.1f, Reduction=%.1f%%, Health=%.1f/%.1f, GuardBroken=%d"),
-			FinalAttackData.FinalDamage, FinalDamage, DamageReduction,
-			APAttributeSet->GetHealth(), APAttributeSet->GetMaxHealth(), bGuardBroken);
+		//최종 상태 결정
+		if (bGuardBroken)
+		{
+			LastDefenseState = bIsParryActive ? EPlayerDefenseState::ParryFallbackGuardBroken : EPlayerDefenseState::GuardBroken;
+		}
+		else
+		{
+			LastDefenseState = bIsParryActive ? EPlayerDefenseState::ParryFallbackBlocked : EPlayerDefenseState::Blocked;
+		}
+
+		DEBUG_LOG(TEXT("CalculateAndSetAttributes: DefenseState=%d, Damage=%.1f, FinalDamage=%.1f, Reduction=%.1f%%, Health=%.1f/%.1f, ParryActive=%d"),
+			static_cast<uint8>(LastDefenseState), FinalAttackData.FinalDamage, FinalDamage, DamageReduction,
+			APAttributeSet->GetHealth(), APAttributeSet->GetMaxHealth(), bIsParryActive);
 		return;
 	}
 
@@ -300,49 +343,150 @@ void UActionPracticeAbilitySystemComponent::PrepareHitReactionEventData(FGamepla
 {
 	Super::PrepareHitReactionEventData(OutEventData, FinalAttackData);
 
-	if (bGuardBroken)
+	switch (LastDefenseState)
 	{
-		//가드 브레이크: State.GuardBroken 태그 전달
+	case EPlayerDefenseState::GuardBroken:
+	case EPlayerDefenseState::ParryFallbackGuardBroken:
 		OutEventData.TargetTags.AddTag(StateGuardBrokenTag);
 		DEBUG_LOG(TEXT("GuardBreak Reaction: State.GuardBroken tag added"));
-	}
-	else if (bBlockedLastAttack)
-	{
-		//일반 블록 리액션: State.Blocking 태그 전달
+		break;
+
+	case EPlayerDefenseState::Blocked:
 		OutEventData.TargetTags.AddTag(StateAbilityBlockingTag);
 		DEBUG_LOG(TEXT("Block Reaction triggered"));
+		break;
+
+	default:
+		break;
 	}
 }
 
 EDefenseResult UActionPracticeAbilitySystemComponent::GetDefenseResult() const
 {
-	if (bGuardBroken)
+	switch (LastDefenseState)
 	{
+	case EPlayerDefenseState::Parried:
+		return EDefenseResult::Parried;
+
+	case EPlayerDefenseState::GuardBroken:
+	case EPlayerDefenseState::ParryFallbackGuardBroken:
 		return EDefenseResult::GuardBroken;
-	}
-	if (bBlockedLastAttack)
-	{
+
+	case EPlayerDefenseState::Blocked:
+	case EPlayerDefenseState::ParryFallbackBlocked:
 		return EDefenseResult::Blocked;
+
+	default:
+		return EDefenseResult::None;
 	}
-	return EDefenseResult::None;
 }
 
 bool UActionPracticeAbilitySystemComponent::ShouldActivateHitReaction() const
 {
-	//가드 + 가드 브레이크 시 즉시 활성화
-	if (bBlockedLastAttack || bGuardBroken)
+	const bool bSuperResult = Super::ShouldActivateHitReaction();
+	DEBUG_LOG(TEXT("ShouldActivateHitReaction: DefenseState=%d, SuperResult=%d"),
+		static_cast<uint8>(LastDefenseState), bSuperResult);
+
+	switch (LastDefenseState)
 	{
+	case EPlayerDefenseState::Parried:
+		DEBUG_LOG(TEXT("ShouldActivateHitReaction: FALSE (parried)"));
+		return false;
+
+	case EPlayerDefenseState::ParryFallbackBlocked:
+		DEBUG_LOG(TEXT("ShouldActivateHitReaction: FALSE (parry fallback block)"));
+		return false;
+
+	case EPlayerDefenseState::Blocked:
+	case EPlayerDefenseState::GuardBroken:
+	case EPlayerDefenseState::ParryFallbackGuardBroken:
+		DEBUG_LOG(TEXT("ShouldActivateHitReaction: TRUE (DefenseState=%d)"), static_cast<uint8>(LastDefenseState));
 		return true;
+
+	default:
+		break;
 	}
 
 	//기본 포이즈 브레이크 체크
-	return Super::ShouldActivateHitReaction();
+	DEBUG_LOG(TEXT("ShouldActivateHitReaction: SuperResult=%d"), bSuperResult);
+	return bSuperResult;
+}
+
+void UActionPracticeAbilitySystemComponent::CheckParrySuccess(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
+{
+	if (!OwnerCharacter || !SourceActor)
+	{
+		DEBUG_LOG(TEXT("CheckParrySuccess: SKIP (no owner or source)"));
+		return;
+	}
+
+	//패리 불가 공격
+	if (FinalAttackData.bUnparriable)
+	{
+		DEBUG_LOG(TEXT("CheckParrySuccess: SKIP (unparriable)"));
+		return;
+	}
+
+	//State.Parrying 태그 확인
+	const bool bHasParryingTag = HasMatchingGameplayTag(StateParryingTag);
+	DEBUG_LOG(TEXT("CheckParrySuccess: StateParryingTag valid=%d, has=%d"), StateParryingTag.IsValid(), bHasParryingTag);
+	if (!bHasParryingTag)
+	{
+		DEBUG_LOG(TEXT("CheckParrySuccess: SKIP (no State.Parrying tag)"));
+		return;
+	}
+
+	//좌측 무기(방패/무기) 확인
+	AWeapon* LeftWeapon = OwnerCharacter->GetLeftWeapon();
+	if (!LeftWeapon)
+	{
+		DEBUG_LOG(TEXT("CheckParrySuccess: SKIP (no LeftWeapon)"));
+		return;
+	}
+
+	//패리 각도 확인 (WeaponDataAsset의 BlockData에서 읽기)
+	const FBlockActionData* BlockData = LeftWeapon->GetWeaponBlockData();
+	const float ParryAngle = BlockData ? BlockData->ParryAngle : 60.0f;
+
+	//공격자 방향 계산
+	const FVector ToSource = SourceActor->GetActorLocation() - OwnerCharacter->GetActorLocation();
+	const FVector ToSourceNormalized = ToSource.GetSafeNormal2D();
+	const FVector Forward = OwnerCharacter->GetActorForwardVector();
+
+	const float DotProduct = FVector::DotProduct(Forward, ToSourceNormalized);
+	const float AngleDegrees = FMath::RadiansToDegrees(FMath::Acos(DotProduct));
+
+	DEBUG_LOG(TEXT("CheckParrySuccess: Angle=%.1f, ParryAngle=%.1f"), AngleDegrees, ParryAngle);
+
+	if (AngleDegrees <= ParryAngle)
+	{
+		LastDefenseState = EPlayerDefenseState::Parried;
+		DEBUG_LOG(TEXT("CheckParrySuccess: SUCCESS"));
+	}
+	else
+	{
+		DEBUG_LOG(TEXT("CheckParrySuccess: FAIL (angle exceeded)"));
+	}
+}
+
+void UActionPracticeAbilitySystemComponent::ForceEnemyGroggy(AActor* EnemyActor)
+{
+	if (!EnemyActor)
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(EnemyActor);
+	UEnemyAbilitySystemComponent* EnemyASC = Cast<UEnemyAbilitySystemComponent>(TargetASC);
+	if (EnemyASC)
+	{
+		EnemyASC->ForceActivateGroggy();
+		DEBUG_LOG(TEXT("ForceEnemyGroggy: Triggered groggy on %s"), *EnemyActor->GetName());
+	}
 }
 
 void UActionPracticeAbilitySystemComponent::CheckBlockSuccess(AActor* SourceActor)
 {
-	bBlockedLastAttack = false;
-
 	if (!OwnerCharacter || !SourceActor)
 	{
 		return;
@@ -370,7 +514,8 @@ void UActionPracticeAbilitySystemComponent::CheckBlockSuccess(AActor* SourceActo
 
 	if (AngleDegrees <= BlockingAngle)
 	{
-		bBlockedLastAttack = true;
+		//CalculateAndSetAttributes에서 최종 상태(Blocked/GuardBroken/ParryFallback*) 결정
+		LastDefenseState = EPlayerDefenseState::Blocked;
 	}
 }
 

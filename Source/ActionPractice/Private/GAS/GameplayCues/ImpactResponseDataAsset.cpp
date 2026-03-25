@@ -13,6 +13,10 @@ const FImpactResponseData& UImpactResponseDataAsset::GetResponse(EPhysicalSurfac
 {
 	switch (InDefenseResult)
 	{
+	case EDefenseResult::Parried:
+		DEBUG_LOG(TEXT("GetResponse - Parried → ParriedResponse"));
+		return ParriedResponse;
+
 	case EDefenseResult::GuardBroken:
 		DEBUG_LOG(TEXT("GetResponse - GuardBroken → GuardBreakResponse"));
 		return GuardBreakResponse;

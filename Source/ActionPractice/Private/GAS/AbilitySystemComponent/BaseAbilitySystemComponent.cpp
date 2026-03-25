@@ -122,6 +122,7 @@ FGameplayEffectSpecHandle UBaseAbilitySystemComponent::CreateAttackGameplayEffec
 	{
 		APContext->SetAttackDamageType(FinalAttackData.DamageType);
 		APContext->SetPoiseDamage(FinalAttackData.PoiseDamage);
+		APContext->SetUnparriable(FinalAttackData.bUnparriable);
 
 		//HitResult를 Context에 추가 — GAS가 Cue 파라미터에 Location/Normal을 자동 매핑
 		if (HitResult)

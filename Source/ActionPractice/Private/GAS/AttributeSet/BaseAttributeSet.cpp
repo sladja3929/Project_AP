@@ -214,6 +214,7 @@ void UBaseAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallba
 			{
 				FinalAttackData.DamageType = APContext->GetAttackDamageType();
 				FinalAttackData.PoiseDamage = APContext->GetPoiseDamage();
+				FinalAttackData.bUnparriable = APContext->GetUnparriable();
 			}
 
 			//Impact Cue용 EffectContext 캐싱 (판정 후 수동 발동에 사용)

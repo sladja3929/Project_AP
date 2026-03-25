@@ -183,6 +183,15 @@ void UEnemyAbilitySystemComponent::ActivateGroggyAbility(const FFinalAttackData&
 	}
 }
 
+void UEnemyAbilitySystemComponent::ForceActivateGroggy()
+{
+	//Stance 체크 없이 직접 발동
+	FFinalAttackData EmptyAttackData;
+	ActivateGroggyAbility(EmptyAttackData);
+
+	DEBUG_LOG(TEXT("ForceActivateGroggy: Forced groggy activation (parry)"));
+}
+
 void UEnemyAbilitySystemComponent::ResetBreakGauges()
 {
 	//Poise 리셋

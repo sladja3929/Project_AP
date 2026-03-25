@@ -24,6 +24,9 @@ bool FActionPracticeGameplayEffectContext::NetSerialize(FArchive& Ar, UPackageMa
 		DefenseResult = static_cast<EDefenseResult>(DefenseResultValue);
 	}
 
+	//bUnparriable 직렬화
+	Ar << bUnparriable;
+
 	bOutSuccess = true;
 	return true;
 }
