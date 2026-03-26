@@ -86,6 +86,20 @@ void UEnemyAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallb
 }
 
 // Rep Notify Functions
+void UEnemyAttributeSet::OnRep_Health(const FGameplayAttributeData& OldHealth)
+{
+	Super::OnRep_Health(OldHealth);
+
+	//클라이언트: Health 복제 수신 시 HP바 표시 (서버는 PostGameplayEffectExecute에서 처리)
+	if (UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent())
+	{
+		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(ASC->GetAvatarActor()))
+		{
+			Enemy->ShowEnemyHealthBar();
+		}
+	}
+}
+
 void UEnemyAttributeSet::OnRep_Stance(const FGameplayAttributeData& OldStance)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UEnemyAttributeSet, Stance, OldStance);

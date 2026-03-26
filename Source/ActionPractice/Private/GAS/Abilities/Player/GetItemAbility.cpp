@@ -12,7 +12,7 @@
 #include "Items/UsableItemDataAsset.h"
 #include "AbilitySystemComponent.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogGetItemAbility, Log, All);
@@ -36,46 +36,46 @@ void UGetItemAbility::ActivateAbility(
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	//PickupItem 참조 획득
-	AcquirePickupItem(TriggerEventData);
-
-	if (!CachedPickupItem.IsValid())
+	//서버 전용: 아이템 획득 처리 — ServerInitiated 어빌리티는 클라이언트에서도 ActivateAbility가 호출되므로 권한 분리 필요
+	if (HasAuthority(&ActivationInfo))
 	{
-		DEBUG_LOG(TEXT("ActivateAbility: No PickupItem reference — aborting"));
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+		AcquirePickupItem(TriggerEventData);
 
-	//아이템 즉시 획득 (몽타주 재생 전)
-	const bool bSuccess = ProcessItemAcquisition();
-	if (!bSuccess)
-	{
-		DEBUG_LOG(TEXT("ActivateAbility: Item acquisition failed — aborting"));
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
-	//PickupItem 비활성화 (서버)
-	CachedPickupItem->OnPickedUp();
-
-	//클라이언트에 획득 알림 전달
-	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
-	if (Character)
-	{
-		AActionPracticePlayerController* PC = Cast<AActionPracticePlayerController>(Character->GetController());
-		if (PC)
+		if (!CachedPickupItem.IsValid())
 		{
-			PC->Client_NotifyItemAcquired(
-				const_cast<UBaseItemDataAsset*>(CachedPickupItem->GetItemDA()),
-				CachedPickupItem->GetItemCount()
-			);
+			DEBUG_LOG(TEXT("ActivateAbility: No PickupItem reference — aborting"));
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			return;
+		}
+
+		const bool bSuccess = ProcessItemAcquisition();
+		if (!bSuccess)
+		{
+			DEBUG_LOG(TEXT("ActivateAbility: Item acquisition failed — aborting"));
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			return;
+		}
+
+		//PickupItem 비활성화
+		CachedPickupItem->OnPickedUp();
+
+		//클라이언트에 획득 알림 전달
+		AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
+		if (Character)
+		{
+			AActionPracticePlayerController* PC = Cast<AActionPracticePlayerController>(Character->GetController());
+			if (PC)
+			{
+				PC->Client_NotifyItemAcquired(
+					const_cast<UBaseItemDataAsset*>(CachedPickupItem->GetItemDA()),
+					CachedPickupItem->GetItemCount()
+				);
+			}
 		}
 	}
 
-	//몽타주 재생 전 무기 숨김
+	//서버+클라이언트 공통: 몽타주 연출 — 서버는 권한 실행, 클라이언트는 ClientActivateAbilitySucceed 수신 후 실행
 	SetWeaponsVisibility(false);
-
-	//픽업 몽타주 재생 — 순수 연출, 캔슬되어도 아이템은 이미 인벤에 있음
 	StartMontageWithEventsTask();
 }
 

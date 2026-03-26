@@ -63,6 +63,9 @@ public:
 protected:
 #pragma region "Protected Functions"
 
+	//클라이언트에서 Health 복제 시 HP바 표시 트리거
+	virtual void OnRep_Health(const FGameplayAttributeData& OldHealth) override;
+
 	UFUNCTION()
 	virtual void OnRep_Stance(const FGameplayAttributeData& OldStance);
 

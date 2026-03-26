@@ -160,6 +160,7 @@ void AActionPracticePlayerController::OnPossess(APawn* InPawn)
 void AActionPracticePlayerController::OnUnPossess()
 {
 	GetWorldTimerManager().ClearTimer(BindHUDTimerHandle);
+	bHUDDataBound = false;
 	UnbindDeathStateTagEvent();
 	UnbindRecoveringTagEvent();
 	UnbindInteractionPromptEvent();
@@ -386,6 +387,7 @@ void AActionPracticePlayerController::InitializeMasterHUD()
 
 void AActionPracticePlayerController::BindPlayerHUDData()
 {
+	if (bHUDDataBound) return;
 	if (!MasterHUDWidget) return;
 	if (!CachedCharacter) return;
 
@@ -394,6 +396,7 @@ void AActionPracticePlayerController::BindPlayerHUDData()
 	UItemManagerComponent* ItemMgr = CachedCharacter->GetItemManagerComponent();
 
 	MasterHUDWidget->BindPlayerData(AttrSet, WeaponMgr, ItemMgr);
+	bHUDDataBound = true;
 	DEBUG_LOG(TEXT("BindPlayerHUDData: Bound to %s"), *GetNameSafe(CachedCharacter));
 }
 

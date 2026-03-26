@@ -245,11 +245,9 @@ void UEnemyDeathAbility::FreezeAnimPose()
 	AEnemyCharacter* Enemy = GetEnemyCharacterFromActorInfo();
 	if (!Enemy) return;
 
-	if (USkeletalMeshComponent* Mesh = Enemy->GetMesh())
-	{
-		Mesh->bPauseAnims = true;
-		DEBUG_LOG(TEXT("FreezeAnimPose: bPauseAnims = true"));
-	}
+	//bPauseAnims은 복제되지 않으므로 Multicast RPC로 모든 클라이언트에 전파
+	Enemy->Multicast_FreezeAnimPose();
+	DEBUG_LOG(TEXT("FreezeAnimPose: Multicast_FreezeAnimPose called"));
 }
 
 void UEnemyDeathAbility::HideHealthBar()

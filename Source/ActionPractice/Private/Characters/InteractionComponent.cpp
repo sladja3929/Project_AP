@@ -38,7 +38,7 @@ void UInteractionComponent::TryInteract()
 {
 	if (!CurrentInteractable.IsValid()) return;
 
-	//Owner의 Recovering 상태 확인 — 모든 IInteractable에 공통 적용
+	//클라이언트 로컬 선검증 — Recovering 태그 (LocalOnly, 서버에 없음)
 	AActor* Owner = GetOwner();
 	if (Owner)
 	{
@@ -59,9 +59,26 @@ void UInteractionComponent::TryInteract()
 	IInteractable* InteractableInterface = Cast<IInteractable>(Interactable);
 	if (!InteractableInterface) return;
 
-	if (!InteractableInterface->CanInteract(GetOwner())) return;
+	//클라이언트 로컬 선검증 — 즉각적인 피드백용 (서버에서 재검증함)
+	if (!InteractableInterface->CanInteract(Owner)) return;
 
-	InteractableInterface->Interact(GetOwner());
+	//ServerInitiated 어빌리티 활성화를 위해 서버에서 Interact 실행
+	Server_TryInteract(Interactable);
+}
+
+void UInteractionComponent::Server_TryInteract_Implementation(AActor* InInteractable)
+{
+	if (!IsValid(InInteractable)) return;
+
+	IInteractable* InteractableInterface = Cast<IInteractable>(InInteractable);
+	if (!InteractableInterface) return;
+
+	AActor* Owner = GetOwner();
+
+	//서버 재검증 — 클라이언트와 서버 상태가 다를 수 있음
+	if (!InteractableInterface->CanInteract(Owner)) return;
+
+	InteractableInterface->Interact(Owner);
 }
 
 AActor* UInteractionComponent::GetCurrentInteractable() const

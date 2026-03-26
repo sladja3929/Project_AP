@@ -68,6 +68,10 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_ReleaseLockOn();
 
+	//사망 포즈 고정 — ServerOnly 어빌리티는 bPauseAnims가 복제되지 않으므로 Multicast로 전파
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_FreezeAnimPose();
+
 	// ===== Replication =====
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

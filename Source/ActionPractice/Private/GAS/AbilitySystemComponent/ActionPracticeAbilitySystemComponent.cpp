@@ -10,7 +10,7 @@
 #include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionPracticeAbilitySystemComponent, Log, All);
@@ -294,7 +294,7 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 
 		//가드 성공 시 포이즈 대미지는 적용하지 않음
 
-		//===== 가드 스태미나 소모 (엘든링 Guard Boost 공식) =====
+		//===== 가드 스태미나 소모 (엘든링 가드 공식) =====
 		bool bGuardBroken = false;
 		if (FinalAttackData.PoiseDamage > 0.0f && BlockData)
 		{

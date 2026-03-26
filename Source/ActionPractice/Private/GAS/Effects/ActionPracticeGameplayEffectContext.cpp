@@ -44,7 +44,7 @@ FGameplayEffectContext* FActionPracticeGameplayEffectContext::Duplicate() const
 
 UScriptStruct* FActionPracticeGameplayEffectContext::GetScriptStruct() const
 {
-	return FGameplayEffectContext::GetScriptStruct();
+	return FActionPracticeGameplayEffectContext::StaticStruct();
 }
 
 FActionPracticeGameplayEffectContext* FActionPracticeGameplayEffectContext::GetActionPracticeEffectContext(FGameplayEffectContextHandle& Handle)

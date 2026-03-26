@@ -209,6 +209,14 @@ void AEnemyCharacter::SetLockedOnByPlayer(bool bLocked)
 	}
 }
 
+void AEnemyCharacter::Multicast_FreezeAnimPose_Implementation()
+{
+	if (USkeletalMeshComponent* InMesh = GetMesh())
+	{
+		InMesh->bPauseAnims = true;
+	}
+}
+
 void AEnemyCharacter::Multicast_ReleaseLockOn_Implementation()
 {
 	//로컬 플레이어의 LockOnComponent가 이 적을 타깃으로 하고 있으면 해제

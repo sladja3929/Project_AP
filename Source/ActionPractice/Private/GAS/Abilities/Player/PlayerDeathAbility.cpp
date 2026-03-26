@@ -369,5 +369,12 @@ void UPlayerDeathAbility::EndAbility(
 	}
 	END_ABILITY_TASK(WaitDelayTask);
 
+	//bPauseAnims 복구 — 서버는 PerformRespawn에서 처리, 클라이언트는 EndAbility 수신 시 처리
+	//bPauseAnims은 복제되지 않으므로 양쪽에서 명시적으로 해제
+	if (ABaseCharacter* Character = GetBaseCharacterFromActorInfo())
+	{
+		Character->GetMesh()->bPauseAnims = false;
+	}
+
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

@@ -31,6 +31,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	AActor* GetCurrentInteractable() const;
 
+	UFUNCTION(Server, Reliable)
+	void Server_TryInteract(AActor* InInteractable);
+
 #pragma endregion
 
 protected:

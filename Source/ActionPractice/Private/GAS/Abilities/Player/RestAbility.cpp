@@ -17,7 +17,7 @@
 #include "Abilities/GameplayAbilityTypes.h"
 #include "Kismet/GameplayStatics.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogRestAbility, Log, All);

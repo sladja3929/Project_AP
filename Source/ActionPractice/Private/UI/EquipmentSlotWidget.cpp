@@ -48,6 +48,16 @@ void UEquipmentSlotWidget::NativeDestruct()
 
 void UEquipmentSlotWidget::SetDataSources(UWeaponManagerComponent* InWeaponManager, UItemManagerComponent* InItemManager)
 {
+	//재호출 시 이전 바인딩 먼저 제거 — AddDynamic 중복 바인딩 크래시 방지
+	if (WeaponManager)
+	{
+		WeaponManager->OnWeaponChanged.RemoveDynamic(this, &UEquipmentSlotWidget::RefreshWeaponSlot);
+	}
+	if (ItemManager)
+	{
+		ItemManager->OnEquippedItemChanged.RemoveDynamic(this, &UEquipmentSlotWidget::RefreshItemSlot);
+	}
+
 	WeaponManager = InWeaponManager;
 	ItemManager = InItemManager;
 

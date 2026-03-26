@@ -121,6 +121,9 @@ protected:
 	//BindPlayerHUDData 지연 호출용 — 동일 핸들 재사용으로 중복 방지
 	FTimerHandle BindHUDTimerHandle;
 
+	//AcknowledgePossession+OnRep_Pawn 타이밍 경쟁으로 인한 중복 바인딩 방지
+	bool bHUDDataBound = false;
+
 	// ===== Interaction Prompt Dimming =====
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> CachedRecoveringUIASC = nullptr;
