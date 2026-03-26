@@ -5,6 +5,7 @@
 #include "UI/DeathScreenWidget.h"
 #include "UI/InteractionPromptWidget.h"
 #include "UI/InteractionResultWidget.h"
+#include "UI/PauseMenuWidget.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 
@@ -130,6 +131,58 @@ void UMasterHUDWidget::CreateChildWidgets()
 			DEBUG_LOG(TEXT("InteractionResultWidget created in BaseLayer"));
 		}
 	}
+
+	//ModalLayer — PauseMenu (초기 Collapsed)
+	if (PauseMenuWidgetClass && ModalLayer)
+	{
+		PauseMenuWidget = CreateWidget<UPauseMenuWidget>(PC, PauseMenuWidgetClass);
+		if (PauseMenuWidget)
+		{
+			UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(ModalLayer->AddChild(PauseMenuWidget));
+			if (OverlaySlot)
+			{
+				OverlaySlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Fill);
+				OverlaySlot->SetVerticalAlignment(EVerticalAlignment::VAlign_Fill);
+			}
+			PauseMenuWidget->HideMenu();
+			DEBUG_LOG(TEXT("PauseMenuWidget created in ModalLayer (Hidden)"));
+		}
+	}
+}
+
+void UMasterHUDWidget::TogglePauseMenu()
+{
+	if (!PauseMenuWidget) return;
+
+	if (PauseMenuWidget->IsMenuVisible())
+	{
+		HidePauseMenu();
+	}
+	else
+	{
+		ShowPauseMenu();
+	}
+}
+
+void UMasterHUDWidget::ShowPauseMenu()
+{
+	if (PauseMenuWidget)
+	{
+		PauseMenuWidget->ShowMenu();
+	}
+}
+
+void UMasterHUDWidget::HidePauseMenu()
+{
+	if (PauseMenuWidget)
+	{
+		PauseMenuWidget->HideMenu();
+	}
+}
+
+bool UMasterHUDWidget::IsPauseMenuVisible() const
+{
+	return PauseMenuWidget && PauseMenuWidget->IsMenuVisible();
 }
 
 void UMasterHUDWidget::ShowItemAcquisition(const UBaseItemDataAsset* InItemDA, int32 InCount)

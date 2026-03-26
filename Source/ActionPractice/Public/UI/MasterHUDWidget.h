@@ -16,6 +16,7 @@ class UEnemyAttributeSet;
 class UWeaponManagerComponent;
 class UItemManagerComponent;
 class UBaseItemDataAsset;
+class UPauseMenuWidget;
 
 UCLASS()
 class ACTIONPRACTICE_API UMasterHUDWidget : public UUserWidget
@@ -56,6 +57,12 @@ public:
 	FORCEINLINE UDeathScreenWidget* GetDeathScreenWidget() const { return DeathScreenWidget; }
 	FORCEINLINE UInteractionPromptWidget* GetInteractionPromptWidget() const { return InteractionPromptWidget; }
 
+	//ESC 메뉴 토글
+	void TogglePauseMenu();
+	void ShowPauseMenu();
+	void HidePauseMenu();
+	bool IsPauseMenuVisible() const;
+
 	//AddToViewport 이후 컨트롤러에서 명시적으로 호출 — NativeConstruct 안에서 호출하지 않음
 	void CreateChildWidgets();
 
@@ -93,6 +100,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	TSubclassOf<UInteractionResultWidget> InteractionResultWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UPauseMenuWidget> PauseMenuWidgetClass;
+
 	//생성된 위젯 인스턴스
 	UPROPERTY()
 	TObjectPtr<UPlayerStatsWidget> PlayerStatsWidget;
@@ -111,6 +121,9 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UInteractionResultWidget> InteractionResultWidget;
+
+	UPROPERTY()
+	TObjectPtr<UPauseMenuWidget> PauseMenuWidget;
 
 #pragma endregion
 

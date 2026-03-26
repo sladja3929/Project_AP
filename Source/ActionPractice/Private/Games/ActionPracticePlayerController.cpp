@@ -132,6 +132,11 @@ void AActionPracticePlayerController::SetupInputComponent()
 		{
 			EIC->BindAction(IA_CycleRightWeapon, ETriggerEvent::Triggered, this, &AActionPracticePlayerController::HandleCycleWeapon);
 		}
+
+		if (IA_Pause)
+		{
+			EIC->BindAction(IA_Pause, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnPauseInput);
+		}
 	}
 }
 
@@ -171,6 +176,11 @@ void AActionPracticePlayerController::OnUnPossess()
 void AActionPracticePlayerController::AcknowledgePossession(APawn* P)
 {
 	Super::AcknowledgePossession(P);
+
+	//타이틀 화면(UIOnly)에서 OpenLevel로 진입 시 입력 모드 복구
+	bShowMouseCursor = false;
+	SetInputMode(FInputModeGameOnly());
+	
 	CachedCharacter = Cast<AActionPracticeCharacter>(P);
 	DEBUG_LOG(TEXT("AcknowledgePossession: CachedCharacter = %s"), *GetNameSafe(CachedCharacter));
 
@@ -572,6 +582,29 @@ void AActionPracticePlayerController::HandleRecoveringTagChanged(const FGameplay
 
 	MasterHUDWidget->SetInteractionPromptDimmed(NewCount > 0);
 	DEBUG_LOG(TEXT("HandleRecoveringTagChanged: Dimmed=%s (Count=%d)"), NewCount > 0 ? TEXT("true") : TEXT("false"), NewCount);
+}
+
+void AActionPracticePlayerController::OnPauseInput()
+{
+	if (!IsLocalController()) return;
+	if (!MasterHUDWidget) return;
+
+	MasterHUDWidget->TogglePauseMenu();
+
+	if (MasterHUDWidget->IsPauseMenuVisible())
+	{
+		//메뉴 열림 — 마우스 커서 표시 + 게임/UI 겸용 입력
+		bShowMouseCursor = true;
+		SetInputMode(FInputModeGameAndUI());
+		DEBUG_LOG(TEXT("Pause Menu Opened"));
+	}
+	else
+	{
+		//메뉴 닫힘 — 마우스 커서 숨김 + 게임 전용 입력
+		bShowMouseCursor = false;
+		SetInputMode(FInputModeGameOnly());
+		DEBUG_LOG(TEXT("Pause Menu Closed"));
+	}
 }
 
 #pragma endregion

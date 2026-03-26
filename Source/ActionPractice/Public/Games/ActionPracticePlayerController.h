@@ -105,6 +105,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
 	TObjectPtr<UInputAction> IA_CycleQuickSlot = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")
+	TObjectPtr<UInputAction> IA_Pause = nullptr;
+
 	// ===== UI =====
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	TSubclassOf<UMasterHUDWidget> MasterHUDWidgetClass = nullptr;
@@ -182,6 +185,9 @@ protected:
 	void BindRecoveringTagEvent();
 	void UnbindRecoveringTagEvent();
 	void HandleRecoveringTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+
+	// ===== Pause Menu =====
+	void OnPauseInput();
 
 #pragma endregion
 
