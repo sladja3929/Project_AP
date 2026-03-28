@@ -6,7 +6,7 @@
 #include "GameplayTagContainer.h"
 #include "ActivateAbilityTask.generated.h"
 
-class UAbilitySystemComponent;
+class UEnemyAbilitySystemComponent;
 class UGameplayAbility;
 
 /**
@@ -23,7 +23,7 @@ struct FActivateAbilityTaskInstanceData
     
     //Context에 바인딩된 ASC
     UPROPERTY(EditAnywhere, Category = "Context")
-    TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent = nullptr;
+    TObjectPtr<UEnemyAbilitySystemComponent> EnemyAbilitySystemComponent = nullptr;
 
     //실행할 어빌리티 클래스를 에셋에서 지정
     UPROPERTY(EditAnywhere, Category = "Parameter")

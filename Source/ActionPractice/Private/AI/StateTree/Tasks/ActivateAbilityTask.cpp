@@ -1,5 +1,5 @@
 #include "AI/StateTree/Tasks/ActivateAbilityTask.h"
-#include "AbilitySystemComponent.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "StateTreeAsyncExecutionContext.h"
 #include "StateTreeExecutionContext.h"
 
@@ -22,7 +22,7 @@ EStateTreeRunStatus FActivateAbilityTask::EnterState(FStateTreeExecutionContext&
     InstanceData.bAbilityCancelled = false;
     InstanceData.ElapsedEndDelay = 0.0f;
 
-    if (!InstanceData.AbilitySystemComponent)
+    if (!InstanceData.EnemyAbilitySystemComponent)
     {
         DEBUG_LOG(TEXT("EnterState: ASC is nullptr"));
         return EStateTreeRunStatus::Failed;
@@ -34,13 +34,13 @@ EStateTreeRunStatus FActivateAbilityTask::EnterState(FStateTreeExecutionContext&
         return EStateTreeRunStatus::Failed;
     }
     
-    FGameplayAbilitySpec* Spec = InstanceData.AbilitySystemComponent->FindAbilitySpecFromClass(InstanceData.AbilityToActivate);
+    FGameplayAbilitySpec* Spec = InstanceData.EnemyAbilitySystemComponent->FindAbilitySpecFromClass(InstanceData.AbilityToActivate);
 
     if (!Spec)
     {
         DEBUG_LOG(TEXT("EnterState: No AbilitySpec. Ability=%s, ASC=%p"),
             *GetNameSafe(InstanceData.AbilityToActivate),
-            InstanceData.AbilitySystemComponent.Get());
+            InstanceData.EnemyAbilitySystemComponent.Get());
         return EStateTreeRunStatus::Failed;
     }
 
@@ -49,10 +49,10 @@ EStateTreeRunStatus FActivateAbilityTask::EnterState(FStateTreeExecutionContext&
     DEBUG_LOG(TEXT("EnterState: Using Ability=%s, Handle=%s, ASC=%p"),
         *GetNameSafe(InstanceData.AbilityToActivate),
         *InstanceData.AbilityHandle.ToString(),
-        InstanceData.AbilitySystemComponent.Get());
+        InstanceData.EnemyAbilitySystemComponent.Get());
 
     //어빌리티 활성화
-    const bool bSuccess = InstanceData.AbilitySystemComponent->TryActivateAbility(InstanceData.AbilityHandle, true);
+    const bool bSuccess = InstanceData.EnemyAbilitySystemComponent->TryActivateAbility(InstanceData.AbilityHandle, true);
 
     if (!bSuccess)
     {
@@ -73,14 +73,14 @@ EStateTreeRunStatus FActivateAbilityTask::Tick(FStateTreeExecutionContext& Conte
 {
     FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
-    if (!InstanceData.AbilitySystemComponent || !InstanceData.AbilityHandle.IsValid())
+    if (!InstanceData.EnemyAbilitySystemComponent || !InstanceData.AbilityHandle.IsValid())
     {
         DEBUG_LOG(TEXT("Tick: ASC or Handle invalid - Task FAILED"));
         return EStateTreeRunStatus::Failed;
     }
 
     //Spec 상태를 직접 확인
-    const FGameplayAbilitySpec* Spec = InstanceData.AbilitySystemComponent->FindAbilitySpecFromHandle(InstanceData.AbilityHandle);
+    const FGameplayAbilitySpec* Spec = InstanceData.EnemyAbilitySystemComponent->FindAbilitySpecFromHandle(InstanceData.AbilityHandle);
 
     if (!Spec)
     {
@@ -123,12 +123,12 @@ void FActivateAbilityTask::ExitState(FStateTreeExecutionContext& Context, const 
     DEBUG_LOG(TEXT("ExitState: Called. Ability=%s, Handle=%s, ASC=%p"),
         *GetNameSafe(InstanceData.AbilityToActivate),
         *InstanceData.AbilityHandle.ToString(),
-        InstanceData.AbilitySystemComponent.Get());
+        InstanceData.EnemyAbilitySystemComponent.Get());
 
-    if (InstanceData.AbilitySystemComponent && InstanceData.AbilityHandle.IsValid())
+    if (InstanceData.EnemyAbilitySystemComponent && InstanceData.AbilityHandle.IsValid())
     {
         //아직 활성화 중이면 취소
-        InstanceData.AbilitySystemComponent->CancelAbilityHandle(InstanceData.AbilityHandle);
+        InstanceData.EnemyAbilitySystemComponent->CancelAbilityHandle(InstanceData.AbilityHandle);
         DEBUG_LOG(TEXT("ExitState: Cancelled ability via CancelAbilityHandle"));
     }
 

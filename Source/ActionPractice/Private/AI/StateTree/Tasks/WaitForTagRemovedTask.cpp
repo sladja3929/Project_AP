@@ -1,5 +1,5 @@
 #include "AI/StateTree/Tasks/WaitForTagRemovedTask.h"
-#include "AbilitySystemComponent.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "StateTreeExecutionContext.h"
 
 #define ENABLE_DEBUG_LOG 0
@@ -15,14 +15,14 @@ EStateTreeRunStatus FWaitForTagRemovedTask::EnterState(FStateTreeExecutionContex
 {
 	const FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
-	if (!InstanceData.AbilitySystemComponent || !InstanceData.Tag.IsValid())
+	if (!InstanceData.EnemyAbilitySystemComponent || !InstanceData.Tag.IsValid())
 	{
 		DEBUG_LOG(TEXT("EnterState: ASC or Tag invalid — Failed"));
 		return EStateTreeRunStatus::Failed;
 	}
 
 	//이미 태그가 없으면 즉시 완료
-	if (!InstanceData.AbilitySystemComponent->HasMatchingGameplayTag(InstanceData.Tag))
+	if (!InstanceData.EnemyAbilitySystemComponent->HasMatchingGameplayTag(InstanceData.Tag))
 	{
 		DEBUG_LOG(TEXT("EnterState: Tag '%s' not present — Succeeded immediately"), *InstanceData.Tag.ToString());
 		return EStateTreeRunStatus::Succeeded;
@@ -36,12 +36,12 @@ EStateTreeRunStatus FWaitForTagRemovedTask::Tick(FStateTreeExecutionContext& Con
 {
 	const FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
-	if (!InstanceData.AbilitySystemComponent)
+	if (!InstanceData.EnemyAbilitySystemComponent)
 	{
 		return EStateTreeRunStatus::Failed;
 	}
 
-	if (!InstanceData.AbilitySystemComponent->HasMatchingGameplayTag(InstanceData.Tag))
+	if (!InstanceData.EnemyAbilitySystemComponent->HasMatchingGameplayTag(InstanceData.Tag))
 	{
 		DEBUG_LOG(TEXT("Tick: Tag '%s' removed — Succeeded"), *InstanceData.Tag.ToString());
 		return EStateTreeRunStatus::Succeeded;

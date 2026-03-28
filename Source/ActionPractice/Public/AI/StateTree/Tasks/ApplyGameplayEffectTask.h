@@ -5,7 +5,7 @@
 #include "StateTreeTaskBase.h"
 #include "ApplyGameplayEffectTask.generated.h"
 
-class UAbilitySystemComponent;
+class UEnemyAbilitySystemComponent;
 class UGameplayEffect;
 
 USTRUCT()
@@ -17,7 +17,7 @@ struct FApplyGameplayEffectTaskInstanceData
 
 	//Context에 바인딩된 ASC
 	UPROPERTY(EditAnywhere, Category = "Context")
-	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent = nullptr;
+	TObjectPtr<UEnemyAbilitySystemComponent> EnemyAbilitySystemComponent = nullptr;
 
 	//적용할 GE 클래스
 	UPROPERTY(EditAnywhere, Category = "Parameter")

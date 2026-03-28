@@ -5,7 +5,7 @@
 #include "GameplayTagContainer.h"
 #include "HasGameplayTagsCondition.generated.h"
 
-class UAbilitySystemComponent;
+class UEnemyAbilitySystemComponent;
 
 //매칭 모드
 UENUM()
@@ -27,7 +27,7 @@ struct FHasGameplayTagsConditionInstanceData
 
 	//Context에 바인딩된 ASC
 	UPROPERTY(EditAnywhere, Category = "Context")
-	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent = nullptr;
+	TObjectPtr<UEnemyAbilitySystemComponent> EnemyAbilitySystemComponent = nullptr;
 
 	//체크할 태그 컨테이너
 	UPROPERTY(EditAnywhere, Category = "Parameter")

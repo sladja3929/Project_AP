@@ -1,5 +1,5 @@
 #include "AI/StateTree/Conditions/HasGameplayTagsCondition.h"
-#include "AbilitySystemComponent.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "StateTreeExecutionContext.h"
 
 #define ENABLE_DEBUG_LOG 0
@@ -15,7 +15,7 @@ bool FHasGameplayTagsCondition::TestCondition(FStateTreeExecutionContext& Contex
 {
 	const FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
-	if (!InstanceData.AbilitySystemComponent || InstanceData.Tags.IsEmpty())
+	if (!InstanceData.EnemyAbilitySystemComponent || InstanceData.Tags.IsEmpty())
 	{
 		return InstanceData.bInvert;
 	}
@@ -25,11 +25,11 @@ bool FHasGameplayTagsCondition::TestCondition(FStateTreeExecutionContext& Contex
 	switch (InstanceData.MatchMode)
 	{
 	case EGameplayTagMatchMode::All:
-		bResult = InstanceData.AbilitySystemComponent->HasAllMatchingGameplayTags(InstanceData.Tags);
+		bResult = InstanceData.EnemyAbilitySystemComponent->HasAllMatchingGameplayTags(InstanceData.Tags);
 		break;
 
 	case EGameplayTagMatchMode::Any:
-		bResult = InstanceData.AbilitySystemComponent->HasAnyMatchingGameplayTags(InstanceData.Tags);
+		bResult = InstanceData.EnemyAbilitySystemComponent->HasAnyMatchingGameplayTags(InstanceData.Tags);
 		break;
 	}
 

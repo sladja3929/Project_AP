@@ -4,6 +4,7 @@
 #include "StateTreeEvaluatorBase.h"
 #include "HealthRateEvaluator.generated.h"
 
+class UEnemyAbilitySystemComponent;
 class UAbilitySystemComponent;
 
 /**
@@ -18,7 +19,7 @@ struct ACTIONPRACTICE_API FHealthRateEvaluatorInstanceData
 	GENERATED_BODY()
 	
 	UPROPERTY(EditAnywhere, Category = "Context")
-	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent = nullptr;
+	TObjectPtr<UEnemyAbilitySystemComponent> EnemyAbilitySystemComponent = nullptr;
 
 	//Output: 현재 체력 비율 (0.0 ~ 1.0)
 	UPROPERTY(EditAnywhere, Category = "Output")

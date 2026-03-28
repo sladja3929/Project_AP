@@ -5,7 +5,7 @@
 #include "GameplayTagContainer.h"
 #include "WaitForTagRemovedTask.generated.h"
 
-class UAbilitySystemComponent;
+class UEnemyAbilitySystemComponent;
 
 USTRUCT()
 struct FWaitForTagRemovedTaskInstanceData
@@ -16,7 +16,7 @@ struct FWaitForTagRemovedTaskInstanceData
 
 	//Context에 바인딩된 ASC
 	UPROPERTY(EditAnywhere, Category = "Context")
-	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent = nullptr;
+	TObjectPtr<UEnemyAbilitySystemComponent> EnemyAbilitySystemComponent = nullptr;
 
 	//대기할 태그 (이 태그가 ASC에서 제거되면 Succeeded)
 	UPROPERTY(EditAnywhere, Category = "Parameter")

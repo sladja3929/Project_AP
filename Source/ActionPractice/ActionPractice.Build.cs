@@ -26,7 +26,8 @@ public class ActionPractice : ModuleRules
 			"UMG",
 			"NetCore",
 			"Niagara",
-			"PhysicsCore"
+			"PhysicsCore",
+			"NavigationSystem"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

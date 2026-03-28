@@ -29,6 +29,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	float HealthBarVisibilityDuration = 5.0f;
 
+	//ST Property Binding용 스폰 위치 캐시
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
+	FVector SpawnLocation = FVector::ZeroVector;
+
 #pragma endregion
 
 #pragma region "Public Functions"

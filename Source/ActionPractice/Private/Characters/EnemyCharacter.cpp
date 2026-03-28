@@ -250,7 +250,8 @@ void AEnemyCharacter::OnHealthBarTimerExpired()
 void AEnemyCharacter::CacheInitialEnemyState()
 {
 	InitialTransform = GetActorTransform();
-	DEBUG_LOG(TEXT("CacheInitialEnemyState: Transform cached at %s"), *InitialTransform.GetLocation().ToString());
+	SpawnLocation = InitialTransform.GetLocation();
+	DEBUG_LOG(TEXT("CacheInitialEnemyState: Transform cached at %s"), *SpawnLocation.ToString());
 }
 
 void AEnemyCharacter::ResetEnemy()

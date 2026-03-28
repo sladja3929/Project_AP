@@ -1,5 +1,5 @@
 #include "AI/StateTree/Tasks/ApplyGameplayEffectTask.h"
-#include "AbilitySystemComponent.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "StateTreeExecutionContext.h"
 #include "GAS/GameplayTagsSubsystem.h"
@@ -17,7 +17,7 @@ EStateTreeRunStatus FApplyGameplayEffectTask::EnterState(FStateTreeExecutionCont
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
-	if (!InstanceData.AbilitySystemComponent)
+	if (!InstanceData.EnemyAbilitySystemComponent)
 	{
 		DEBUG_LOG(TEXT("EnterState: ASC is nullptr"));
 		return EStateTreeRunStatus::Failed;
@@ -30,8 +30,8 @@ EStateTreeRunStatus FApplyGameplayEffectTask::EnterState(FStateTreeExecutionCont
 	}
 
 	//GE Spec 생성
-	FGameplayEffectContextHandle EffectContext = InstanceData.AbilitySystemComponent->MakeEffectContext();
-	FGameplayEffectSpecHandle SpecHandle = InstanceData.AbilitySystemComponent->MakeOutgoingSpec(
+	FGameplayEffectContextHandle EffectContext = InstanceData.EnemyAbilitySystemComponent->MakeEffectContext();
+	FGameplayEffectSpecHandle SpecHandle = InstanceData.EnemyAbilitySystemComponent->MakeOutgoingSpec(
 		InstanceData.EffectClass, 1.0f, EffectContext);
 
 	if (!SpecHandle.IsValid())
@@ -63,7 +63,7 @@ EStateTreeRunStatus FApplyGameplayEffectTask::EnterState(FStateTreeExecutionCont
 	}
 
 	//GE 적용
-	InstanceData.ActiveEffectHandle = InstanceData.AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(
+	InstanceData.ActiveEffectHandle = InstanceData.EnemyAbilitySystemComponent->ApplyGameplayEffectSpecToSelf(
 		*SpecHandle.Data.Get());
 
 	if (!InstanceData.ActiveEffectHandle.IsValid())
@@ -86,9 +86,9 @@ void FApplyGameplayEffectTask::ExitState(FStateTreeExecutionContext& Context, co
 
 	if (InstanceData.bEndWithState && InstanceData.ActiveEffectHandle.IsValid())
 	{
-		if (InstanceData.AbilitySystemComponent)
+		if (InstanceData.EnemyAbilitySystemComponent)
 		{
-			InstanceData.AbilitySystemComponent->RemoveActiveGameplayEffect(InstanceData.ActiveEffectHandle);
+			InstanceData.EnemyAbilitySystemComponent->RemoveActiveGameplayEffect(InstanceData.ActiveEffectHandle);
 			DEBUG_LOG(TEXT("ExitState: GE Removed. EffectClass=%s"),
 				*GetNameSafe(InstanceData.EffectClass));
 		}
