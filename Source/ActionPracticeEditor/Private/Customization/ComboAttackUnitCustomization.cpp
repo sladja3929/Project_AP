@@ -1,6 +1,7 @@
 #include "Customization/ComboAttackUnitCustomization.h"
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
+#include "IDetailPropertyRow.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Items/AttackData.h"
 
@@ -105,12 +106,62 @@ void FComboAttackUnitCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> 
 
 void FComboAttackUnitCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> StructPropertyHandle, IDetailChildrenBuilder& StructBuilder, IPropertyTypeCustomizationUtils& StructCustomizationUtils)
 {
+	//부모 구조체의 AttackType 핸들 탐색
+	TSharedPtr<IPropertyHandle> AttackTypeHandle = FindParentAttackTypeHandle(StructPropertyHandle);
+
 	uint32 NumChildren = 0;
 	StructPropertyHandle->GetNumChildren(NumChildren);
 
 	for (uint32 i = 0; i < NumChildren; ++i)
 	{
 		TSharedRef<IPropertyHandle> ChildHandle = StructPropertyHandle->GetChildHandle(i).ToSharedRef();
+
+		//SubAttackMontage 필드: AttackType이 Charge일 때만 표시
+		if (ChildHandle->GetProperty() && ChildHandle->GetProperty()->GetFName() == GET_MEMBER_NAME_CHECKED(FComboAttackUnit, SubAttackMontage))
+		{
+			if (AttackTypeHandle.IsValid())
+			{
+				IDetailPropertyRow& Row = StructBuilder.AddProperty(ChildHandle);
+				Row.Visibility(TAttribute<EVisibility>::CreateLambda([AttackTypeHandle]()
+				{
+					uint8 Val = 0;
+					if (AttackTypeHandle.IsValid())
+					{
+						AttackTypeHandle->GetValue(Val);
+					}
+					return static_cast<EComboAttackType>(Val) == EComboAttackType::Charge
+						? EVisibility::Visible : EVisibility::Collapsed;
+				}));
+				continue;
+			}
+			//AttackType 핸들을 못 찾으면 기본 표시 (fallback)
+		}
+
 		StructBuilder.AddProperty(ChildHandle);
 	}
+}
+
+TSharedPtr<IPropertyHandle> FComboAttackUnitCustomization::FindParentAttackTypeHandle(TSharedRef<IPropertyHandle> StructPropertyHandle, int32 MaxDepth)
+{
+	//PropertyHandle 체인을 역추적하며 "AttackType" 자식이 있는 부모를 찾는다
+	//
+	//WeaponDA 경로 (2홉):
+	//  FComboAttackUnit[N] → ComboSequence(TArray) → FTaggedAttackData → AttackType
+	//
+	//EnemyDA 경로 (3홉):
+	//  FComboAttackUnit(ComboData) → FEnemyComboAttackUnit[N] → ComboSequence(TArray) → FEnemyTaggedAttackData → AttackType
+
+	TSharedPtr<IPropertyHandle> Current = StructPropertyHandle->GetParentHandle();
+
+	for (int32 Depth = 0; Depth < MaxDepth && Current.IsValid(); ++Depth)
+	{
+		TSharedPtr<IPropertyHandle> AttackTypeChild = Current->GetChildHandle(TEXT("AttackType"));
+		if (AttackTypeChild.IsValid() && AttackTypeChild->IsValidHandle())
+		{
+			return AttackTypeChild;
+		}
+		Current = Current->GetParentHandle();
+	}
+
+	return nullptr;
 }

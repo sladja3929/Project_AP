@@ -4,6 +4,7 @@
 #include "Widgets/Text/STextBlock.h"
 #include "GameplayTagContainer.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
+#include "Items/AttackData.h"
 
 TSharedRef<IPropertyTypeCustomization> FEnemyTaggedAttackDataCustomization::MakeInstance()
 {
@@ -15,6 +16,7 @@ void FEnemyTaggedAttackDataCustomization::CustomizeHeader(TSharedRef<IPropertyHa
 	TSharedPtr<IPropertyHandle> AttackTagsHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FEnemyTaggedAttackData, AttackTags));
 	TSharedPtr<IPropertyHandle> ComboSequenceHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FEnemyTaggedAttackData, ComboSequence));
 	TSharedPtr<IPropertyHandle> CooldownHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FEnemyTaggedAttackData, CooldownDuration));
+	TSharedPtr<IPropertyHandle> AttackTypeHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FEnemyTaggedAttackData, AttackType));
 
 	HeaderRow
 	.NameContent()
@@ -82,6 +84,27 @@ void FEnemyTaggedAttackDataCustomization::CustomizeHeader(TSharedRef<IPropertyHa
 				if (CooldownValue > 0.0f)
 				{
 					return FText::FromString(FString::Printf(TEXT("| CD: %.1fs"), CooldownValue));
+				}
+				return FText::GetEmpty();
+			})
+		]
+
+		//AttackType 표시
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		.Padding(8.0f, 0.0f, 0.0f, 0.0f)
+		.VAlign(VAlign_Center)
+		[
+			SNew(STextBlock)
+			.ColorAndOpacity(FSlateColor(FLinearColor(0.4f, 0.8f, 0.4f)))
+			.Text_Lambda([AttackTypeHandle]() -> FText
+			{
+				if (!AttackTypeHandle.IsValid()) return FText::GetEmpty();
+				uint8 Val = 0;
+				AttackTypeHandle->GetValue(Val);
+				if (static_cast<EComboAttackType>(Val) == EComboAttackType::Charge)
+				{
+					return FText::FromString(TEXT("| Charge"));
 				}
 				return FText::GetEmpty();
 			})

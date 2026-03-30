@@ -45,6 +45,10 @@ struct FEnemyTaggedAttackData
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tags")
     FGameplayTagContainer AttackTags;
 
+    //공격 유형 (Normal: 기본, Charge: 차지 공격 - SubAttackMontage 사용)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Type")
+    EComboAttackType AttackType = EComboAttackType::Normal;
+
     //콤보 시퀀스
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combo")
     TArray<FEnemyComboAttackUnit> ComboSequence;
@@ -144,7 +148,8 @@ public:
                     AssetsToLoad.Add(EnemyCombo.ComboData.AttackMontage.ToSoftObjectPath());
                 }
 
-                if (!EnemyCombo.ComboData.SubAttackMontage.IsNull())
+                //Charge 유형일 때만 SubAttackMontage 프리로드
+                if (AttackData.AttackType == EComboAttackType::Charge && !EnemyCombo.ComboData.SubAttackMontage.IsNull())
                 {
                     AssetsToLoad.Add(EnemyCombo.ComboData.SubAttackMontage.ToSoftObjectPath());
                 }

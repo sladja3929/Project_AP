@@ -4,6 +4,7 @@
 #include "Widgets/Text/STextBlock.h"
 #include "GameplayTagContainer.h"
 #include "Items/WeaponDataAsset.h"
+#include "Items/AttackData.h"
 
 TSharedRef<IPropertyTypeCustomization> FTaggedAttackDataCustomization::MakeInstance()
 {
@@ -14,6 +15,7 @@ void FTaggedAttackDataCustomization::CustomizeHeader(TSharedRef<IPropertyHandle>
 {
 	TSharedPtr<IPropertyHandle> AttackTagsHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FTaggedAttackData, AttackTags));
 	TSharedPtr<IPropertyHandle> ComboSequenceHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FTaggedAttackData, ComboSequence));
+	TSharedPtr<IPropertyHandle> AttackTypeHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FTaggedAttackData, AttackType));
 
 	HeaderRow
 	.NameContent()
@@ -61,6 +63,27 @@ void FTaggedAttackDataCustomization::CustomizeHeader(TSharedRef<IPropertyHandle>
 					ComboSequenceHandle->GetNumChildren(NumChildren);
 				}
 				return FText::FromString(FString::Printf(TEXT("%d Combos"), NumChildren));
+			})
+		]
+
+		//AttackType 표시
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		.Padding(8.0f, 0.0f, 0.0f, 0.0f)
+		.VAlign(VAlign_Center)
+		[
+			SNew(STextBlock)
+			.ColorAndOpacity(FSlateColor(FLinearColor(0.4f, 0.8f, 0.4f)))
+			.Text_Lambda([AttackTypeHandle]() -> FText
+			{
+				if (!AttackTypeHandle.IsValid()) return FText::GetEmpty();
+				uint8 Val = 0;
+				AttackTypeHandle->GetValue(Val);
+				if (static_cast<EComboAttackType>(Val) == EComboAttackType::Charge)
+				{
+					return FText::FromString(TEXT("| Charge"));
+				}
+				return FText::GetEmpty(); //Normal은 표시하지 않음 (기본이므로)
 			})
 		]
 	];

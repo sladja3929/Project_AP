@@ -15,6 +15,15 @@ enum class EAttackDamageType : uint8
 	Pierce UMETA(DisplayName = "Pierce")
 };
 
+//DA 레벨 공격 유형 분류 (에디터 조건부 필드 노출용)
+UENUM(BlueprintType)
+enum class EComboAttackType : uint8
+{
+	Normal UMETA(DisplayName = "Normal"),
+	Charge UMETA(DisplayName = "Charge"),
+	//향후 Rush, Projectile 등 확장
+};
+
 //개별 공격에서 사용할 소켓 설정 (소켓 이름 + Radius)
 USTRUCT(BlueprintType)
 struct FAttackSocketConfig
