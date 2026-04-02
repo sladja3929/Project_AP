@@ -102,9 +102,14 @@ void FEnemyTaggedAttackDataCustomization::CustomizeHeader(TSharedRef<IPropertyHa
 				if (!AttackTypeHandle.IsValid()) return FText::GetEmpty();
 				uint8 Val = 0;
 				AttackTypeHandle->GetValue(Val);
-				if (static_cast<EComboAttackType>(Val) == EComboAttackType::Charge)
+				const EComboAttackType Type = static_cast<EComboAttackType>(Val);
+				if (Type == EComboAttackType::Charge)
 				{
 					return FText::FromString(TEXT("| Charge"));
+				}
+				if (Type == EComboAttackType::Lunge)
+				{
+					return FText::FromString(TEXT("| Lunge"));
 				}
 				return FText::GetEmpty();
 			})

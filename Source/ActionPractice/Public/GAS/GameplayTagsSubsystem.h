@@ -42,6 +42,7 @@ public:
 	static const FGameplayTag& GetEnemyAbilityDeathTag();
 	static const FGameplayTag& GetEnemyAbilityHitReactionTag();
 	static const FGameplayTag& GetEnemyAbilityGroggyTag();
+	static const FGameplayTag& GetEnemyAbilityLungeTag();
 	static const FGameplayTag& GetAbilityGetItemTag();
 	static const FGameplayTag& GetAbilityParryTag();
 #pragma endregion
@@ -81,6 +82,9 @@ public:
 	static const FGameplayTag& GetEventNotifyHitDetectionEndTag();
 	static const FGameplayTag& GetEventNotifyRotateToTargetTag();
 	static const FGameplayTag& GetEventNotifyCheckConditionTag();
+	static const FGameplayTag& GetEventNotifyTrackingTargetTag();
+	static const FGameplayTag& GetEventNotifyLungeStartTag();
+	static const FGameplayTag& GetEventNotifyLungeEndTag();
 	static const FGameplayTag& GetEventNotifyAddComboTag();
 	static const FGameplayTag& GetEventActionInputByBufferTag();
 	static const FGameplayTag& GetEventActionPlayBufferTag();
@@ -137,6 +141,7 @@ private:
 	const FGameplayTag& GetEnemyAbilityDeathTagInternal() const;
 	const FGameplayTag& GetEnemyAbilityHitReactionTagInternal() const;
 	const FGameplayTag& GetEnemyAbilityGroggyTagInternal() const;
+	const FGameplayTag& GetEnemyAbilityLungeTagInternal() const;
 	const FGameplayTag& GetAbilityGetItemTagInternal() const;
 	const FGameplayTag& GetAbilityParryTagInternal() const;
 #pragma endregion
@@ -176,6 +181,9 @@ private:
 	const FGameplayTag& GetEventNotifyHitDetectionEndTagInternal() const;
 	const FGameplayTag& GetEventNotifyRotateToTargetTagInternal() const;
 	const FGameplayTag& GetEventNotifyCheckConditionTagInternal() const;
+	const FGameplayTag& GetEventNotifyTrackingTargetTagInternal() const;
+	const FGameplayTag& GetEventNotifyLungeStartTagInternal() const;
+	const FGameplayTag& GetEventNotifyLungeEndTagInternal() const;
 	const FGameplayTag& GetEventNotifyAddComboTagInternal() const;
 	const FGameplayTag& GetEventActionInputByBufferTagInternal() const;
 	const FGameplayTag& GetEventActionPlayBufferTagInternal() const;

@@ -9,6 +9,7 @@
 #include "EnemyDataAsset.generated.h"
 
 class UAnimMontage;
+class UCurveVector;
 
 //적 전용 콤보 단위 (공용 FComboAttackUnit + 적 전용 설정)
 USTRUCT(BlueprintType)
@@ -35,6 +36,19 @@ struct FEnemyComboAttackUnit
     float MaxTargetAngle = 60.0f;
 };
 
+//적 돌진 공격 설정 (타겟 위치 기반 이동)
+USTRUCT(BlueprintType)
+struct FEnemyLungeConfig
+{
+    GENERATED_BODY()
+
+    //높이 궤적 커브 (Time 0~1, Z축이 높이 오프셋)
+    //Lunging ANS Begin 시점의 적 Z값 기준으로 적용
+    //nullptr이면 직선 이동 (지면 대시)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Lunge")
+    TObjectPtr<UCurveVector> HeightCurve = nullptr;
+};
+
 //GameplayTag로 식별되는 적 공격 데이터
 USTRUCT(BlueprintType)
 struct FEnemyTaggedAttackData
@@ -45,7 +59,7 @@ struct FEnemyTaggedAttackData
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tags")
     FGameplayTagContainer AttackTags;
 
-    //공격 유형 (Normal: 기본, Charge: 차지 공격 - SubAttackMontage 사용)
+    //공격 유형 (Normal: 기본, Charge: 차지 공격, Lunge: 돌진 공격)
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Type")
     EComboAttackType AttackType = EComboAttackType::Normal;
 
@@ -56,6 +70,11 @@ struct FEnemyTaggedAttackData
     //공격별 쿨다운 (0이면 쿨다운 없음)
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
     float CooldownDuration = 0.0f;
+
+    //돌진 설정 (AttackType이 Lunge일 때만 에디터에 표시)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Lunge",
+        meta = (EditCondition = "AttackType == EComboAttackType::Lunge", EditConditionHides))
+    FEnemyLungeConfig LungeConfig;
 };
 
 UCLASS(BlueprintType)

@@ -247,6 +247,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEnemyAbilityGroggyTag()
 	return FGameplayTag::EmptyTag;
 }
 
+const FGameplayTag& UGameplayTagsSubsystem::GetEnemyAbilityLungeTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEnemyAbilityLungeTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
 const FGameplayTag& UGameplayTagsSubsystem::GetAbilityGetItemTag()
 {
 	if (UGameplayTagsSubsystem* Subsystem = Get())
@@ -544,6 +553,33 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyCheckConditionTag()
 	if (UGameplayTagsSubsystem* Subsystem = Get())
 	{
 		return Subsystem->GetEventNotifyCheckConditionTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyTrackingTargetTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEventNotifyTrackingTargetTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyLungeStartTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEventNotifyLungeStartTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyLungeEndTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetEventNotifyLungeEndTagInternal();
 	}
 	return FGameplayTag::EmptyTag;
 }
@@ -916,6 +952,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEnemyAbilityGroggyTagInternal() c
 	return FGameplayTag::EmptyTag;
 }
 
+const FGameplayTag& UGameplayTagsSubsystem::GetEnemyAbilityLungeTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->EnemyAbility_Lunge;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
 const FGameplayTag& UGameplayTagsSubsystem::GetAbilityGetItemTagInternal() const
 {
 	if (GameplayTagsDataAsset)
@@ -1213,6 +1258,33 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyCheckConditionTagInter
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Event_Notify_CheckCondition;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyTrackingTargetTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Event_Notify_TrackingTarget;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyLungeStartTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Event_Notify_LungeStart;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyLungeEndTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->Event_Notify_LungeEnd;
 	}
 	return FGameplayTag::EmptyTag;
 }

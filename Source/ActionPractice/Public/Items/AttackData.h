@@ -21,7 +21,8 @@ enum class EComboAttackType : uint8
 {
 	Normal UMETA(DisplayName = "Normal"),
 	Charge UMETA(DisplayName = "Charge"),
-	//향후 Rush, Projectile 등 확장
+	Lunge  UMETA(DisplayName = "Lunge"),
+	//향후 Projectile 등 확장
 };
 
 //개별 공격에서 사용할 소켓 설정 (소켓 이름 + Radius)

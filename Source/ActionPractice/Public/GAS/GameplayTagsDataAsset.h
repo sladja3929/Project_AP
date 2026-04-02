@@ -89,6 +89,9 @@ public:
 	FGameplayTag EnemyAbility_Groggy;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
+	FGameplayTag EnemyAbility_Lunge;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
 	FGameplayTag Ability_GetItem;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Tags")
@@ -194,6 +197,15 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
 	FGameplayTag Event_Notify_CheckCondition;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
+	FGameplayTag Event_Notify_TrackingTarget;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
+	FGameplayTag Event_Notify_LungeStart;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
+	FGameplayTag Event_Notify_LungeEnd;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Event Tags")
 	FGameplayTag Event_Notify_AddCombo;
