@@ -5,6 +5,7 @@
 #include "NiagaraComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
+#include "Camera/CameraShakeBase.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -78,6 +79,20 @@ UNiagaraComponent* UEffectManagerSubsystem::SpawnEnvironmentImpact(const FEnviro
 			FinalLocation,
 			Request.VolumeMultiplier,
 			Request.PitchMultiplier
+		);
+	}
+
+	//카메라 쉐이크 재생
+	if (Request.CameraShakeClass)
+	{
+		UGameplayStatics::PlayWorldCameraShake(
+			World,
+			Request.CameraShakeClass,
+			FinalLocation,
+			Request.CameraShakeInnerRadius,
+			Request.CameraShakeOuterRadius,
+			Request.CameraShakeFalloff,
+			false  //bOrientShakeTowardsEpicenter
 		);
 	}
 

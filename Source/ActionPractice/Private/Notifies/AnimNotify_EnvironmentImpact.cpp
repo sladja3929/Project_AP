@@ -6,6 +6,7 @@
 #include "CollisionQueryParams.h"
 #include "NiagaraSystem.h"
 #include "Engine/World.h"
+#include "Camera/CameraShakeBase.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -60,6 +61,8 @@ void UAnimNotify_EnvironmentImpact::Notify(USkeletalMeshComponent* MeshComp, UAn
 	}
 
 	//각 시작점마다 트레이스 후 이펙트 스폰
+	bool bCameraShakePlayed = false;
+
 	for (const FVector& Origin : TraceOrigins)
 	{
 		FVector HitLocation;
@@ -78,6 +81,16 @@ void UAnimNotify_EnvironmentImpact::Notify(USkeletalMeshComponent* MeshComp, UAn
 			Request.bAlignToNormal = bAlignToSurfaceNormal;
 			Request.VolumeMultiplier = VolumeMultiplier;
 			Request.PitchMultiplier = PitchMultiplier;
+
+			//카메라 쉐이크는 첫 번째 히트에서만 1회 재생
+			if (!bCameraShakePlayed)
+			{
+				Request.CameraShakeClass = CameraShakeClass;
+				Request.CameraShakeFalloff = CameraShakeFalloff;
+				Request.CameraShakeInnerRadius = CameraShakeInnerRadius;
+				Request.CameraShakeOuterRadius = CameraShakeOuterRadius;
+				bCameraShakePlayed = true;
+			}
 
 			EffectManager->SpawnEnvironmentImpact(Request);
 		}

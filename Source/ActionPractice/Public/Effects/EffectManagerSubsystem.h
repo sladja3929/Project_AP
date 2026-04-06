@@ -9,6 +9,7 @@
 class UNiagaraSystem;
 class UNiagaraComponent;
 class USoundBase;
+class UCameraShakeBase;
 
 USTRUCT(BlueprintType)
 struct FEnvironmentImpactRequest
@@ -54,6 +55,25 @@ struct FEnvironmentImpactRequest
 	//사운드 피치 배수
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
 	float PitchMultiplier = 1.0f;
+
+	// ===== Camera Shake =====
+
+	//재생할 카메라 쉐이크 클래스 (BP_CameraShake 등)
+	//nullptr이면 카메라 쉐이크를 재생하지 않는다
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Shake")
+	TSubclassOf<UCameraShakeBase> CameraShakeClass = nullptr;
+
+	//거리 감쇠 곡선 지수 (1.0 = 선형, 2.0 = 급격 감쇠)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Shake", meta = (ClampMin = "0.01"))
+	float CameraShakeFalloff = 1.0f;
+
+	//이 반경 내에서는 쉐이크 100% 적용
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Shake", meta = (ClampMin = "0.0"))
+	float CameraShakeInnerRadius = 0.0f;
+
+	//이 반경 밖이면 카메라 쉐이크 없음 (InnerRadius ~ OuterRadius 구간에서 선형 감쇠)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Shake", meta = (ClampMin = "0.0"))
+	float CameraShakeOuterRadius = 1500.0f;
 };
 
 //전역 이펙트 관리 서브시스템
