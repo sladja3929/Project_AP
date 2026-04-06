@@ -1,6 +1,8 @@
 #include "Notifies/AnimNotifyState_Lunging.h"
 #include "AbilitySystemComponent.h"
 #include "GAS/GameplayTagsSubsystem.h"
+#include "Characters/EnemyCharacter.h"
+#include "Components/CapsuleComponent.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -28,6 +30,18 @@ void UAnimNotifyState_Lunging::NotifyBegin(USkeletalMeshComponent* MeshComp, UAn
 	EventData.EventMagnitude = TotalDuration; //ANS 지속시간 = 이동 시간
 
 	ASC->HandleGameplayEvent(EventData.EventTag, &EventData);
+
+	//Lunge 중 적-플레이어 겹침 허용
+	AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Owner);
+	if (Enemy)
+	{
+		UCapsuleComponent* Capsule = Enemy->GetCapsuleComponent();
+		if (Capsule)
+		{
+			Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+		}
+	}
+
 	DEBUG_LOG(TEXT("Lunging Begin — Duration: %.2f"), TotalDuration);
 }
 
@@ -47,5 +61,17 @@ void UAnimNotifyState_Lunging::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnim
 	EventData.EventTag = UGameplayTagsSubsystem::GetEventNotifyLungeEndTag();
 
 	ASC->HandleGameplayEvent(EventData.EventTag, &EventData);
+
+	//콜리전 복구
+	AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Owner);
+	if (Enemy)
+	{
+		UCapsuleComponent* Capsule = Enemy->GetCapsuleComponent();
+		if (Capsule)
+		{
+			Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+		}
+	}
+
 	DEBUG_LOG(TEXT("Lunging End"));
 }
