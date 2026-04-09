@@ -71,7 +71,12 @@ void UGASStateTreeAIComponentSchema::PostLoad()
 
 bool UGASStateTreeAIComponentSchema::IsStructAllowed(const UScriptStruct* InScriptStruct) const
 {
-	//Task, Evaluator, Condition 허용
+	if (Super::IsStructAllowed(InScriptStruct))
+	{
+		return true;
+	}
+
+	//게임 모듈 커스텀 Task, Evaluator, Condition 허용
 	return InScriptStruct->IsChildOf(FStateTreeTaskBase::StaticStruct()) ||
 		   InScriptStruct->IsChildOf(FStateTreeEvaluatorBase::StaticStruct()) ||
 		   InScriptStruct->IsChildOf(FStateTreeConditionBase::StaticStruct());
