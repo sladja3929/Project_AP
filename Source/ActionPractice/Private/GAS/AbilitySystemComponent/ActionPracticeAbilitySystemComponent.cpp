@@ -288,11 +288,14 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 		const float DamageReduction = BlockData ? BlockData->DamageReduction : 0.0f;
 		const float FinalDamage = FinalAttackData.FinalDamage * (1.0f - DamageReduction / 100.0f);
 
-		//HP 적용 
+		//HP 적용
 		const float OldHealth = APAttributeSet->GetHealth();
 		APAttributeSet->SetHealth(FMath::Clamp(OldHealth - FinalDamage, 0.0f, APAttributeSet->GetMaxHealth()));
 
-		//가드 성공 시 포이즈 대미지는 적용하지 않음
+		//가드 성공 시 포이즈 attribute는 깎지 않지만, 리액션 레벨 판정을 위해 유효 잔량은 계산해 둠
+		//(LastEffectivePoise는 BaseAbilitySystemComponent::PrepareHitReactionEventData에서 EventMagnitude로 전달됨)
+		const float OldPoise = APAttributeSet->GetPoise();
+		LastEffectivePoise = OldPoise - FinalAttackData.PoiseDamage;
 
 		//===== 가드 스태미나 소모 (엘든링 가드 공식) =====
 		bool bGuardBroken = false;
@@ -329,9 +332,9 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 			LastDefenseState = bIsParryActive ? EPlayerDefenseState::ParryFallbackBlocked : EPlayerDefenseState::Blocked;
 		}
 
-		DEBUG_LOG(TEXT("CalculateAndSetAttributes: DefenseState=%d, Damage=%.1f, FinalDamage=%.1f, Reduction=%.1f%%, Health=%.1f/%.1f, ParryActive=%d"),
+		DEBUG_LOG(TEXT("CalculateAndSetAttributes: DefenseState=%d, Damage=%.1f, FinalDamage=%.1f, Reduction=%.1f%%, Health=%.1f/%.1f, EffectivePoise=%.1f, ParryActive=%d"),
 			static_cast<uint8>(LastDefenseState), FinalAttackData.FinalDamage, FinalDamage, DamageReduction,
-			APAttributeSet->GetHealth(), APAttributeSet->GetMaxHealth(), bIsParryActive);
+			APAttributeSet->GetHealth(), APAttributeSet->GetMaxHealth(), LastEffectivePoise, bIsParryActive);
 		return;
 	}
 

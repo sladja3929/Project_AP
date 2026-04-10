@@ -267,17 +267,21 @@ void UBaseAbilitySystemComponent::CalculateAndSetAttributes(AActor* SourceActor,
 	const float OldHealth = BaseAttributeSet->GetHealth();
 	BaseAttributeSet->SetHealth(FMath::Clamp(OldHealth - FinalDamage, 0.0f, BaseAttributeSet->GetMaxHealth()));
 
-	//포이즈 대미지 적용 (하한 클램핑 없음 — 음수값이 HitReaction 강도 판정에 사용됨)
+	//유효 포이즈 잔량 계산 (실제 Poise attribute는 Pre*Change에서 [0, Max]로 클램프되므로,
+	//초과된 음수값은 LastEffectivePoise로 별도 보관해 HitReaction 강도 판정에 사용)
+	const float OldPoise = BaseAttributeSet->GetPoise();
+	LastEffectivePoise = OldPoise - FinalAttackData.PoiseDamage;
+
+	//포이즈 대미지 적용 (실제 attribute)
 	if (FinalAttackData.PoiseDamage > 0.0f)
 	{
-		const float OldPoise = BaseAttributeSet->GetPoise();
-		BaseAttributeSet->SetPoise(OldPoise - FinalAttackData.PoiseDamage);
+		BaseAttributeSet->SetPoise(LastEffectivePoise);
 	}
 
-	DEBUG_LOG(TEXT("OnDamaged: Damage=%.1f, FinalDamage=%.1f, Health=%.1f/%.1f, Poise=%.1f/%.1f"),
+	DEBUG_LOG(TEXT("OnDamaged: Damage=%.1f, FinalDamage=%.1f, Health=%.1f/%.1f, Poise=%.1f/%.1f, EffectivePoise=%.1f"),
 		FinalAttackData.FinalDamage, FinalDamage,
 		BaseAttributeSet->GetHealth(), BaseAttributeSet->GetMaxHealth(),
-		BaseAttributeSet->GetPoise(), BaseAttributeSet->GetMaxPoise());
+		BaseAttributeSet->GetPoise(), BaseAttributeSet->GetMaxPoise(), LastEffectivePoise);
 }
 
 void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
@@ -317,7 +321,7 @@ void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, c
 
 				if (TryActivateAbilityWithEventData(HitReactionSpecs[0]->Handle, &EventData))
 				{
-					DEBUG_LOG(TEXT("HitReaction activated with Poise=%.1f"), EventData.EventMagnitude);
+					DEBUG_LOG(TEXT("HitReaction activated with EffectivePoise=%.1f"), EventData.EventMagnitude);
 				}
 				else
 				{
@@ -334,26 +338,15 @@ void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, c
 
 bool UBaseAbilitySystemComponent::ShouldActivateHitReaction() const
 {
-	UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(GetAttributeSet(UBaseAttributeSet::StaticClass()));
-	const UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
-	if (!BaseAttributeSet)
-	{
-		return false;
-	}
-
-	//포이즈 브레이크 체크
-	return BaseAttributeSet->GetPoise() <= 0.0f;
+	//포이즈 브레이크 체크 (LastEffectivePoise는 클램프되지 않은 실제 잔량)
+	return LastEffectivePoise <= 0.0f;
 }
 
 void UBaseAbilitySystemComponent::PrepareHitReactionEventData(FGameplayEventData& OutEventData, const FFinalAttackData& FinalAttackData)
 {
-	UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(GetAttributeSet(UBaseAttributeSet::StaticClass()));
-	UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
-	if (BaseAttributeSet)
-	{
-		OutEventData.EventMagnitude = BaseAttributeSet->GetPoise(); //음수값
-		OutEventData.EventTag = AbilityHitReactionTag;
-	}
+	//LastEffectivePoise는 OldPoise - PoiseDamage 값으로, 음수일수록 초과된 포이즈 대미지가 커서 강한 리액션
+	OutEventData.EventMagnitude = LastEffectivePoise;
+	OutEventData.EventTag = AbilityHitReactionTag;
 }
 
 void UBaseAbilitySystemComponent::ResetBreakGauges()
@@ -362,12 +355,18 @@ void UBaseAbilitySystemComponent::ResetBreakGauges()
 	UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
 	if (!BaseAttributeSet)
 	{
+		LastEffectivePoise = TNumericLimits<float>::Max();
 		return;
 	}
 
-	if (BaseAttributeSet->GetPoise() <= 0.0f)
+	//포이즈 브레이크가 발생한 경우에만 실제 Poise attribute를 최대치로 복원
+	if (LastEffectivePoise <= 0.0f)
 	{
 		BaseAttributeSet->SetPoise(BaseAttributeSet->GetMaxPoise());
-		DEBUG_LOG(TEXT("ResetBreakGauges: Poise reset to %.1f"), BaseAttributeSet->GetMaxPoise());
+		DEBUG_LOG(TEXT("ResetBreakGauges: Poise reset to %.1f (EffectivePoise=%.1f)"),
+			BaseAttributeSet->GetMaxPoise(), LastEffectivePoise);
 	}
+
+	//다음 피격을 위해 유효 포이즈 잔량 초기화
+	LastEffectivePoise = TNumericLimits<float>::Max();
 }

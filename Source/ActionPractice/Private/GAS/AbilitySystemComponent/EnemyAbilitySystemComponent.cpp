@@ -123,7 +123,7 @@ void UEnemyAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, 
 
 				if (TryActivateAbilityWithEventData(HitReactionSpecs[0]->Handle, &EventData))
 				{
-					DEBUG_LOG(TEXT("EnemyHitReaction activated with Poise=%.1f"), EventData.EventMagnitude);
+					DEBUG_LOG(TEXT("EnemyHitReaction activated with EffectivePoise=%.1f"), EventData.EventMagnitude);
 
 					//ST 이벤트 전송
 					SendStateTreeEvent(AbilityHitReactionTag);

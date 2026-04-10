@@ -100,6 +100,12 @@ protected:
 	//Impact Cue 태그
 	FGameplayTag GameplayCueImpactTag;
 
+	//이번 피격의 유효 포이즈 잔량 (= OldPoise - PoiseDamage, 클램프 없음)
+	//실제 Poise attribute는 [0, Max]로 클램프되므로, 리액션 강도(음수 크기) 판정을 위해 별도 보관
+	//가드 성공처럼 Poise를 실제로 깎지 않는 경우에도 이 값은 갱신되어 리액션 레벨 산출에 사용됨
+	//각 피격 파이프라인 종료 시 ResetBreakGauges에서 초기값으로 리셋됨
+	float LastEffectivePoise = TNumericLimits<float>::Max();
+
 #pragma endregion
 
 #pragma region "Protected Functions"
