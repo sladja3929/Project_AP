@@ -39,14 +39,14 @@ void UEnemyAttackComponent::BeginPlay()
 		BuildSocketConfigs(EnemyData->HitSocketInfo);
 	}
 
-	//디버그용 5번 키 바인딩
+	//디버그용 2번 키 바인딩
 	if (GetWorld())
 	{
 		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 		{
 			if (PC->InputComponent)
 			{
-				PC->InputComponent->BindKey(EKeys::Five, IE_Pressed, this, &UEnemyAttackComponent::ToggleWeaponDebugTrace);
+				PC->InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &UEnemyAttackComponent::ToggleWeaponDebugTrace);
 			}
 		}
 	}
