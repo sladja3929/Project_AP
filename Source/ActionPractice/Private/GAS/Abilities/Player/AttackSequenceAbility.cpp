@@ -13,7 +13,7 @@
 #include "AbilitySystemComponent.h"
 #include "GAS/Abilities/HitDetectionSetter.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackSequenceAbility, Log, All);
@@ -524,6 +524,12 @@ void UAttackSequenceAbility::SetUpPlayMontageWithEventsTask()
 #pragma region "Hander Functions"
 void UAttackSequenceAbility::OnEventAttackInput(FGameplayEventData Payload)
 {
+	//Attacking/Prepare 상태에서는 직접 입력 무시 (버퍼 시스템이 처리)
+	if (CurrentState == EAttackSequenceState::Attacking || CurrentState == EAttackSequenceState::Prepare)
+	{
+		return;
+	}
+
 	DEBUG_LOG(TEXT("AttackSequenceAbility - AttackInput Received"));
 
 	//Normal Attack 입력
