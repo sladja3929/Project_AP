@@ -27,7 +27,7 @@
 #include "Blueprint/UserWidget.h"
 
 // 디버그 로그 활성화/비활성화 (0: 비활성화, 1: 활성화)
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogActionPracticePlayerController, Log, All);

@@ -13,7 +13,7 @@
 #include "AbilitySystemComponent.h"
 #include "GAS/Abilities/HitDetectionSetter.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackSequenceAbility, Log, All);
@@ -184,6 +184,9 @@ void UAttackSequenceAbility::CacheWeaponData()
 		DEBUG_LOG(TEXT("Failed to cache WeaponDataAsset"));
 		return;
 	}
+
+	//패키지 빌드에서 SoftPtr 미로드 방지 — DA 캐싱 시점에 몽타주 프리로드
+	const_cast<UWeaponDataAsset*>(CachedWeaponDataAsset.Get())->PreloadAllMontages();
 
 	DEBUG_LOG(TEXT("WeaponDataAsset cached - AttackData count: %d"), CachedWeaponDataAsset->TaggedAttackData.Num());
 }

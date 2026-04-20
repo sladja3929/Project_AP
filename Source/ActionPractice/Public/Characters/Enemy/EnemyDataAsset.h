@@ -181,6 +181,34 @@ public:
             AssetsToLoad.Add(DeathMontage.ToSoftObjectPath());
         }
 
+        //히트리액션 몽타주 프리로드
+        if (!HitReactionLightMontage.IsNull())
+        {
+            AssetsToLoad.Add(HitReactionLightMontage.ToSoftObjectPath());
+        }
+        if (!HitReactionMiddleMontage.IsNull())
+        {
+            AssetsToLoad.Add(HitReactionMiddleMontage.ToSoftObjectPath());
+        }
+        if (!HitReactionHeavyMontage.IsNull())
+        {
+            AssetsToLoad.Add(HitReactionHeavyMontage.ToSoftObjectPath());
+        }
+
+        //그로기 몽타주 프리로드
+        if (!GroggyStartMontage.IsNull())
+        {
+            AssetsToLoad.Add(GroggyStartMontage.ToSoftObjectPath());
+        }
+        if (!GroggyLoopMontage.IsNull())
+        {
+            AssetsToLoad.Add(GroggyLoopMontage.ToSoftObjectPath());
+        }
+        if (!GroggyEndMontage.IsNull())
+        {
+            AssetsToLoad.Add(GroggyEndMontage.ToSoftObjectPath());
+        }
+
         //Asset Manager를 통한 로딩
         if (AssetsToLoad.Num() > 0 && UAssetManager::IsInitialized())
         {

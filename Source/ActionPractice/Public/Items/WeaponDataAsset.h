@@ -167,6 +167,16 @@ public:
             AssetsToLoad.Add(BlockData.BlockReactionHeavyMontage.ToSoftObjectPath());
         }
 
+        if (!BlockData.GuardBreakMontage.IsNull())
+        {
+            AssetsToLoad.Add(BlockData.GuardBreakMontage.ToSoftObjectPath());
+        }
+
+        if (!BlockData.ParryMontage.IsNull())
+        {
+            AssetsToLoad.Add(BlockData.ParryMontage.ToSoftObjectPath());
+        }
+
         //Asset Manager를 통한 로딩
         if (AssetsToLoad.Num() > 0 && UAssetManager::IsInitialized())
         {

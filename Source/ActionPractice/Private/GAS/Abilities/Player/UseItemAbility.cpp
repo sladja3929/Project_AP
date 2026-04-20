@@ -149,10 +149,10 @@ UAnimMontage* UUseItemAbility::SetMontageToPlayTask()
 		return nullptr;
 	}
 
-	UAnimMontage* Montage = CachedItemDA->UseMontage.Get();
+	UAnimMontage* Montage = CachedItemDA->UseMontage.LoadSynchronous();
 	if (!Montage)
 	{
-		DEBUG_LOG(TEXT("SetMontageToPlayTask: UseMontage not loaded"));
+		DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load UseMontage"));
 	}
 
 	return Montage;
