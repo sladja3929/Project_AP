@@ -1,5 +1,6 @@
 #include "UI/PauseMenuWidget.h"
 #include "Components/Button.h"
+#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 #define ENABLE_DEBUG_LOG 0
@@ -14,6 +15,11 @@
 void UPauseMenuWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	if (TitleButton)
+	{
+		TitleButton->OnClicked.AddDynamic(this, &UPauseMenuWidget::OnTitleButtonClicked);
+	}
 
 	if (QuitButton)
 	{
@@ -36,6 +42,12 @@ void UPauseMenuWidget::HideMenu()
 bool UPauseMenuWidget::IsMenuVisible() const
 {
 	return GetVisibility() == ESlateVisibility::Visible;
+}
+
+void UPauseMenuWidget::OnTitleButtonClicked()
+{
+	DEBUG_LOG(TEXT("Title button clicked — returning to TitleMap"));
+	UGameplayStatics::OpenLevel(this, FName(TEXT("TitleMap")));
 }
 
 void UPauseMenuWidget::OnQuitButtonClicked()

@@ -19,6 +19,7 @@
 
 UEnemyAttackComponent::UEnemyAttackComponent()
 {
+	DebugOwnerLabel = TEXT("Enemy");
 }
 
 void UEnemyAttackComponent::BeginPlay()

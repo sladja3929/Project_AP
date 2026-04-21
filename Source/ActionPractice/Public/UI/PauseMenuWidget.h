@@ -29,6 +29,9 @@ protected:
 #pragma region "Protected Variables"
 
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> TitleButton;
+
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> QuitButton;
 
 #pragma endregion
@@ -36,6 +39,9 @@ protected:
 #pragma region "Protected Functions"
 
 	virtual void NativeConstruct() override;
+
+	UFUNCTION()
+	void OnTitleButtonClicked();
 
 	UFUNCTION()
 	void OnQuitButtonClicked();

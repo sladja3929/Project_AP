@@ -623,7 +623,7 @@ void UAttackTraceComponent::ToggleWeaponDebugTrace()
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(100, 2.0f, bDrawDebugTrace ? FColor::Green : FColor::Red,
-			FString::Printf(TEXT("Debug: %s"), bDrawDebugTrace ? TEXT("ON") : TEXT("OFF")));
+			FString::Printf(TEXT("[%s] Attack Draw: %s"), *DebugOwnerLabel, bDrawDebugTrace ? TEXT("ON") : TEXT("OFF")));
 	}
 }
 #pragma endregion

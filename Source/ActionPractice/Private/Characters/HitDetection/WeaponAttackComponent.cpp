@@ -21,6 +21,7 @@
 
 UWeaponAttackComponent::UWeaponAttackComponent()
 {
+	DebugOwnerLabel = TEXT("Player");
 }
 
 void UWeaponAttackComponent::BeginPlay()
