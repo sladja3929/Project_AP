@@ -26,7 +26,7 @@ void UActionPracticeGameInstance::ApplyDesktopResolution()
 
 	Settings->SetScreenResolution(DesktopRes);
 	Settings->SetFullscreenMode(EWindowMode::WindowedFullscreen);
-	Settings->ApplySettings(false);
+	Settings->ApplyResolutionSettings(false);
 
 	DEBUG_LOG(TEXT("Desktop resolution applied: %d x %d (WindowedFullscreen)"), DesktopRes.X, DesktopRes.Y);
 }
