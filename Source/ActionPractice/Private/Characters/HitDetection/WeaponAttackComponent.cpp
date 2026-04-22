@@ -8,7 +8,6 @@
 #include "Components/MeshComponent.h"
 #include "Characters/ActionPracticeCharacter.h"
 #include "AbilitySystemComponent.h"
-#include "Components/InputComponent.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -42,17 +41,7 @@ void UWeaponAttackComponent::BeginPlay()
 		BuildSocketConfigs(WeaponData->HitSocketInfo);
 	}
 
-	//디버그용 1번 키 바인딩
-	if (GetWorld())
-	{
-		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
-		{
-			if (PC->InputComponent)
-			{
-				PC->InputComponent->BindKey(EKeys::One, IE_Pressed, this, &UWeaponAttackComponent::ToggleWeaponDebugTrace);
-			}
-		}
-	}
+	//디버그 트레이스 on/off는 WeaponManagerComponent가 일괄 관리 (무기 스위치에도 상태 유지 + 키 바인딩 누적 방지)
 }
 
 AActor* UWeaponAttackComponent::GetOwnerActor() const

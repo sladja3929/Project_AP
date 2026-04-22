@@ -4,6 +4,10 @@
 #include "Items/WeaponDataAsset.h"
 #include "Items/WeaponEnums.h"
 #include "Characters/HitDetection/HitDetectionInterface.h"
+#include "Characters/HitDetection/WeaponAttackComponent.h"
+#include "Components/InputComponent.h"
+#include "Engine/Engine.h"
+#include "GameFramework/PlayerController.h"
 #include "Net/UnrealNetwork.h"
 #include "Animation/AnimInstance.h"
 
@@ -34,6 +38,15 @@ void UWeaponManagerComponent::BeginPlay()
 	if (DefaultLeftWeapons.Num() > 0)
 	{
 		EquipWeapon(DefaultLeftWeapons[0], true, false);
+	}
+
+	//디버그 트레이스 "1" 키 바인딩 (로컬 플레이어 한정, 1회만 - 무기 스위치로 재바인딩되지 않음)
+	if (APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
+	{
+		if (PC->InputComponent)
+		{
+			PC->InputComponent->BindKey(EKeys::One, IE_Pressed, this, &UWeaponManagerComponent::ToggleWeaponDebugTrace);
+		}
 	}
 }
 
@@ -101,6 +114,9 @@ void UWeaponManagerComponent::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, b
 			AWeapon* EquippedWeapon = bIsLeftHand ? LeftWeapon.Get() : RightWeapon.Get();
 			UpdateAnimationLayer(EquippedWeapon, bIsLeftHand);
 		}
+
+		//새 무기에 현재 디버그 상태 주입 (리스닝 서버/싱글 플레이 경로)
+		ApplyDebugTraceToCurrentWeapons();
 
 		DEBUG_LOG(TEXT("EquipWeapon: Weapon Changed, IsLeft=%d"), bIsLeftHand);
 		OnWeaponChanged.Broadcast(bIsLeftHand);
@@ -192,6 +208,7 @@ void UWeaponManagerComponent::OnRep_LeftWeapon()
 
 	UpdateAnimationLayer(LeftWeapon, true);
 	OwnerCharacter->TryAutoActivateAttackSequenceAbility();
+	ApplyDebugTraceToCurrentWeapons();
 	OnWeaponChanged.Broadcast(true);
 }
 
@@ -213,6 +230,7 @@ void UWeaponManagerComponent::OnRep_RightWeapon()
 
 	UpdateAnimationLayer(RightWeapon, false);
 	OwnerCharacter->TryAutoActivateAttackSequenceAbility();
+	ApplyDebugTraceToCurrentWeapons();
 	OnWeaponChanged.Broadcast(false);
 }
 
@@ -296,4 +314,31 @@ void UWeaponManagerComponent::UnlinkAnimationLayer(bool bIsLeftHand)
 	LayerClassRef = nullptr;
 
 	DEBUG_LOG(TEXT("UnlinkAnimationLayer: Unlinked (IsLeft=%d)"), bIsLeftHand);
+}
+
+void UWeaponManagerComponent::ToggleWeaponDebugTrace()
+{
+	bWeaponDebugTrace = !bWeaponDebugTrace;
+	ApplyDebugTraceToCurrentWeapons();
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(100, 2.0f, bWeaponDebugTrace ? FColor::Green : FColor::Red,
+			FString::Printf(TEXT("[Player] Attack Draw: %s"), bWeaponDebugTrace ? TEXT("ON") : TEXT("OFF")));
+	}
+}
+
+void UWeaponManagerComponent::ApplyDebugTraceToCurrentWeapons()
+{
+	auto ApplyTo = [this](AWeapon* Weapon)
+	{
+		if (!Weapon) return;
+		if (UWeaponAttackComponent* TraceComp = Weapon->FindComponentByClass<UWeaponAttackComponent>())
+		{
+			TraceComp->bDrawDebugTrace = bWeaponDebugTrace;
+		}
+	};
+
+	ApplyTo(RightWeapon.Get());
+	ApplyTo(LeftWeapon.Get());
 }

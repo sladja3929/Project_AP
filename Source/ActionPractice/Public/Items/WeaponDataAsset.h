@@ -128,6 +128,9 @@ public:
 
     void PreloadAllMontages()
     {
+        //이미 프리로드 됐으면 스킵 (LoadedMontageCache가 하드 레퍼런스로 붙잡고 있음)
+        if (bMontagesPreloaded) return;
+
         TArray<FSoftObjectPath> AssetsToLoad;
 
         for (FTaggedAttackData& TaggedData : TaggedAttackData)
@@ -183,11 +186,32 @@ public:
             UAssetManager& AssetManager = UAssetManager::Get();
             FStreamableManager& StreamableManager = AssetManager.GetStreamableManager();
 
-            //동기 로딩
+            //로드된 몽타주를 UPROPERTY 하드 레퍼런스에 보관해야 GC로부터 보호됨
+            //StreamableManager.LoadSynchronous는 핸들 없이 호출되면 반환 직후 GC 대상이 되고,
+            //TSoftObjectPtr 필드도 WeakObjectPtr 기반이라 하드 레퍼런스를 유지하지 못함
+            LoadedMontageCache.Reset(AssetsToLoad.Num());
             for (const FSoftObjectPath& AssetPath : AssetsToLoad)
             {
-                StreamableManager.LoadSynchronous(AssetPath);
+                if (UObject* Loaded = StreamableManager.LoadSynchronous(AssetPath))
+                {
+                    if (UAnimMontage* Montage = Cast<UAnimMontage>(Loaded))
+                    {
+                        LoadedMontageCache.Add(Montage);
+                    }
+                }
             }
         }
+
+        bMontagesPreloaded = true;
     }
+
+private:
+    //PreloadAllMontages로 로드된 몽타주를 GC로부터 보호하기 위한 하드 레퍼런스 캐시
+    //WeaponSwitch로 이전 무기 액터가 Destroy되며 GC가 유발되면 프리로드된 몽타주가 수거되어
+    //쿡 빌드에서 몽타주 재생이 실패할 수 있기 때문에 DA가 직접 붙잡아 둔다
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UAnimMontage>> LoadedMontageCache;
+
+    UPROPERTY(Transient)
+    bool bMontagesPreloaded = false;
 };

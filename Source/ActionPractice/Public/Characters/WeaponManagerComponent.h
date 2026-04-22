@@ -105,6 +105,9 @@ private:
 	//현재 Link된 우팔 레이어 ABP 클래스 (Unlink용 캐싱)
 	TSubclassOf<UAnimInstance> CurrentRightArmLayerClass = nullptr;
 
+	//디버그 트레이스 표시 상태 (무기 스위치에도 유지)
+	bool bWeaponDebugTrace = false;
+
 #pragma endregion
 
 #pragma region "Private Functions"
@@ -117,6 +120,12 @@ private:
 
 	//무기 타입과 손 방향에 따른 소켓 이름 결정
 	FName ResolveSocketName(EWeaponEnums WeaponType, bool bIsLeftHand) const;
+
+	//"1" 키로 디버그 트레이스 on/off
+	void ToggleWeaponDebugTrace();
+
+	//현재 장착된 무기 WeaponAttackComponent들에 디버그 상태 주입
+	void ApplyDebugTraceToCurrentWeapons();
 
 #pragma endregion
 };
