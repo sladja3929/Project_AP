@@ -13,7 +13,7 @@
 #include "AbilitySystemComponent.h"
 #include "GAS/Abilities/HitDetectionSetter.h"
 
-#define ENABLE_DEBUG_LOG 0
+#define ENABLE_DEBUG_LOG 1
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackSequenceAbility, Log, All);
@@ -359,15 +359,17 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 	switch (PreviousState)
 	{
 	case EAttackSequenceState::Idle:
+		//bPreserveMontage 경로에서 시작된 리스너가 남아있을 수 있으므로 정리
+		END_ABILITY_TASK(WaitCancelAttackEventTask);
 		break;
-		
+
 	case EAttackSequenceState::Prepare:
 		break;
-		
+
 	case EAttackSequenceState::Attacking:
-		
+
 		break;
-		
+
 	case EAttackSequenceState::AfterRecovery:
 		END_ABILITY_TASK(WaitResetComboEventTask);
 		END_ABILITY_TASK(WaitCancelAttackEventTask);

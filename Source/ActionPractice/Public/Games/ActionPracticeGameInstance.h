@@ -22,5 +22,8 @@ protected:
 	//모니터 네이티브 해상도를 읽어 WindowedFullscreen으로 적용
 	void ApplyDesktopResolution();
 
+	//포트폴리오 시연용: 스캘러빌리티 품질을 고정 (벤치마크 자동 조정 방지)
+	void ApplyScalabilitySettings();
+
 #pragma endregion
 };
