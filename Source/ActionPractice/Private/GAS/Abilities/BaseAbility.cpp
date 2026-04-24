@@ -92,7 +92,8 @@ bool UBaseAbility::CheckStaminaCost(const FGameplayAbilityActorInfo& ActorInfo) 
 
 	if (const UBaseAttributeSet* AttributeSet = GetBaseAttributeSetFromActorInfo(&ActorInfo))
 	{
-		return AttributeSet->GetStamina() > 0;
+		//ApplyStaminaCost의 실패 임계값과 일치시켜 CanActivate/Apply 간 gap 제거
+		return AttributeSet->GetStamina() >= MinStaminaThreshold;
 	}
 
 	return false;
@@ -107,7 +108,7 @@ bool UBaseAbility::ApplyStaminaCost()
 	}
 
 	const UBaseAttributeSet* AttributeSet = GetBaseAttributeSetFromActorInfo();
-	if (!AttributeSet || AttributeSet->GetStamina() < 3.0f)
+	if (!AttributeSet || AttributeSet->GetStamina() < MinStaminaThreshold)
 	{
 		DEBUG_LOG(TEXT("No AttributeSet or Low Stamina"));
 		return false;

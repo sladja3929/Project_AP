@@ -51,7 +51,13 @@ void URollAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, cons
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	if (!ConsumeStamina()) return;
+	//스태미나 부족 시 어빌리티 종료는 호출자가 책임
+	if (!ConsumeStamina())
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
 	StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 	START_WAIT_EVENT_TASK(WaitInvincibleStartEventTask, EventNotifyInvincibleStartTag, OnEventInvincibleStart, nullptr, true, true);
 }
@@ -61,7 +67,6 @@ bool URollAbility::ConsumeStamina()
 	if (!ApplyStaminaCost())
 	{
 		DEBUG_LOG(TEXT("No Stamina"));
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return false;
 	}
 

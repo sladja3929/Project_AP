@@ -77,6 +77,9 @@ public:
 protected:
 #pragma region "Protected Variables"
 
+	//CheckStaminaCost / ApplyStaminaCost 공통 임계값 — 이 값 미만에서는 어빌리티 활성화 불가 및 소비 실패
+	static constexpr float MinStaminaThreshold = 3.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability Stats")
 	float StaminaCost = 0.0f;
 
