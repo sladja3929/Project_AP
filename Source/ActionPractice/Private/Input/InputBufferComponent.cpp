@@ -203,36 +203,39 @@ void UInputBufferComponent::ExecuteBuffer()
 
 	//윈도우 닫기
 	bBufferWindowOpened = false;
-	
+
 	DEBUG_LOG(TEXT("ExecuteBuffer called"));
 
-	//저장된 단발 액션 실행
+	//저장된 단발 액션 실행 (dispatch 전에 먼저 소비)
 	if (BufferedActionTag.IsValid())
 	{
-		ActivateAbilityByTag(BufferedActionTag);
-
+		//★ consume-before-dispatch: dispatch 중 재귀가 들어와도 빈 버퍼를 보도록 멤버를 먼저 클리어
+		const FGameplayTag TagToActivate = BufferedActionTag;
 		BufferedActionTag = FGameplayTag();
 		BufferPriority = -1;
 		bBufferedActionReleased = false;
+
+		ActivateAbilityByTag(TagToActivate);
 		DEBUG_LOG(TEXT("ExecuteBuffer: Normal buffer executed"));
+		return;
 	}
 
-	//저장된 모든 홀드 액션 실행
-	else if (BufferedHoldActionTags.Num() > 0)
+	//저장된 모든 홀드 액션 실행 (dispatch 전에 먼저 소비)
+	if (BufferedHoldActionTags.Num() > 0)
 	{
-		for (const FGameplayTag& Tag : BufferedHoldActionTags)
+		//★ consume-before-dispatch: 소유권을 로컬로 옮기고 멤버는 즉시 비움
+		TSet<FGameplayTag> HoldToActivate = MoveTemp(BufferedHoldActionTags);
+		BufferedHoldActionTags.Reset();
+
+		for (const FGameplayTag& Tag : HoldToActivate)
 		{
 			ActivateAbilityByTag(Tag);
 		}
-
-		BufferedHoldActionTags.Empty();
 		DEBUG_LOG(TEXT("ExecuteBuffer: Hold buffers executed"));
+		return;
 	}
-	
-	else
-	{
-		DEBUG_LOG(TEXT("ExecuteBuffer: No buffered action"));
-	}
+
+	DEBUG_LOG(TEXT("ExecuteBuffer: No buffered action"));
 }
 
 void UInputBufferComponent::ActivateAbilityByTag(FGameplayTag ActionTag)
