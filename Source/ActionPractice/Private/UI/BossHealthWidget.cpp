@@ -1,7 +1,7 @@
 ﻿#include "UI/BossHealthWidget.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
-#include "GAS/AttributeSet/BossAttributeSet.h"
+#include "GAS/AttributeSet/EnemyAttributeSet.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -41,7 +41,7 @@ void UBossHealthWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
 	UpdateDamageBars(InDeltaTime);
 }
 
-void UBossHealthWidget::SetBossAttributeSet(UBossAttributeSet* InAttributeSet)
+void UBossHealthWidget::SetBossAttributeSet(UEnemyAttributeSet* InAttributeSet)
 {
 	if (!InAttributeSet)
 	{

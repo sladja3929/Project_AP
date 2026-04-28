@@ -55,7 +55,13 @@ void UBaseAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle
         return;
     }
     
-    if (!ConsumeStamina()) return;
+    //스태미나 부족 시 어빌리티 종료는 호출자가 책임
+    if (!ConsumeStamina())
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
+    }
+
     StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 }
 
@@ -127,7 +133,6 @@ bool UBaseAttackAbility::ConsumeStamina()
     if (!ApplyStaminaCost())
     {
         DEBUG_LOG(TEXT("No Stamina"));
-        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
         return false;
     }
 

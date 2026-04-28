@@ -2,6 +2,7 @@
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
 #include "StateTreeExecutionContext.h"
+#include "Characters/EnemyCharacter.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -16,15 +17,15 @@ void FUpdateTargetInfoEvaluator::TreeStart(FStateTreeExecutionContext& Context) 
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
-	if (!InstanceData.SourceActor)
+	if (!InstanceData.EnemyCharacter)
 	{
-		DEBUG_LOG(TEXT("SourceActor is not valid in UpdateTargetInfoEvaluator"));
+		DEBUG_LOG(TEXT("EnemyCharacter is not valid in UpdateTargetInfoEvaluator"));
 		return;
 	}
 
-	if (!InstanceData.AIController)
+	if (!InstanceData.EnemyAIController)
 	{
-		DEBUG_LOG(TEXT("AIController is not valid in UpdateTargetInfoEvaluator"));
+		DEBUG_LOG(TEXT("EnemyAIController is not valid in UpdateTargetInfoEvaluator"));
 		return;
 	}
 
@@ -52,7 +53,7 @@ void FUpdateTargetInfoEvaluator::UpdateTargetInfo(FStateTreeExecutionContext& Co
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
-	if (!InstanceData.AIController || !InstanceData.AIController->CurrentTarget.IsValid() || !InstanceData.SourceActor)
+	if (!InstanceData.EnemyAIController || !InstanceData.EnemyAIController->CurrentTarget.IsValid() || !InstanceData.EnemyCharacter)
 	{
 		InstanceData.DetectedTarget = nullptr;
 		InstanceData.DistanceToTarget = -1.0f;
@@ -61,7 +62,7 @@ void FUpdateTargetInfoEvaluator::UpdateTargetInfo(FStateTreeExecutionContext& Co
 		return;
 	}
 
-	AActor* TargetActor = InstanceData.AIController->GetCurrentTargetActor();
+	AActor* TargetActor = InstanceData.EnemyAIController->GetCurrentTargetActor();
 	if (!TargetActor)
 	{
 		InstanceData.DetectedTarget = nullptr;
@@ -73,7 +74,7 @@ void FUpdateTargetInfoEvaluator::UpdateTargetInfo(FStateTreeExecutionContext& Co
 
 	InstanceData.DetectedTarget = TargetActor;
 
-	const FVector SourceLocation = InstanceData.SourceActor->GetActorLocation();
+	const FVector SourceLocation = InstanceData.EnemyCharacter->GetActorLocation();
 	const FVector TargetLocation = TargetActor->GetActorLocation();
 
 	//거리 계산
@@ -82,7 +83,7 @@ void FUpdateTargetInfoEvaluator::UpdateTargetInfo(FStateTreeExecutionContext& Co
 
 	//각도 계산 (Enemy의 정면 기준 Target과의 Yaw 각도)
 	const FVector DirectionToTarget = (TargetLocation - SourceLocation).GetSafeNormal();
-	const FVector ForwardVector = InstanceData.SourceActor->GetActorForwardVector();
+	const FVector ForwardVector = InstanceData.EnemyCharacter->GetActorForwardVector();
 
 	//내적을 이용한 각도 계산 (0~180도)
 	const float DotProduct = FVector::DotProduct(ForwardVector, DirectionToTarget);
@@ -96,9 +97,9 @@ void FUpdateTargetInfoEvaluator::UpdateTargetInfo(FStateTreeExecutionContext& Co
 	InstanceData.AngleToTarget = SignedAngle;
 	InstanceData.bTargetDetected = true;
 
-	//AIController의 CurrentTarget 구조체 갱신
-	InstanceData.AIController->CurrentTarget.Distance = Distance;
-	InstanceData.AIController->CurrentTarget.AngleToTarget = SignedAngle;
+	//EnemyAIController의 CurrentTarget 구조체 갱신
+	InstanceData.EnemyAIController->CurrentTarget.Distance = Distance;
+	InstanceData.EnemyAIController->CurrentTarget.AngleToTarget = SignedAngle;
 
 	DEBUG_LOG(TEXT("Target Info Updated - Distance: %.2f, Angle: %.2f"), Distance, SignedAngle);
 }

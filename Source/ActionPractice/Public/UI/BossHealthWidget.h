@@ -4,7 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "BossHealthWidget.generated.h"
 
-class UBossAttributeSet;
+class UEnemyAttributeSet;
 class UProgressBar;
 class UTextBlock;
 
@@ -34,7 +34,7 @@ public:
 	virtual void NativeDestruct() override;
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
-	void SetBossAttributeSet(UBossAttributeSet* InAttributeSet);
+	void SetBossAttributeSet(UEnemyAttributeSet* InAttributeSet);
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void SetBossName(const FName& InBossName);
@@ -48,7 +48,7 @@ protected:
 #pragma region "Protected Variables"
 
 	UPROPERTY()
-	TObjectPtr<UBossAttributeSet> BossAttributeSet;
+	TObjectPtr<UEnemyAttributeSet> BossAttributeSet;
 
 	float CurrentBossHealthPercent = 1.0f;
 	float TargetBossHealthDamagePercent = 1.0f;

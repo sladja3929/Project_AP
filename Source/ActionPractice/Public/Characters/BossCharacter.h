@@ -1,69 +1,50 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AI/EnemyAIController.h"
-#include "Characters/BaseCharacter.h"
-#include "GAS/AttributeSet/BossAttributeSet.h"
+#include "Characters/EnemyCharacter.h"
 #include "BossCharacter.generated.h"
 
-class UBossHealthWidget;
-class AActionPracticeCharacter;
-class UEnemyAttackComponent;
-class UEnemyDataAsset;
+class AActionPracticePlayerController;
 
 UCLASS()
-class ACTIONPRACTICE_API ABossCharacter : public ABaseCharacter
+class ACTIONPRACTICE_API ABossCharacter : public AEnemyCharacter
 {
 	GENERATED_BODY()
 
 public:
 #pragma region "Public Variables"
 
-	UPROPERTY(EditDefaultsOnly, Category = "Data")
-	FName EnemyName = NAME_None;
-
-#pragma endregion 
+#pragma endregion
 
 #pragma region "Public Functions"
 
 	ABossCharacter();
 
-	virtual void Tick(float DeltaTime) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	//===== Hit Detection Interface =====
-	virtual TScriptInterface<IHitDetectionInterface> GetHitDetectionInterface() const override;
+	// ===== Network =====
+	//모든 클라이언트에서 보스 조우 연출 (BGM, UI)
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnBossEncounter();
 
-	FORCEINLINE UBossAttributeSet* GetAttributeSet() const { return Cast<UBossAttributeSet>(AttributeSet); }
-	FORCEINLINE UBossHealthWidget* GetBossHealthWidget() const { return BossHealthWidget; }
-	FORCEINLINE class AEnemyAIController* GetEnemyAIController() const { return Cast<AEnemyAIController>(GetController()); }
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnBossDisengage();
 
-	const UEnemyDataAsset* GetEnemyData() const { return EnemyData.Get(); }
+	// ===== Enemy Reset (보스 전용 추가) =====
+	virtual void ResetEnemy() override;
 
-	void RotateToTarget(const AActor* TargetActor, float RotateTime);
-
-	//===== Replication =====
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	//보스는 머리 위 HP바를 사용하지 않음 (화면 하단 보스 HP바 사용)
+	virtual void ShowEnemyHealthBar() override;
+	virtual void HideEnemyHealthBar() override;
 
 #pragma endregion
 
 protected:
 #pragma region "Protected Variables"
 
-	UPROPERTY(EditDefaultsOnly, Category = "Data")
-	TObjectPtr<UEnemyDataAsset> EnemyData;
-
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<UBossHealthWidget> BossHealthWidgetClass;
-
-	UPROPERTY()
-	TObjectPtr<UBossHealthWidget> BossHealthWidget;
-
-	bool bHealthWidgetActive = false;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
-	TObjectPtr<UEnemyAttackComponent> EnemyAttackComponent;
+	//보스 조우 중인지 서버측 플래그
+	bool bBossEncountered = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Audio")
 	TObjectPtr<USoundBase> BossBGM;
@@ -75,40 +56,21 @@ protected:
 
 #pragma region "Protected Functions"
 
-	// ===== GAS =====
-	virtual void CreateAbilitySystemComponent() override;
-	virtual void CreateAttributeSet() override;
-
-	// ===== UI =====
-	UFUNCTION()
-	void OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus);
-
-	void CreateAndAttachHealthWidget();
-	void RemoveHealthWidget();
+	// ===== Perception (보스 전용 override) =====
+	virtual void OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus) override;
 
 	// ===== Audio =====
 	void PlayBossBGM();
 	void StopBossBGM();
-
-	// ===== Network =====
-	//모든 클라이언트에서 보스 조우 연출 (BGM, UI)
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_OnBossEncounter();
-
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_OnBossDisengage();
 
 #pragma endregion
 
 private:
 #pragma region "Private Variables"
 
-	TWeakObjectPtr<AActionPracticeCharacter> DetectedPlayer;
-
 #pragma endregion
 
 #pragma region "Private Functions"
-
 
 #pragma endregion
 };

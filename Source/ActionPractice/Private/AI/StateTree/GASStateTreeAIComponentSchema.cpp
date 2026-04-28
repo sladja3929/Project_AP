@@ -7,22 +7,76 @@
 #include "StateTreeExecutionContext.h"
 #include "StateTreeTaskBase.h"
 #include "AI/EnemyAIController.h"
-#include "Characters/BossCharacter.h"
-#include "GAS/AbilitySystemComponent/BossAbilitySystemComponent.h"
-#include "AbilitySystemComponent.h"
+#include "Characters/EnemyCharacter.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
+#include "AbilitySystemInterface.h"
 
 
 #define ENABLE_DEBUG_LOG 0
 #if ENABLE_DEBUG_LOG
-	DEFINE_LOG_CATEGORY_STATIC(LogBossStateTreeSchema, Log, All);
-#define DEBUG_LOG(Format, ...) UE_LOG(LogBossStateTreeSchema, Warning, Format, ##__VA_ARGS__)
+	DEFINE_LOG_CATEGORY_STATIC(LogEnemyStateTreeSchema, Log, All);
+#define DEBUG_LOG(Format, ...) UE_LOG(LogEnemyStateTreeSchema, Warning, Format, ##__VA_ARGS__)
 #else
 #define DEBUG_LOG(Format, ...)
 #endif
 
+UGASStateTreeAIComponentSchema::UGASStateTreeAIComponentSchema()
+{
+	//부모 생성자 이후 ContextDataDescs 상태:
+	//  [0] = Name="Actor", Struct=APawn
+	//  [1] = Name="AIController", Struct=AAIController
+
+	//[0]: Actor → EnemyCharacter (타입+이름 변경)
+	ContextActorClass = AEnemyCharacter::StaticClass();
+	ContextDataDescs[0].Struct = ContextActorClass.Get();
+	ContextDataDescs[0].Name = FName(TEXT("EnemyCharacter"));
+
+	//[1]: AIController → EnemyAIController (타입+이름 변경)
+	AIControllerClass = AEnemyAIController::StaticClass();
+	ContextDataDescs[1].Struct = AIControllerClass.Get();
+	ContextDataDescs[1].Name = FName(TEXT("EnemyAIController"));
+
+	//[2]: EnemyAbilitySystemComponent 추가
+	ContextDataDescs.Emplace(
+		FName(TEXT("EnemyAbilitySystemComponent")),
+		UEnemyAbilitySystemComponent::StaticClass(),
+		FGuid(0xA1B2C3D4, 0xE5F6A7B8, 0xC9D0E1F2, 0x13243546)
+	);
+}
+
+void UGASStateTreeAIComponentSchema::PostLoad()
+{
+	Super::PostLoad();
+
+	//Super::PostLoad이 [0].Struct, [1].Struct를 ContextActorClass/AIControllerClass로 복원하지만
+	//Name은 직렬화된 옛 이름("Actor", "AIController")이 남아있으므로 강제 보정
+	ContextDataDescs[0].Name = FName(TEXT("EnemyCharacter"));
+	ContextDataDescs[1].Name = FName(TEXT("EnemyAIController"));
+
+	//기존 에셋은 엔트리 2개만 직렬화되어 있으므로 ASC 엔트리 복원
+	if (ContextDataDescs.Num() < 3)
+	{
+		ContextDataDescs.Emplace(
+			FName(TEXT("EnemyAbilitySystemComponent")),
+			UEnemyAbilitySystemComponent::StaticClass(),
+			FGuid(0xA1B2C3D4, 0xE5F6A7B8, 0xC9D0E1F2, 0x13243546)
+		);
+	}
+	else
+	{
+		ContextDataDescs[2].Struct = UEnemyAbilitySystemComponent::StaticClass();
+		ContextDataDescs[2].Name = FName(TEXT("EnemyAbilitySystemComponent"));
+	}
+}
+
 bool UGASStateTreeAIComponentSchema::IsStructAllowed(const UScriptStruct* InScriptStruct) const
 {
-	//Task, Evaluator, Condition 허용
+	if (Super::IsStructAllowed(InScriptStruct))
+	{
+		return true;
+	}
+
+	//게임 모듈 커스텀 Task, Evaluator, Condition 허용
 	return InScriptStruct->IsChildOf(FStateTreeTaskBase::StaticStruct()) ||
 		   InScriptStruct->IsChildOf(FStateTreeEvaluatorBase::StaticStruct()) ||
 		   InScriptStruct->IsChildOf(FStateTreeConditionBase::StaticStruct());
@@ -30,9 +84,9 @@ bool UGASStateTreeAIComponentSchema::IsStructAllowed(const UScriptStruct* InScri
 
 bool UGASStateTreeAIComponentSchema::IsClassAllowed(const UClass* InClass) const
 {
-	//BossAIController, BossCharacter, Actor 허용
+	//EnemyAIController, EnemyCharacter, Actor 허용
 	return InClass->IsChildOf(AEnemyAIController::StaticClass()) ||
-		   InClass->IsChildOf(ABossCharacter::StaticClass()) ||
+		   InClass->IsChildOf(AEnemyCharacter::StaticClass()) ||
 		   InClass->IsChildOf(AActor::StaticClass());
 }
 
@@ -41,76 +95,48 @@ bool UGASStateTreeAIComponentSchema::IsExternalItemAllowed(const UStruct& InStru
 	return true;
 }
 
-//언리얼 5.6부터는 GetContextDataDescs로 Context 배열을 가져온 후 Context를 추가
-TConstArrayView<FStateTreeExternalDataDesc> UGASStateTreeAIComponentSchema::GetContextDataDescs() const
-{
-	//Static으로 Context 데이터 배열를 가져와서 메모리 유지 (일반 변수는 에셋 생성 시 에러남)
-	static TArray<FStateTreeExternalDataDesc> CachedDescs;
-
-	//매번 새로 생성 (부모 클래스의 Context가 바뀔 수 있으므로)
-	CachedDescs.Reset();
-
-	//부모 클래스의 기존 Context 그대로 가져오기 (Actor, AIController)
-	TConstArrayView<FStateTreeExternalDataDesc> ParentDescsView = Super::GetContextDataDescs();
-	CachedDescs.Append(ParentDescsView.GetData(), ParentDescsView.Num());
-
-	//커스텀 Context 데이터 추가
-	
-	//ASC
-	FStateTreeExternalDataDesc ASCDesc(UAbilitySystemComponent::StaticClass(), EStateTreeExternalDataRequirement::Required);
-	ASCDesc.Name = TEXT("AbilitySystemComponent");
-	CachedDescs.Add(ASCDesc);
-	
-	return CachedDescs;
-}
-
 void UGASStateTreeAIComponentSchema::SetContextData(FContextDataSetter& ContextDataSetter, bool bLogErrors) const
 {
-	//기본 Actor, AIController 설정
-	Super::SetContextData(ContextDataSetter, bLogErrors);
+	//부모는 "Actor"/"AIController" 이름으로 설정하므로 Super 호출하지 않음
 
-	//Actor 가져오기
 	AAIController* AIOwner = ContextDataSetter.GetComponent()->GetAIOwner();
-	AActor* OwnerActor = (AIOwner != nullptr) ? AIOwner->GetPawn() : ContextDataSetter.GetComponent()->GetOwner();
-	AActor* FallbackOwner = ContextDataSetter.GetComponent()->GetOwner();
+	APawn* OwnerPawn = AIOwner ? AIOwner->GetPawn() : nullptr;
 
-	UAbilitySystemComponent* ASC = nullptr;
-
-	if (OwnerActor)
+	//EnemyCharacter
+	AEnemyCharacter* EnemyChar = Cast<AEnemyCharacter>(OwnerPawn);
+	if (!ContextDataSetter.SetContextDataByName(FName(TEXT("EnemyCharacter")), FStateTreeDataView(EnemyChar)))
 	{
-		//IAbilitySystemInterface를 통해 ASC 가져오기
-		if (IAbilitySystemInterface* ASInterface = Cast<IAbilitySystemInterface>(OwnerActor))
+		if (bLogErrors)
 		{
-			ASC = ASInterface->GetAbilitySystemComponent();
-		}
-
-		//인터페이스가 없으면 컴포넌트로 직접 찾기
-		if (!ASC)
-		{
-			ASC = OwnerActor->FindComponentByClass<UAbilitySystemComponent>();
+			DEBUG_LOG(TEXT("SetContextData: FAILED to set EnemyCharacter (Pawn=%s)"), *GetNameSafe(OwnerPawn));
 		}
 	}
 
-	//이전 ASC와 비교하여 변경되었을 때만 로그 출력 (로그 스팸 방지)
-	static UAbilitySystemComponent* LastASC = nullptr;
-
-	if (ASC != LastASC)
+	//EnemyAIController
+	AEnemyAIController* EnemyAI = Cast<AEnemyAIController>(AIOwner);
+	if (!ContextDataSetter.SetContextDataByName(FName(TEXT("EnemyAIController")), FStateTreeDataView(EnemyAI)))
 	{
-		DEBUG_LOG(TEXT("Schema::SetContextData: ASC Changed! Old=%p, New=%p, Actor=%s"),
-			LastASC,
-			ASC,
-			*GetNameSafe(OwnerActor ? OwnerActor : FallbackOwner));
-
-		LastASC = ASC;
+		if (bLogErrors)
+		{
+			DEBUG_LOG(TEXT("SetContextData: FAILED to set EnemyAIController (AI=%s)"), *GetNameSafe(AIOwner));
+		}
 	}
 
-	//ASC를 Context에 설정
-	if (!ContextDataSetter.SetContextDataByName(TEXT("AbilitySystemComponent"), FStateTreeDataView(ASC)))
+	//EnemyAbilitySystemComponent
+	UEnemyAbilitySystemComponent* EnemyASC = nullptr;
+	if (EnemyChar)
 	{
-		DEBUG_LOG(TEXT("Schema::SetContextData: FAILED to set ASC in context. ASC=%p"), ASC);
-		if (bLogErrors && !ASC)
+		if (IAbilitySystemInterface* ASInterface = Cast<IAbilitySystemInterface>(EnemyChar))
 		{
-			DEBUG_LOG(TEXT("Schema::SetContextData: bLogErrors=true and ASC is nullptr"));
+			EnemyASC = Cast<UEnemyAbilitySystemComponent>(ASInterface->GetAbilitySystemComponent());
+		}
+	}
+
+	if (!ContextDataSetter.SetContextDataByName(FName(TEXT("EnemyAbilitySystemComponent")), FStateTreeDataView(EnemyASC)))
+	{
+		if (bLogErrors)
+		{
+			DEBUG_LOG(TEXT("SetContextData: FAILED to set EnemyASC (EnemyChar=%s)"), *GetNameSafe(EnemyChar));
 		}
 	}
 }

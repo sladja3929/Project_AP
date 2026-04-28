@@ -79,6 +79,8 @@ DerivedDataCache/*
 .claude
 .env
 *repopackpy-output.txt
+*repomix-output.txt
+*repomix-output.xml
 
 # ThirdParty / temp content folders
 Content/ThirdParty/*
@@ -87,5 +89,9 @@ Content/Mediterranean_Coast
 # Other files
 other_helper/*
 instruction.txt
+inst.txt
 error.png
 errorlog.txt
+error.txt
+plan.txt
+log.txt

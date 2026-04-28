@@ -1,5 +1,5 @@
 #include "Public/Games/ActionPracticeGameMode.h"
-#include "Characters/BossCharacter.h"
+#include "Characters/EnemyCharacter.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -18,7 +18,7 @@ void AActionPracticeGameMode::BeginPlay()
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-		SpawnedBoss = GetWorld()->SpawnActor<ABossCharacter>(
+		SpawnedBoss = GetWorld()->SpawnActor<AEnemyCharacter>(
 			BossClass,
 			BossSpawnLocation,
 			BossSpawnRotation,
@@ -30,6 +30,29 @@ void AActionPracticeGameMode::BeginPlay()
 			UE_LOG(LogTemp, Log, TEXT("Boss spawned: %s at location: %s"), *SpawnedBoss->GetName(), *BossSpawnLocation.ToString());
 		}
 	}
+}
+
+void AActionPracticeGameMode::ResetAllEnemies()
+{
+	if (!HasAuthority()) return;
+
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	TArray<AActor*> FoundEnemies;
+	UGameplayStatics::GetAllActorsOfClass(World, AEnemyCharacter::StaticClass(), FoundEnemies);
+
+	int32 ResetCount = 0;
+	for (AActor* Actor : FoundEnemies)
+	{
+		AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Actor);
+		if (!Enemy || !IsValid(Enemy)) continue;
+
+		Enemy->ResetEnemy();
+		++ResetCount;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("AActionPracticeGameMode::ResetAllEnemies - Reset %d enemies"), ResetCount);
 }
 
 AActor* AActionPracticeGameMode::ChoosePlayerStart_Implementation(AController* Player)

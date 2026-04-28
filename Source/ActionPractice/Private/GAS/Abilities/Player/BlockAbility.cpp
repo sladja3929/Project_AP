@@ -22,16 +22,17 @@
 UBlockAbility::UBlockAbility()
 {
 	PlayMontageWithEventsTask = nullptr;
-	DamageReductionMultiplier = 0.5f;
-	StaminaDamageReduction = 0.5f;
-	BlockAngle = 120.0f;
-	ParryWindow = 0.3f;
 }
 
 void UBlockAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	
+
+	if (!WeaponBlockData)
+	{
+		return;
+	}
+
 	StartMontageWithEventsTask();
 	StartWaitInputReleaseTask(true);
 }

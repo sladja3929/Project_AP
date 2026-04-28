@@ -33,6 +33,9 @@ void UBaseAbilitySystemComponent::BeginPlay()
 
 	//HitReaction 태그 초기화
 	AbilityHitReactionTag = UGameplayTagsSubsystem::GetAbilityHitReactionTag();
+
+	//Impact Cue 태그 초기화
+	GameplayCueImpactTag = UGameplayTagsSubsystem::GetGameplayCueImpactTag();
 }
 
 void UBaseAbilitySystemComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -46,6 +49,9 @@ void UBaseAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AAc
 
 	CachedCharacter = Cast<ABaseCharacter>(InOwnerActor);
 
+	//죽음 가드 리셋 (캐릭터가 다시 살아날 때 재사용 가능)
+	bDeathHandled = false;
+
 	//AttributeSet의 OnDamagedPreResolve 델리게이트 바인딩
 	UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(GetAttributeSet(UBaseAttributeSet::StaticClass()));
 	if (UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet))
@@ -55,6 +61,11 @@ void UBaseAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AAc
 
 	//외부 바인딩용 신호
 	OnASCInitialized.Broadcast(this);
+}
+
+bool UBaseAbilitySystemComponent::TryActivateAbilityWithEventData(FGameplayAbilitySpecHandle AbilityToActivate, const FGameplayEventData* TriggerEventData)
+{
+	return InternalTryActivateAbility(AbilityToActivate, FPredictionKey(), nullptr, nullptr, TriggerEventData);
 }
 
 FGameplayEffectSpecHandle UBaseAbilitySystemComponent::CreateGameplayEffectSpec(TSubclassOf<UGameplayEffect> GameplayEffectClass, float Level, UObject* SourceObject)
@@ -88,7 +99,8 @@ FGameplayEffectSpecHandle UBaseAbilitySystemComponent::CreateAttackGameplayEffec
 	TSubclassOf<UGameplayEffect> GameplayEffectClass,
 	float Level,
 	UObject* SourceObject,
-	const FFinalAttackData& FinalAttackData)
+	const FFinalAttackData& FinalAttackData,
+	const FHitResult* HitResult)
 {
 	//기본 Spec 생성
 	FGameplayEffectSpecHandle SpecHandle = CreateGameplayEffectSpec(GameplayEffectClass, Level, SourceObject);
@@ -102,7 +114,7 @@ FGameplayEffectSpecHandle UBaseAbilitySystemComponent::CreateAttackGameplayEffec
 	//Incoming Damage Attribute Magnitude 설정
 	SetSpecSetByCallerMagnitude(SpecHandle, UGameplayTagsSubsystem::GetEffectDamageIncomingDamageTag(), FinalAttackData.FinalDamage);
 
-	//ActionPracticeGameplayEffectContext 추출하여 DamageType, PoiseDamage 설정
+	//ActionPracticeGameplayEffectContext 추출하여 DamageType, PoiseDamage, HitResult 설정
 	FGameplayEffectContext* Context = SpecHandle.Data.Get()->GetContext().Get();
 	FActionPracticeGameplayEffectContext* APContext = static_cast<FActionPracticeGameplayEffectContext*>(Context);
 
@@ -110,6 +122,13 @@ FGameplayEffectSpecHandle UBaseAbilitySystemComponent::CreateAttackGameplayEffec
 	{
 		APContext->SetAttackDamageType(FinalAttackData.DamageType);
 		APContext->SetPoiseDamage(FinalAttackData.PoiseDamage);
+		APContext->SetUnparriable(FinalAttackData.bUnparriable);
+
+		//HitResult를 Context에 추가 — GAS가 Cue 파라미터에 Location/Normal을 자동 매핑
+		if (HitResult)
+		{
+			APContext->AddHitResult(*HitResult, true);
+		}
 	}
 	else
 	{
@@ -153,13 +172,76 @@ void UBaseAbilitySystemComponent::SetSpecSetByCallerMagnitudes(FGameplayEffectSp
 	}
 }
 
+void UBaseAbilitySystemComponent::HandleDeath()
+{
+	if (bDeathHandled) return;
+	bDeathHandled = true;
+
+	//StateDead 태그는 PlayerDeathAbility가 몽타주 종료 후 직접 추가
+	//UI가 몽타주 연출 이후에 반응하도록 타이밍 분리
+	DEBUG_LOG(TEXT("HandleDeath: bDeathHandled set"));
+}
+
+void UBaseAbilitySystemComponent::ResetDeathHandled()
+{
+	bDeathHandled = false;
+	DEBUG_LOG(TEXT("ResetDeathHandled: death guard cleared"));
+}
+
+void UBaseAbilitySystemComponent::CacheDamageEffectContext(const FGameplayEffectContextHandle& InContext)
+{
+	CachedDamageContext = InContext;
+}
+
 void UBaseAbilitySystemComponent::OnDamaged(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
 {
-	//방어력 계산 및 Attribute 설정
+	//1단계: 어트리뷰트에 대미지 적용 (HP, Poise 등 — 음수 허용)
 	CalculateAndSetAttributes(SourceActor, FinalAttackData);
 
-	//피격 로직 트리거
+	//2단계: 판정 결과 확정 후 Impact Cue 수동 발동
+	ExecuteImpactCue(FinalAttackData);
+
+	//3단계: 피격 반응 판정 및 실행 (사망 > 그로기 > 히트리액션)
 	HandleOnDamagedResolved(SourceActor, FinalAttackData);
+
+	//4단계: 브레이크 게이지 리셋 (사용 완료된 음수 게이지를 최대치로 복원)
+	ResetBreakGauges();
+}
+
+EDefenseResult UBaseAbilitySystemComponent::GetDefenseResult() const
+{
+	return EDefenseResult::None;
+}
+
+void UBaseAbilitySystemComponent::ExecuteImpactCue(const FFinalAttackData& FinalAttackData)
+{
+	if (!CachedDamageContext.IsValid())
+	{
+		DEBUG_LOG(TEXT("ExecuteImpactCue: No cached context"));
+		return;
+	}
+
+	if (!GameplayCueImpactTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("ExecuteImpactCue: ImpactCueTag is not valid"));
+		CachedDamageContext.Clear();
+		return;
+	}
+
+	//원본 Context를 복제하여 DefenseResult 주입 (원본 오염 방지)
+	FGameplayEffectContextHandle CueContext(CachedDamageContext.Get()->Duplicate());
+	FActionPracticeGameplayEffectContext* APContext = static_cast<FActionPracticeGameplayEffectContext*>(CueContext.Get());
+	if (APContext)
+	{
+		APContext->SetDefenseResult(GetDefenseResult());
+	}
+
+	FGameplayCueParameters CueParams;
+	CueParams.EffectContext = CueContext;
+
+	ExecuteGameplayCue(GameplayCueImpactTag, CueParams);
+
+	CachedDamageContext.Clear();
 }
 
 void UBaseAbilitySystemComponent::CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
@@ -185,17 +267,21 @@ void UBaseAbilitySystemComponent::CalculateAndSetAttributes(AActor* SourceActor,
 	const float OldHealth = BaseAttributeSet->GetHealth();
 	BaseAttributeSet->SetHealth(FMath::Clamp(OldHealth - FinalDamage, 0.0f, BaseAttributeSet->GetMaxHealth()));
 
-	//포이즈 대미지 적용
+	//유효 포이즈 잔량 계산 (실제 Poise attribute는 Pre*Change에서 [0, Max]로 클램프되므로,
+	//초과된 음수값은 LastEffectivePoise로 별도 보관해 HitReaction 강도 판정에 사용)
+	const float OldPoise = BaseAttributeSet->GetPoise();
+	LastEffectivePoise = OldPoise - FinalAttackData.PoiseDamage;
+
+	//포이즈 대미지 적용 (실제 attribute)
 	if (FinalAttackData.PoiseDamage > 0.0f)
 	{
-		const float OldPoise = BaseAttributeSet->GetPoise();
-		BaseAttributeSet->SetPoise(FMath::Clamp(OldPoise - FinalAttackData.PoiseDamage, 0.0f, BaseAttributeSet->GetMaxPoise()));
+		BaseAttributeSet->SetPoise(LastEffectivePoise);
 	}
 
-	DEBUG_LOG(TEXT("OnDamaged: Damage=%.1f, FinalDamage=%.1f, Health=%.1f/%.1f, Poise=%.1f/%.1f"),
+	DEBUG_LOG(TEXT("OnDamaged: Damage=%.1f, FinalDamage=%.1f, Health=%.1f/%.1f, Poise=%.1f/%.1f, EffectivePoise=%.1f"),
 		FinalAttackData.FinalDamage, FinalDamage,
 		BaseAttributeSet->GetHealth(), BaseAttributeSet->GetMaxHealth(),
-		BaseAttributeSet->GetPoise(), BaseAttributeSet->GetMaxPoise());
+		BaseAttributeSet->GetPoise(), BaseAttributeSet->GetMaxPoise(), LastEffectivePoise);
 }
 
 void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, const FFinalAttackData& FinalAttackData)
@@ -216,16 +302,13 @@ void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, c
 	if (BaseAttributeSet->GetHealth() <= 0.0f)
 	{
 		DEBUG_LOG(TEXT("HandleOnDamagedResolved: Character died"));
-		//TODO: 죽음 처리
+		HandleDeath();
 		return;
 	}
 
-	//포이즈 브레이크 체크
-	if (BaseAttributeSet->GetPoise() <= 0.0f)
+	//HitReaction 활성화 여부 체크
+	if (ShouldActivateHitReaction())
 	{
-		DEBUG_LOG(TEXT("HandleOnDamagedResolved: Poise broken, Poise=%.1f"), BaseAttributeSet->GetPoise());
-
-		//HitReaction Ability 활성화
 		if (AbilityHitReactionTag.IsValid())
 		{
 			TArray<FGameplayAbilitySpec*> HitReactionSpecs;
@@ -233,23 +316,16 @@ void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, c
 
 			if (HitReactionSpecs.Num() > 0)
 			{
-				FGameplayAbilitySpec* HitReactionSpec = HitReactionSpecs[0];
-
-				//EventData 준비
 				FGameplayEventData EventData;
 				PrepareHitReactionEventData(EventData, FinalAttackData);
 
-				FGameplayAbilityActorInfo* ActorInfo = const_cast<FGameplayAbilityActorInfo*>(AbilityActorInfo.Get());
-				if (ActorInfo && HitReactionSpec)
+				if (TryActivateAbilityWithEventData(HitReactionSpecs[0]->Handle, &EventData))
 				{
-					TriggerAbilityFromGameplayEvent(
-						HitReactionSpec->Handle,
-						ActorInfo,
-						AbilityHitReactionTag,
-						&EventData,
-						*this
-					);
-					DEBUG_LOG(TEXT("HitReaction Ability activated with Poise=%.1f"), EventData.EventMagnitude);
+					DEBUG_LOG(TEXT("HitReaction activated with EffectivePoise=%.1f"), EventData.EventMagnitude);
+				}
+				else
+				{
+					DEBUG_LOG(TEXT("HitReaction activation failed"));
 				}
 			}
 			else
@@ -260,13 +336,37 @@ void UBaseAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, c
 	}
 }
 
+bool UBaseAbilitySystemComponent::ShouldActivateHitReaction() const
+{
+	//포이즈 브레이크 체크 (LastEffectivePoise는 클램프되지 않은 실제 잔량)
+	return LastEffectivePoise <= 0.0f;
+}
+
 void UBaseAbilitySystemComponent::PrepareHitReactionEventData(FGameplayEventData& OutEventData, const FFinalAttackData& FinalAttackData)
+{
+	//LastEffectivePoise는 OldPoise - PoiseDamage 값으로, 음수일수록 초과된 포이즈 대미지가 커서 강한 리액션
+	OutEventData.EventMagnitude = LastEffectivePoise;
+	OutEventData.EventTag = AbilityHitReactionTag;
+}
+
+void UBaseAbilitySystemComponent::ResetBreakGauges()
 {
 	UAttributeSet* AttributeSet = const_cast<UAttributeSet*>(GetAttributeSet(UBaseAttributeSet::StaticClass()));
 	UBaseAttributeSet* BaseAttributeSet = Cast<UBaseAttributeSet>(AttributeSet);
-	if (BaseAttributeSet)
+	if (!BaseAttributeSet)
 	{
-		OutEventData.EventMagnitude = BaseAttributeSet->GetPoise(); // 음수값
-		OutEventData.EventTag = AbilityHitReactionTag;
+		LastEffectivePoise = TNumericLimits<float>::Max();
+		return;
 	}
+
+	//포이즈 브레이크가 발생한 경우에만 실제 Poise attribute를 최대치로 복원
+	if (LastEffectivePoise <= 0.0f)
+	{
+		BaseAttributeSet->SetPoise(BaseAttributeSet->GetMaxPoise());
+		DEBUG_LOG(TEXT("ResetBreakGauges: Poise reset to %.1f (EffectivePoise=%.1f)"),
+			BaseAttributeSet->GetMaxPoise(), LastEffectivePoise);
+	}
+
+	//다음 피격을 위해 유효 포이즈 잔량 초기화
+	LastEffectivePoise = TNumericLimits<float>::Max();
 }

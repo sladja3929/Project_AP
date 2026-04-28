@@ -6,6 +6,7 @@
 
 class AActor;
 class AEnemyAIController;
+class AEnemyCharacter;
 
 /**
  * Evaluator Instance Data
@@ -18,11 +19,13 @@ struct ACTIONPRACTICE_API FUpdateTargetInfoEvaluatorInstanceData
 {
 	GENERATED_BODY()
 
+	//Context: EnemyAIController
 	UPROPERTY(EditAnywhere, Category = "Context")
-	TObjectPtr<AActor> SourceActor = nullptr;
+	TObjectPtr<AEnemyAIController> EnemyAIController = nullptr;
 
+	//Context: EnemyCharacter
 	UPROPERTY(EditAnywhere, Category = "Context")
-	TObjectPtr<AEnemyAIController> AIController = nullptr;
+	TObjectPtr<AEnemyCharacter> EnemyCharacter = nullptr;
 
 	//Output: 타겟 액터
 	UPROPERTY(EditAnywhere, Category = "Output")

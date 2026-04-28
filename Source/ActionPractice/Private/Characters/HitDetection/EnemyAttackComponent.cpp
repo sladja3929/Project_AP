@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Characters/HitDetection/EnemyAttackComponent.h"
-#include "Characters/BossCharacter.h"
+#include "Characters/EnemyCharacter.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
 #include "Items/AttackData.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -19,11 +19,12 @@
 
 UEnemyAttackComponent::UEnemyAttackComponent()
 {
+	DebugOwnerLabel = TEXT("Enemy");
 }
 
 void UEnemyAttackComponent::BeginPlay()
 {
-	OwnerEnemy = Cast<ABossCharacter>(GetOwner());
+	OwnerEnemy = Cast<AEnemyCharacter>(GetOwner());
 	if (!OwnerEnemy)
 	{
 		DEBUG_LOG(TEXT("EnemyAttackComponent: Owner is not an Enemy!"));
@@ -39,7 +40,7 @@ void UEnemyAttackComponent::BeginPlay()
 		BuildSocketConfigs(EnemyData->HitSocketInfo);
 	}
 
-	//디버그용 2번 키 바인딩 (1번은 Weapon이 사용)
+	//디버그용 2번 키 바인딩
 	if (GetWorld())
 	{
 		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
@@ -65,10 +66,10 @@ UAbilitySystemComponent* UEnemyAttackComponent::GetOwnerASC() const
 }
 
 #pragma region "Trace Config Functions"
-bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 ComboIndex)
+bool UEnemyAttackComponent::LoadTraceConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex)
 {
-	DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig: AttackName=%s, ComboIndex=%d"),
-		*AttackName.ToString(), ComboIndex);
+	DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig: AttackTags=%s, ComboIndex=%d"),
+		*AttackTags.ToStringSimple(), ComboIndex);
 
 	if (!OwnerEnemy)
 	{
@@ -84,7 +85,7 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 Combo
 		return false;
 	}
 
-	const FNamedAttackData* AttackData = EnemyData->NamedAttackData.Find(AttackName);
+	const FEnemyTaggedAttackData* AttackData = EnemyData->GetAttackDataByTags(AttackTags);
 	if (!AttackData || AttackData->ComboSequence.Num() == 0)
 	{
 		DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig FAILED"));
@@ -93,7 +94,7 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 Combo
 
 	//콤보 인덱스 유효성 검사
 	ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboSequence.Num() - 1);
-	const FAttackStats& AttackInfo = AttackData->ComboSequence[ComboIndex].AttackData;
+	const FAttackStats& AttackInfo = AttackData->ComboSequence[ComboIndex].ComboData.AttackData;
 
 	UsingHitSocketGroups.Empty();
 
@@ -119,6 +120,7 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FName& AttackName, int32 Combo
 	CurrentAttackData.FinalDamage = EnemyData->BaseDamage * AttackInfo.DamageMultiplier;
 	CurrentAttackData.PoiseDamage = AttackInfo.PoiseDamage;
 	CurrentAttackData.DamageType = AttackInfo.DamageType;
+	CurrentAttackData.bUnparriable = AttackInfo.bUnparriable;
 
 	DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig SUCCESS (UsingSocketGroups=%d)"),
 		UsingHitSocketGroups.Num());

@@ -211,6 +211,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DebugTrace")
 	bool bDrawDebugTrace = false;
 
+	FString DebugOwnerLabel = TEXT("Unknown");
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DebugTrace")
 	float DebugTraceDuration = 4.0f;
 

@@ -15,6 +15,16 @@ enum class EAttackDamageType : uint8
 	Pierce UMETA(DisplayName = "Pierce")
 };
 
+//DA 레벨 공격 유형 분류 (에디터 조건부 필드 노출용)
+UENUM(BlueprintType)
+enum class EComboAttackType : uint8
+{
+	Normal UMETA(DisplayName = "Normal"),
+	Charge UMETA(DisplayName = "Charge"),
+	Lunge  UMETA(DisplayName = "Lunge"),
+	//향후 Projectile 등 확장
+};
+
 //개별 공격에서 사용할 소켓 설정 (소켓 이름 + Radius)
 USTRUCT(BlueprintType)
 struct FAttackSocketConfig
@@ -48,6 +58,10 @@ struct FAttackStats
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack")
 	float StaminaCost = 10.0f;
+
+	//패리 불가 공격 여부
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack")
+	bool bUnparriable = false;
 	//필요에 따라 경직도, 사운드, 파티클 이펙트 등의 데이터를 여기에 추가
 };
 
@@ -83,6 +97,10 @@ struct FFinalAttackData
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack")
 	float PoiseDamage = 10.0f;
+
+	//패리 불가 공격 여부
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack")
+	bool bUnparriable = false;
 };
 
 //Hit Detection 소켓 정보

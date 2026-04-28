@@ -4,6 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "GAS/AttributeSet/BaseAttributeSet.h"
 #include "StateTreeExecutionContext.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -18,7 +19,7 @@ void FHealthRateEvaluator::TreeStart(FStateTreeExecutionContext& Context) const
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
-	if (!InstanceData.AbilitySystemComponent)
+	if (!InstanceData.EnemyAbilitySystemComponent)
 	{
 		DEBUG_LOG(TEXT("AbilitySystemComponent is not valid in HealthRateEvaluator"));
 	}
@@ -48,13 +49,13 @@ void FHealthRateEvaluator::UpdateHealthRate(FStateTreeExecutionContext& Context)
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
-	if (!InstanceData.AbilitySystemComponent)
+	if (!InstanceData.EnemyAbilitySystemComponent)
 	{
 		InstanceData.HealthRate = 1.0f;
 		return;
 	}
 
-	const UBaseAttributeSet* AttributeSet = InstanceData.AbilitySystemComponent->GetSet<UBaseAttributeSet>();
+	const UBaseAttributeSet* AttributeSet = InstanceData.EnemyAbilitySystemComponent->GetSet<UBaseAttributeSet>();
 	if (!AttributeSet)
 	{
 		DEBUG_LOG(TEXT("BaseAttributeSet is not valid in HealthRateEvaluator"));

@@ -273,7 +273,11 @@ void UChargeAttackAbility::OnEventInputByBuffer(FGameplayEventData Payload)
 
 void UChargeAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& HitResult, FFinalAttackData AttackData)
 {
-    if (bMaxCharged) AttackData.FinalDamage *= 1.5f;
+    if (bMaxCharged)
+    {
+        AttackData.FinalDamage *= 1.5f;
+        AttackData.PoiseDamage *= 1.7f;
+    }
     
     Super::OnHitDetected(HitActor, HitResult, AttackData);
 }

@@ -31,17 +31,21 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnASCInitialized, UBaseAbilitySystemComponent*);
 	FOnASCInitialized OnASCInitialized;
 
+	//EventData를 포함하여 어빌리티 활성화 시도
+	//TryActivateAbility와 동일하되 TriggerEventData를 전달
+	bool TryActivateAbilityWithEventData(FGameplayAbilitySpecHandle AbilityToActivate, const FGameplayEventData* TriggerEventData);
+
 	//기본 GE 생성 헬퍼
 	UFUNCTION(BlueprintCallable, Category = "Ability|GameplayEffect")
 	FGameplayEffectSpecHandle CreateGameplayEffectSpec(TSubclassOf<UGameplayEffect> GameplayEffectClass, float Level, UObject* SourceObject = nullptr);
 
-	//공격 GE 생성
-	UFUNCTION(BlueprintCallable, Category = "Ability|GameplayEffect")
+	//공격 GE 생성 (C++ 전용 — FHitResult 포인터 파라미터로 UFUNCTION 불가)
 	FGameplayEffectSpecHandle CreateAttackGameplayEffectSpec(
 		TSubclassOf<UGameplayEffect> GameplayEffectClass,
 		float Level,
 		UObject* SourceObject,
-		const FFinalAttackData& FinalAttackData
+		const FFinalAttackData& FinalAttackData,
+		const FHitResult* HitResult = nullptr
 	);
 
 	//SetByCaller 설정
@@ -51,7 +55,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ability|GameplayEffect")
 	void SetSpecSetByCallerMagnitudes(FGameplayEffectSpecHandle& SpecHandle, const TMap<FGameplayTag, float>& Magnitudes);
 
+	//===== Death =====
+	//Health <= 0 시 HandleOnDamagedResolved에서 호출되는 공통 진입점
+	//파생 ASC에서 오버라이드하여 플레이어/보스 각자의 죽음 처리를 분기
+	virtual void HandleDeath();
+
+	//리스폰 후 다시 사망 가능 상태로 복구
+	void ResetDeathHandled();
+
+	//사망 처리 완료 여부 조회
+	bool IsDeathHandled() const { return bDeathHandled; }
+
 	//===== Defense Policy Interface =====
+
+	//PostGameplayEffectExecute에서 호출 — Cue용 EffectContext 캐싱
+	void CacheDamageEffectContext(const FGameplayEffectContextHandle& InContext);
+
 	UFUNCTION()
 	virtual void OnDamaged(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
 
@@ -72,12 +91,44 @@ protected:
 
 	FGameplayTag AbilityHitReactionTag;
 
+	//죽음 중복 진입 방지 가드
+	bool bDeathHandled = false;
+
+	//Impact Cue 수동 발동용 — PostGameplayEffectExecute에서 캐싱, ExecuteImpactCue에서 소비
+	FGameplayEffectContextHandle CachedDamageContext;
+
+	//Impact Cue 태그
+	FGameplayTag GameplayCueImpactTag;
+
+	//이번 피격의 유효 포이즈 잔량 (= OldPoise - PoiseDamage, 클램프 없음)
+	//실제 Poise attribute는 [0, Max]로 클램프되므로, 리액션 강도(음수 크기) 판정을 위해 별도 보관
+	//가드 성공처럼 Poise를 실제로 깎지 않는 경우에도 이 값은 갱신되어 리액션 레벨 산출에 사용됨
+	//각 피격 파이프라인 종료 시 ResetBreakGauges에서 초기값으로 리셋됨
+	float LastEffectivePoise = TNumericLimits<float>::Max();
+
 #pragma endregion
 
 #pragma region "Protected Functions"
 
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	//HitReaction을 활성화할지 여부 (포이즈 브레이크 체크)
+	//파생 클래스에서 오버라이드하여 추가 조건을 포함할 수 있음
+	virtual bool ShouldActivateHitReaction() const;
+
+	//브레이크 게이지 리셋 (Poise 등)
+	//HandleOnDamagedResolved에서 음수값이 사용된 후 호출
+	//파생 클래스에서 오버라이드하여 추가 게이지(Stance 등) 리셋 가능
+	virtual void ResetBreakGauges();
+
+	//판정 결과 확정 후 Impact Cue 수동 발동
+	//파생 클래스에서 GetDefenseResult를 오버라이드하여 결과를 전달
+	virtual void ExecuteImpactCue(const FFinalAttackData& FinalAttackData);
+
+	//현재 프레임의 방어 판정 결과를 반환
+	//기본: EDefenseResult::None (일반 피격)
+	virtual EDefenseResult GetDefenseResult() const;
 
 #pragma endregion
 

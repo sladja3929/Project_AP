@@ -12,8 +12,9 @@ class UWeaponCCDComponent;
 class AActionPracticeCharacter;
 class UWeaponDataAsset;
 class UStaticMeshComponent;
+class USkeletalMeshComponent;
 class UPrimitiveComponent;
-class UWeaponAttackComponent;  
+class UWeaponAttackComponent;
 struct FGameplayTag;
 struct FBlockActionData;
 struct FTaggedAttackData;
@@ -58,9 +59,12 @@ public:
 	// ==================
 
 	void CalculateCalculatedDamage();
-	
+
+	//one-handed grip 장착: CharacterMesh의 HandSocketName에 붙인 뒤 grip_oh_socket 기준으로 정렬
+	void AttachToCharacterHandByGripSocket(USkeletalMeshComponent* CharacterMesh, const FName HandSocketName);
+
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
-	virtual void EquipWeapon();	
+	virtual void EquipWeapon();
 
 	UFUNCTION()
 	void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
@@ -114,9 +118,12 @@ protected:
 private:
 #pragma region "Private Variables"
 
+	//WeaponMesh의 one-handed grip 소켓 이름
+	static const FName GripSocketName;
+
 	UPROPERTY()
 	TObjectPtr<AActionPracticeCharacter> OwnerCharacter;
-	
+
 #pragma endregion
 
 #pragma region "Private Functions"

@@ -1,4 +1,8 @@
 #include "Public/Characters/ActionPracticeCharacter.h"
+#include "Characters/LockOnComponent.h"
+#include "Characters/WeaponManagerComponent.h"
+#include "Characters/ItemManagerComponent.h"
+#include "Public/Games/ActionPracticePlayerController.h"
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -14,9 +18,9 @@
 #include "GameplayAbilities/Public/Abilities/GameplayAbility.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "Input/InputBufferComponent.h"
+#include "Characters/InteractionComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
-#include "UI/PlayerStatsWidget.h"
 #include "Input/InputActionDataAsset.h"
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
@@ -56,6 +60,10 @@ AActionPracticeCharacter::AActionPracticeCharacter()
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
+	//Collision Settings
+	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Pawn"));
+	GetMesh()->SetCollisionProfileName(TEXT("HitDetectionPhysics"));
+	
 	//Camera Boom Settings
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -69,6 +77,18 @@ AActionPracticeCharacter::AActionPracticeCharacter()
 
 	//Input Buffer Component Settings
 	InputBufferComponent = CreateDefaultSubobject<UInputBufferComponent>(TEXT("InputBufferComponent"));
+
+	//LockOn Component Settings
+	LockOnComponent = CreateDefaultSubobject<ULockOnComponent>(TEXT("LockOnComponent"));
+
+	//WeaponManager Component Settings
+	WeaponManagerComponent = CreateDefaultSubobject<UWeaponManagerComponent>(TEXT("WeaponManagerComponent"));
+
+	//ItemManager Component Settings
+	ItemManagerComponent = CreateDefaultSubobject<UItemManagerComponent>(TEXT("ItemManagerComponent"));
+
+	//InteractionComponent Settings
+	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
 
 	//GAS Settings
 	CreateAbilitySystemComponent();
@@ -87,7 +107,10 @@ void AActionPracticeCharacter::BeginPlay()
 	AbilityAttackTag = UGameplayTagsSubsystem::GetAbilityAttackTag();
 	EventActionAttackInputTag = UGameplayTagsSubsystem::GetEventActionAttackInputTag();
 	EventActionCancelAttackTag = UGameplayTagsSubsystem::GetEventActionCancelAttackTag();
-	
+	StateCanMoveTag = UGameplayTagsSubsystem::GetStateCanMoveTag();
+	StateCantMoveTag = UGameplayTagsSubsystem::GetStateCantMoveTag();
+	StateUndetectableTag = UGameplayTagsSubsystem::GetStateUndetectableTag();
+
 	if (!StateRecoveringLocalTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("StateRecoveringTag is not valid"));
@@ -119,149 +142,58 @@ void AActionPracticeCharacter::BeginPlay()
 	
 	//InitializeAbilitySystem();
 
-	EquipWeapon(RightWeaponClass, false, false);
-	EquipWeapon(LeftWeaponClass, true, false);
-
-	if (PlayerStatsWidgetClass)
-	{
-		APlayerController* PC = Cast<APlayerController>(GetController());
-		if (PC)
-		{
-			PlayerStatsWidget = CreateWidget<UPlayerStatsWidget>(PC, PlayerStatsWidgetClass);
-			if (PlayerStatsWidget)
-			{
-				PlayerStatsWidget->AddToViewport();
-				
-				//AttributeSet 연결
-				if (AttributeSet)
-				{
-					PlayerStatsWidget->SetAttributeSet(GetAttributeSet());
-					DEBUG_LOG(TEXT("PlayerStatsWidget created and AttributeSet connected"));
-				}
-				else
-				{
-					DEBUG_LOG(TEXT("AttributeSet is nullptr!"));
-				}
-			}
-		}
-		else
-		{
-			DEBUG_LOG(TEXT("PlayerController is nullptr!"));
-		}
-	}
-	else
-	{
-		DEBUG_LOG(TEXT("PlayerStatsWidgetClass is not set!"));
-	}
-
 	TryAutoActivateAttackSequenceAbility();
 }
 
 void AActionPracticeCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	UpdateLockOnCamera();
 }
 
 void AActionPracticeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
-		// ===== Basic Input Actions (Direct Function Binding) =====
-		if (IA_Move)
-		{
-			EnhancedInputComponent->BindAction(IA_Move, ETriggerEvent::Triggered, this, &AActionPracticeCharacter::Move);
-		}
-        
-		if (IA_Look)
-		{
-			EnhancedInputComponent->BindAction(IA_Look, ETriggerEvent::Triggered, this, &AActionPracticeCharacter::Look);
-		}
-
-		if(IA_LockOn)
-		{
-			EnhancedInputComponent->BindAction(IA_LockOn, ETriggerEvent::Started, this, &AActionPracticeCharacter::ToggleLockOn);
-		}
-
-		if(IA_WeaponSwitch)
-		{
-			EnhancedInputComponent->BindAction(IA_WeaponSwitch, ETriggerEvent::Started, this, &AActionPracticeCharacter::WeaponSwitch);
-		}
-
-		// ===== GAS Ability Input Actions =====
-		// Jump
-		if (IA_Jump)
-		{
-			EnhancedInputComponent->BindAction(IA_Jump, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnJumpInput);
-		}
-        
-		// Sprint (Hold)
-		if (IA_Sprint)
-		{
-			EnhancedInputComponent->BindAction(IA_Sprint, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnSprintInput);
-			EnhancedInputComponent->BindAction(IA_Sprint, ETriggerEvent::Completed, this, &AActionPracticeCharacter::OnSprintInputReleased);
-		}
-        
-		// Crouch
-		if (IA_Crouch)
-		{
-			EnhancedInputComponent->BindAction(IA_Crouch, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnCrouchInput);
-		}
-        
-		// Roll
-		if (IA_Roll)
-		{
-			EnhancedInputComponent->BindAction(IA_Roll, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnRollInput);
-		}
-        
-		// Attack
-		if (IA_Attack)
-		{
-			EnhancedInputComponent->BindAction(IA_Attack, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnAttackInput);
-		}
-
-		//Hold
-		if (IA_ChargeAttack)
-		{
-			EnhancedInputComponent->BindAction(IA_ChargeAttack, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnChargeAttackInput);
-			EnhancedInputComponent->BindAction(IA_ChargeAttack, ETriggerEvent::Completed, this, &AActionPracticeCharacter::OnChargeAttackReleased);
-		}
-		
-		// Block (Hold)
-		if (IA_Block)
-		{
-			EnhancedInputComponent->BindAction(IA_Block, ETriggerEvent::Started, this, &AActionPracticeCharacter::OnBlockInput);
-			EnhancedInputComponent->BindAction(IA_Block, ETriggerEvent::Completed, this, &AActionPracticeCharacter::OnBlockInputReleased);
-		}
-    }
+	// 입력 바인딩은 AActionPracticePlayerController::SetupInputComponent 에서 처리
 }
 
 #pragma region "Move Functions"
-void AActionPracticeCharacter::Move(const FInputActionValue& Value)
+void AActionPracticeCharacter::ExecuteMove(const FVector2D& MovementVector)
 {
-	const FVector2D MovementVector = Value.Get<FVector2D>();
-
 	//리커버리가 끝나면 어빌리티 중단
 	if (MovementVector.Size() > 0.1f)
 	{
 		CancelActionForMove();
 	}
 
-	bool bIsRecovering = AbilitySystemComponent->HasMatchingGameplayTag(StateRecoveringLocalTag);
+	//CantMove 태그가 있으면 무조건 이동 차단
+	if (AbilitySystemComponent->HasMatchingGameplayTag(StateCantMoveTag))
+	{
+		return;
+	}
 
-	if (Controller != nullptr && !bIsRecovering)
+	bool bIsRecovering = AbilitySystemComponent->HasMatchingGameplayTag(StateRecoveringLocalTag);
+	bool bCanMoveDuringRecovery = AbilitySystemComponent->HasMatchingGameplayTag(StateCanMoveTag);
+
+	//리커버리 중이고 CanMove가 없으면 이동 차단 (기존 동작)
+	if (bIsRecovering && !bCanMoveDuringRecovery)
+	{
+		return;
+	}
+
+	//이동 입력 스케일 결정 (리커버리 + CanMove면 감속)
+	float MoveScale = (bIsRecovering && bCanMoveDuringRecovery) ? RecoveryMoveSpeedMultiplier : 1.0f;
+
+	if (Controller != nullptr)
 	{
 		bool bIgnoreLockOnState = AbilitySystemComponent->HasMatchingGameplayTag(StateAbilitySprintingTag)
 			|| AbilitySystemComponent->HasMatchingGameplayTag(StateAbilityRollingTag);
 
 		//락온 상태에서 걸을 때: Strafe 이동 (Sprint, Roll 중에는 제외)
-		if(!bIgnoreLockOnState && bIsLockOn && LockedOnTarget)
+		if (!bIgnoreLockOnState && LockOnComponent->IsLockedOn() && LockOnComponent->GetLockOnTarget())
 		{
 			//Strafe 이동 설정: CMC가 ControlRotation을 따르도록 설정
-			SetRotationMode(false, true);
+			LockOnComponent->SetRotationMode(false, true);
 
-			const FVector TargetLocation = LockedOnTarget->GetActorLocation();
+			const FVector TargetLocation = LockOnComponent->GetLockOnTarget()->GetActorLocation();
 			const FVector CharacterLocation = GetActorLocation();
 
 			//타겟 방향 계산
@@ -272,21 +204,21 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 			//타겟을 기준으로 한 이동 방향 계산
 			const FRotator TargetRotation = DirectionToTarget.Rotation();
 			const FVector RightDirection = FRotationMatrix(TargetRotation).GetUnitAxis(EAxis::Y);
-			const FVector BackwardDirection = -DirectionToTarget; // 타겟 반대 방향
+			const FVector BackwardDirection = -DirectionToTarget; //타겟 반대 방향
 
 			//Strafe 이동
-			AddMovementInput(RightDirection, MovementVector.X);
+			AddMovementInput(RightDirection, MovementVector.X * MoveScale);
 
 			//전후 이동
-			AddMovementInput(BackwardDirection, -MovementVector.Y);
+			AddMovementInput(BackwardDirection, -MovementVector.Y * MoveScale);
 
-			//회전은 CMC가 ControlRotation 기반으로 처리 (UpdateLockOnCamera에서 설정)
+			//회전은 CMC가 ControlRotation 기반으로 처리 (Controller의 UpdateLockOnCamera에서 설정)
 		}
 
 		else //일반적인 회전 이동 (락온 없음 or 락온+달리기)
 		{
 			//일반 회전 이동 설정
-			SetRotationMode(true, false);
+			LockOnComponent->SetRotationMode(true, false);
 
 			const FRotator Rotation = Controller->GetControlRotation();
 			const FRotator YawRotation(0, Rotation.Yaw, 0);
@@ -294,22 +226,26 @@ void AActionPracticeCharacter::Move(const FInputActionValue& Value)
 			const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 			const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-			AddMovementInput(ForwardDirection, MovementVector.Y);
-			AddMovementInput(RightDirection, MovementVector.X);
+			AddMovementInput(ForwardDirection, MovementVector.Y * MoveScale);
+			AddMovementInput(RightDirection, MovementVector.X * MoveScale);
 		}
 	}
 }
 
 FVector2D AActionPracticeCharacter::GetCurrentMovementInput() const
 {
-	APlayerController* PC = GetController<APlayerController>();
-	if (PC && IA_Move)
+	// 로컬 입력은 로컬 컨트롤 폰에서만 유효 (데디케이티드 서버·시뮬레이티드 프록시는 ZeroVector)
+	if (!IsLocallyControlled()) return FVector2D::ZeroVector;
+
+	AActionPracticePlayerController* PC = GetController<AActionPracticePlayerController>();
+	UInputAction* MoveAction = PC ? PC->GetIA_Move() : nullptr;
+	if (PC && MoveAction)
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = 
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
 			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
 		{
 			//특정 액션의 현재 값 조회
-			FInputActionValue ActionValue = Subsystem->GetPlayerInput()->GetActionValue(IA_Move);
+			FInputActionValue ActionValue = Subsystem->GetPlayerInput()->GetActionValue(MoveAction);
 			return ActionValue.Get<FVector2D>();
 		}
 	}
@@ -318,14 +254,18 @@ FVector2D AActionPracticeCharacter::GetCurrentMovementInput() const
 
 bool AActionPracticeCharacter::IsBlockInputPressed() const
 {
-	APlayerController* PC = GetController<APlayerController>();
-	if (PC && IA_Block)
+	// 로컬 입력은 로컬 컨트롤 폰에서만 유효 (데디케이티드 서버·시뮬레이티드 프록시는 false)
+	if (!IsLocallyControlled()) return false;
+
+	AActionPracticePlayerController* PC = GetController<AActionPracticePlayerController>();
+	UInputAction* BlockAction = PC ? PC->GetIA_Block() : nullptr;
+	if (PC && BlockAction)
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
 			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
 		{
 			// IA_Block 액션의 현재 값 조회
-			FInputActionValue ActionValue = Subsystem->GetPlayerInput()->GetActionValue(IA_Block);
+			FInputActionValue ActionValue = Subsystem->GetPlayerInput()->GetActionValue(BlockAction);
 			return ActionValue.Get<bool>();
 		}
 	}
@@ -337,13 +277,14 @@ void AActionPracticeCharacter::RotateCharacterToInputDirection(float RotateTime,
 	float DesiredYaw = 0.0f;
 
 	//락온 상태면 락온 대상 방향으로
-	if (!bIgnoreLockOn && bIsLockOn)
+	if (!bIgnoreLockOn && LockOnComponent->IsLockedOn())
 	{
-		if (!LockedOnTarget) return;
+		AActor* LockTarget = LockOnComponent->GetLockOnTarget();
+		if (!LockTarget) return;
 		DEBUG_LOG(TEXT("APCharacter - Rotate Character To Lock On Target"));
-		
+
 		//락온 타겟 방향으로 Yaw 계산
-		const FVector DirectionToTarget = (LockedOnTarget->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+		const FVector DirectionToTarget = (LockTarget->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 		DesiredYaw = DirectionToTarget.Rotation().Yaw;
 	}
 	
@@ -368,49 +309,26 @@ void AActionPracticeCharacter::RotateCharacterToInputDirection(float RotateTime,
 	}
 }
 
+void AActionPracticeCharacter::RotateToTargetPosition(const FVector& TargetPosition, float RotationTime)
+{
+	const FVector Direction = (TargetPosition - GetActorLocation()).GetSafeNormal2D();
+	if (Direction.IsNearlyZero()) return;
+
+	const float DesiredYaw = Direction.Rotation().Yaw;
+	const FRotator TargetRotation(0.0f, DesiredYaw, 0.0f);
+
+	RotateToRotation(TargetRotation, RotationTime);
+
+	if (!HasAuthority())
+	{
+		Server_RequestRotateToYaw(DesiredYaw, RotationTime);
+	}
+}
+
 void AActionPracticeCharacter::Server_RequestRotateToYaw_Implementation(float TargetYaw, float RotateTime)
 {
 	const FRotator TargetRotation(0.0f, TargetYaw, 0.0f);
 	RotateToRotation(TargetRotation, RotateTime);
-}
-
-void AActionPracticeCharacter::ServerSetLockOnState_Implementation(bool bNewLockOn, AActor* NewTarget)
-{
-	bIsLockOn = bNewLockOn;
-	LockedOnTarget = NewTarget;
-
-	DEBUG_LOG(TEXT("Server: Lock-On State Updated - bIsLockOn: %s, Target: %s"),
-		bNewLockOn ? TEXT("true") : TEXT("false"),
-		NewTarget ? *NewTarget->GetName() : TEXT("None"));
-}
-
-void AActionPracticeCharacter::ServerSetRotationMode_Implementation(bool bOrientToMovement, bool bUseControllerDesired)
-{
-	GetCharacterMovement()->bOrientRotationToMovement = bOrientToMovement;
-	GetCharacterMovement()->bUseControllerDesiredRotation = bUseControllerDesired;
-
-	DEBUG_LOG(TEXT("Server: RotationMode Updated - OrientToMovement: %s, UseControllerDesired: %s"),
-		bOrientToMovement ? TEXT("true") : TEXT("false"),
-		bUseControllerDesired ? TEXT("true") : TEXT("false"));
-}
-
-void AActionPracticeCharacter::SetRotationMode(bool bOrientToMovement, bool bUseControllerDesired)
-{
-	//로컬 적용
-	GetCharacterMovement()->bOrientRotationToMovement = bOrientToMovement;
-	GetCharacterMovement()->bUseControllerDesiredRotation = bUseControllerDesired;
-
-	//값이 바뀌었을 때만 서버 RPC
-	if (bCachedOrientToMovement != bOrientToMovement || bCachedUseControllerDesired != bUseControllerDesired)
-	{
-		bCachedOrientToMovement = bOrientToMovement;
-		bCachedUseControllerDesired = bUseControllerDesired;
-
-		if (!HasAuthority())
-		{
-			ServerSetRotationMode(bOrientToMovement, bUseControllerDesired);
-		}
-	}
 }
 
 bool AActionPracticeCharacter::CalculateYawFromMovementInput(float& OutYaw) const
@@ -467,106 +385,12 @@ void AActionPracticeCharacter::CancelActionForMove()
 #pragma endregion
 
 #pragma region "Look Functions"
-void AActionPracticeCharacter::Look(const FInputActionValue& Value)
+void AActionPracticeCharacter::ExecuteLook(const FVector2D& LookAxisVector)
 {
-	if (Controller == nullptr) return;
-	if(bIsLockOn && LockedOnTarget) return;
-	
-	const FVector2D LookAxisVector = Value.Get<FVector2D>();
-	
+	if (LockOnComponent->IsLockedOn() && LockOnComponent->GetLockOnTarget()) return;
+
 	AddControllerYawInput(LookAxisVector.X);
 	AddControllerPitchInput(LookAxisVector.Y);
-}
-
-void AActionPracticeCharacter::ToggleLockOn()
-{
-	if (bIsLockOn)
-	{
-		bIsLockOn = false;
-		LockedOnTarget = nullptr;
-
-		//일반 이동 회전으로 복원
-		SetRotationMode(true, false);
-
-		//서버에 락온 해제 동기화
-		if (!HasAuthority())
-		{
-			ServerSetLockOnState(false, nullptr);
-		}
-
-		if (CameraBoom)
-		{
-			//필요하면 카메라 설정 복원
-		}
-
-		DEBUG_LOG(TEXT("Lock-On Released"));
-	}
-	else
-	{
-		AActor* NearestTarget = FindNearestTarget();
-		if (NearestTarget)
-		{
-			bIsLockOn = true;
-			LockedOnTarget = NearestTarget;
-
-			//락온 회전: CMC가 ControlRotation을 따르도록 설정
-			SetRotationMode(false, true);
-
-			//서버에 락온 동기화
-			if (!HasAuthority())
-			{
-				ServerSetLockOnState(true, NearestTarget);
-			}
-
-			DEBUG_LOG(TEXT("Lock-On Target: %s"), *NearestTarget->GetName());
-		}
-		else
-		{
-			DEBUG_LOG(TEXT("No valid target found for Lock-On"));
-		}
-	}
-}
-
-AActor* AActionPracticeCharacter::FindNearestTarget()
-{
-	TArray<AActor*> FoundTargets;
-	UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName("Enemy"), FoundTargets);
-    
-	AActor* NearestTarget = nullptr;
-	float NearestDistance = FLT_MAX;
-    
-	for (AActor* PotentialTarget : FoundTargets)
-	{
-		float Distance = FVector::Dist(GetActorLocation(), PotentialTarget->GetActorLocation());
-		if (Distance < NearestDistance && Distance < 2000.0f)
-		{
-			NearestDistance = Distance;
-			NearestTarget = PotentialTarget;
-		}
-	}
-    
-	return NearestTarget;
-}
-
-void AActionPracticeCharacter::UpdateLockOnCamera()
-{
-    if (bIsLockOn && LockedOnTarget && Controller && CameraBoom)
-    {
-        const FVector TargetLocation = LockedOnTarget->GetActorLocation();
-        const FVector CharacterLocation = GetActorLocation();
-
-    	//중간점을 바라보게 하여 격렬하게 움직일 때 플레이어와 타겟 모두가 잡히게
-        FVector LookAtPoint = (CharacterLocation + TargetLocation) * 0.5f;
-        FRotator LookAtRotation = (LookAtPoint - CharacterLocation).Rotation();
-
-    	//카메라 위아래 회전 각도 제한
-        LookAtRotation.Pitch = FMath::Clamp(LookAtRotation.Pitch, -25.0f, 15.0f);
-    	
-        FRotator CurrentRotation = Controller->GetControlRotation();
-        FRotator SmoothedRotation = FMath::RInterpTo(CurrentRotation, LookAtRotation, GetWorld()->GetDeltaSeconds(), 5.0f);
-    	
-        Controller->SetControlRotation(SmoothedRotation);
-    }
 }
 #pragma endregion
 
@@ -574,154 +398,38 @@ void AActionPracticeCharacter::UpdateLockOnCamera()
 
 TScriptInterface<IHitDetectionInterface> AActionPracticeCharacter::GetHitDetectionInterface() const
 {
-	if (!RightWeapon) return nullptr;
-	return RightWeapon->GetHitDetectionComponent();
+	if (!WeaponManagerComponent) return nullptr;
+	return WeaponManagerComponent->GetHitDetectionInterface();
 }
 
-void AActionPracticeCharacter::WeaponSwitch()
+void AActionPracticeCharacter::ResetAttackSequenceAbility()
 {
-}
+	if (!AbilitySystemComponent) return;
 
-void AActionPracticeCharacter::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, bool bIsLeftHand, bool bIsTwoHanded)
-{
-	//서버에서만 실행 (싱글플레이어에서는 HasAuthority()가 항상 true)
-	if (!HasAuthority())
+	//현재 활성화된 AttackSequenceAbility 취소
+	const FGameplayTag AbilityAttackNormalTag = UGameplayTagsSubsystem::GetAbilityAttackNormalTag();
+
+	for (FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
 	{
-		return;
-	}
+		if (!Spec.Ability) continue;
 
-	if (!NewWeaponClass) return;
-
-	if(bIsTwoHanded) UnequipWeapon(!bIsLeftHand);
-	UnequipWeapon(bIsLeftHand);
-
-	//새 무기 생성
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this;
-	SpawnParams.Instigator = GetInstigator();
-
-	AWeapon* NewWeapon = GetWorld()->SpawnActor<AWeapon>(NewWeaponClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
-    EWeaponEnums type = NewWeapon->GetWeaponType();
-
-	if (NewWeapon && type != EWeaponEnums::None)
-	{
-		FString SocketString = bIsLeftHand ? "hand_l" : "hand_r";
-
-		switch (type)
+		if (Spec.Ability->GetAssetTags().HasTag(AbilityAttackNormalTag))
 		{
-		case EWeaponEnums::StraightSword:
-			SocketString += "_sword";
-			break;
-
-		case EWeaponEnums::GreatSword:
-			SocketString += "_greatsword";
-			break;
-
-		case EWeaponEnums::Shield:
-			SocketString += "_shield";
+			if (Spec.IsActive())
+			{
+				AbilitySystemComponent->CancelAbilityHandle(Spec.Handle);
+				DEBUG_LOG(TEXT("ResetAttackSequenceAbility: Cancelled active AttackSequenceAbility"));
+			}
 			break;
 		}
-
-		FName SocketName = FName(*SocketString);
-		DEBUG_LOG(TEXT("Equiped Weapon: %s"), *SocketString);
-		NewWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
-
-		if(bIsTwoHanded)
-		{
-			LeftWeapon = NewWeapon;
-			RightWeapon = NewWeapon;
-		}
-		else if (bIsLeftHand)
-		{
-			LeftWeapon = NewWeapon;
-		}
-
-		else
-		{
-			RightWeapon = NewWeapon;
-		}
-	}
-}
-
-void AActionPracticeCharacter::UnequipWeapon(bool bIsLeftHand)
-{
-	TObjectPtr<AWeapon>& WeaponToRemove = bIsLeftHand ? LeftWeapon : RightWeapon;
-
-	if (WeaponToRemove)
-	{
-		WeaponToRemove->Destroy();
-		WeaponToRemove = nullptr;
-	}
-}
-
-TSubclassOf<AWeapon> AActionPracticeCharacter::LoadWeaponClassByName(const FString& WeaponName)
-{
-	FString BlueprintPath = FString::Printf(TEXT("%s%s.%s_C"), 
-										   *WeaponBlueprintBasePath, 
-										   *WeaponName, 
-										   *WeaponName);
-	
-	UClass* LoadedClass = LoadClass<AWeapon>(nullptr, *BlueprintPath);
-	
-	if (LoadedClass && LoadedClass->IsChildOf(AWeapon::StaticClass()))
-	{
-		return TSubclassOf<AWeapon>(LoadedClass);
 	}
 
-	DEBUG_LOG(TEXT("Failed to load weapon class from path: %s"), *BlueprintPath);
-	return nullptr;
-}
-#pragma endregion
+	//재활성화 플래그 초기화
+	bAttackSequenceAutoActivated = false;
+	AttackSequenceAutoActivateRetryCount = 0;
 
-#pragma region "GAS Input Functions"
-void AActionPracticeCharacter::OnJumpInput()
-{
-	GASInputPressed(IA_Jump);
-}
-
-void AActionPracticeCharacter::OnSprintInput()
-{
-	GASInputPressed(IA_Sprint);
-}
-
-void AActionPracticeCharacter::OnSprintInputReleased()
-{
-	GASInputReleased(IA_Sprint);
-}
-
-void AActionPracticeCharacter::OnCrouchInput()
-{
-	GASInputPressed(IA_Crouch);
-}
-
-void AActionPracticeCharacter::OnRollInput()
-{
-	GASInputPressed(IA_Roll);
-}
-
-void AActionPracticeCharacter::OnAttackInput()
-{
-	GASInputPressed(IA_Attack);
-}
-
-void AActionPracticeCharacter::OnBlockInput()
-{
-	GASInputPressed(IA_Block);
-}
-
-void AActionPracticeCharacter::OnBlockInputReleased()
-{
-	GASInputReleased(IA_Block);
-}
-
-void AActionPracticeCharacter::OnChargeAttackInput()
-{
-	GASInputPressed(IA_ChargeAttack);
-}
-
-void AActionPracticeCharacter::OnChargeAttackReleased()
-{
-	GASInputReleased(IA_ChargeAttack);
+	//재활성화 시도
+	TryAutoActivateAttackSequenceAbility();
 }
 
 #pragma endregion
@@ -808,7 +516,12 @@ void AActionPracticeCharacter::GASInputPressed(const UInputAction* InputAction)
 			else
 			{
 				Spec->InputPressed = true;
-				bool bSuccess = APASC->TryActivateAbility(Spec->Handle);
+
+				//InputActionTag를 EventData에 담아 전달
+				FGameplayEventData EventData;
+				EventData.InstigatorTags.AddTag(InputActionData->FindTagByInputAction(InputAction));
+
+				bool bSuccess = APASC->TryActivateAbilityWithEventData(Spec->Handle, &EventData);
 				DEBUG_LOG(TEXT("GASInputPressed: TryActivateAbility %s - %s"), bSuccess ? TEXT("SUCCESS") : TEXT("FAILED"), *GetNameSafe(Spec->Ability));
 			}
 		}
@@ -822,17 +535,20 @@ void AActionPracticeCharacter::GASInputReleased(const UInputAction* InputAction)
 	TArray<FGameplayAbilitySpec*> TryActivateSpecs = FindAbilitySpecsWithInputAction(InputAction);
 	if (TryActivateSpecs.IsEmpty()) return;
 
-	//버퍼 ON/OFF와 무관하게, 현재 활성화된 어빌리티가 있으면 릴리즈를 먼저 전달
+	//버퍼 ON/OFF와 무관하게, 현재 활성화된 어빌리티가 있으면 릴리즈를 먼저 전달 
 	for (auto& Spec : TryActivateSpecs)
 	{
+		//활성화 여부와 무관하게 InputPressed 상태 업데이트
+		//비활성 시 놓친 릴리즈를 기록해두지 않으면, 이후 재활성화 시 WaitInputRelease가 발동하지 않음
+		Spec->InputPressed = false;
+
 		if (!Spec->IsActive())
 			continue;
 
-		Spec->InputPressed = false;
 		APASC->AbilitySpecInputReleased(*Spec);
 	}
 
-	//릴리즈 버퍼링
+	//릴리즈 버퍼링 
 	if (InputBufferComponent && InputBufferComponent->bBufferWindowOpened)
 	{
 		DEBUG_LOG(TEXT("Character UnBuffer"));
@@ -874,137 +590,70 @@ TArray<FGameplayAbilitySpec*> AActionPracticeCharacter::FindAbilitySpecsWithInpu
 }
 #pragma endregion
 
+#pragma region "AI Interface"
+bool AActionPracticeCharacter::CanBeSeenFrom(
+	const FVector& ObserverLocation,
+	FVector& OutSeenLocation,
+	int32& NumberOfLoSChecksPerformed,
+	float& OutSightStrength,
+	const AActor* IgnoreActor,
+	const bool* bWasVisible,
+	int32* UserData) const
+{
+	//State.Undetectable 태그 보유 시 AI Sight 감지 차단
+	if (AbilitySystemComponent && StateUndetectableTag.IsValid())
+	{
+		if (AbilitySystemComponent->HasMatchingGameplayTag(StateUndetectableTag))
+		{
+			OutSightStrength = 0.0f;
+			return false;
+		}
+	}
+
+	//기본 동작: 액터 중심 위치를 감지 위치로 반환
+	OutSeenLocation = GetActorLocation();
+	NumberOfLoSChecksPerformed = 0;
+	OutSightStrength = 1.0f;
+	return true;
+}
+#pragma endregion
+
 #pragma region "Replication Functions"
 void AActionPracticeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	DOREPLIFETIME(AActionPracticeCharacter, bIsLockOn);
-	DOREPLIFETIME(AActionPracticeCharacter, LockedOnTarget);
-	DOREPLIFETIME(AActionPracticeCharacter, LeftWeapon);
-	DOREPLIFETIME(AActionPracticeCharacter, RightWeapon);
-}
-
-void AActionPracticeCharacter::OnRep_LeftWeapon()
-{
-	if (LeftWeapon && GetMesh())
-	{
-		//무기 타입에 따라 소켓 이름 결정
-		EWeaponEnums type = LeftWeapon->GetWeaponType();
-		if (type != EWeaponEnums::None)
-		{
-			FString SocketString = "hand_l";
-
-			switch (type)
-			{
-			case EWeaponEnums::StraightSword:
-				SocketString += "_sword";
-				break;
-
-			case EWeaponEnums::GreatSword:
-				SocketString += "_greatsword";
-				break;
-
-			case EWeaponEnums::Shield:
-				SocketString += "_shield";
-				break;
-			}
-
-			FName SocketName = FName(*SocketString);
-			LeftWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
-			DEBUG_LOG(TEXT("OnRep_LeftWeapon: Attached to %s"), *SocketString);
-		}
-	}
-
-	TryAutoActivateAttackSequenceAbility();
-}
-
-void AActionPracticeCharacter::OnRep_RightWeapon()
-{
-	if (RightWeapon && GetMesh())
-	{
-		//무기 타입에 따라 소켓 이름 결정
-		EWeaponEnums type = RightWeapon->GetWeaponType();
-		if (type != EWeaponEnums::None)
-		{
-			FString SocketString = "hand_r";
-
-			switch (type)
-			{
-			case EWeaponEnums::StraightSword:
-				SocketString += "_sword";
-				break;
-
-			case EWeaponEnums::GreatSword:
-				SocketString += "_greatsword";
-				break;
-
-			case EWeaponEnums::Shield:
-				SocketString += "_shield";
-				break;
-			}
-
-			FName SocketName = FName(*SocketString);
-			RightWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
-			DEBUG_LOG(TEXT("OnRep_RightWeapon: Attached to %s"), *SocketString);
-		}
-	}
-
-	TryAutoActivateAttackSequenceAbility();
 }
 
 bool AActionPracticeCharacter::IsAttackSequenceAutoActivateReady() const
 {
-	// 로컬 입력을 처리할 인스턴스에서만(Standalone/ListenHost/AutonomousProxy)
-	if (!IsLocallyControlled())
-	{
-		return false;
-	}
+	if (!IsLocallyControlled()) return false;
+	if (!AbilitySystemComponent) return false;
 
-	// ASC 필요
-	if (!AbilitySystemComponent)
-	{
-		return false;
-	}
-
-	// AttackSequenceAbility는 현재 구현상 RightWeapon 기반(히트디텍션/DA) 의존이 강함
-	if (!RightWeapon)
-	{
-		return false;
-	}
-
-	// WeaponDataAsset 준비 확인 (DA가 없으면 Ability 내부 CacheWeaponData도 실패)
-	if (!RightWeapon->GetWeaponData())
-	{
-		return false;
-	}
-
-	// HitDetection 인터페이스 준비 확인
-	if (!RightWeapon->GetHitDetectionComponent())
-	{
-		return false;
-	}
+	AWeapon* RW = GetRightWeapon();
+	if (!RW) return false;
+	if (!RW->GetWeaponData()) return false;
+	if (!RW->GetHitDetectionComponent()) return false;
 
 	return true;
 }
 
 void AActionPracticeCharacter::TryAutoActivateAttackSequenceAbility()
 {
-	// 이미 성공했으면 중복 시도 방지
+	//이미 성공했으면 중복 시도 방지
 	if (bAttackSequenceAutoActivated)
 	{
 		return;
 	}
 
-	// 준비 안 됐으면 약간 딜레이 후 재시도 (복제/OnRep 타이밍 흡수)
+	//준비 안 됐으면 약간 딜레이 후 재시도 (복제/OnRep 타이밍 흡수)
 	if (!IsAttackSequenceAutoActivateReady())
 	{
-		// 무한 루프 방지 (필요하면 값 조정)
-		constexpr int32 MaxRetry = 120; // 0.05s * 120 = 6초
+		//무한 루프 방지 (필요하면 값 조정)
+		constexpr int32 MaxRetry = 120; //0.05s * 120 = 6초
 		if (AttackSequenceAutoActivateRetryCount++ >= MaxRetry)
 		{
 			DEBUG_LOG(TEXT("AttackSequence auto-activate failed: retry limit reached. RightWeapon=%s"),
-				*GetNameSafe(RightWeapon.Get()));
+				*GetNameSafe(GetRightWeapon()));
 			return;
 		}
 
@@ -1021,7 +670,7 @@ void AActionPracticeCharacter::TryAutoActivateAttackSequenceAbility()
 		return;
 	}
 
-	// 이제부터 실제 활성화 시도
+	//활성화 시도
 	GetWorldTimerManager().ClearTimer(AttackSequenceAutoActivateTimer);
 
 	UAbilitySystemComponent* ASC = AbilitySystemComponent.Get();
@@ -1030,7 +679,7 @@ void AActionPracticeCharacter::TryAutoActivateAttackSequenceAbility()
 		return;
 	}
 
-	// 기존 BeginPlay 로직과 동일한 방식: AssetTags로 AttackSequenceAbility 식별 후 TryActivate
+	//AssetTags로 AttackSequenceAbility 식별 후 TryActivate
 	const FGameplayTag AbilityAttackNormalTag = UGameplayTagsSubsystem::GetAbilityAttackNormalTag();
 	const FGameplayTag AbilityAttackChargeTag = UGameplayTagsSubsystem::GetAbilityAttackChargeTag();
 
@@ -1047,7 +696,7 @@ void AActionPracticeCharacter::TryAutoActivateAttackSequenceAbility()
 			continue;
 		}
 
-		// 이미 활성 상태면 성공 처리
+		//이미 활성 상태면 성공 처리
 		if (Spec.IsActive())
 		{
 			bAttackSequenceAutoActivated = true;

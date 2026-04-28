@@ -5,6 +5,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/Effects/ActionPracticeGameplayEffectContext.h"
+#include "GAS/AbilitySystemComponent/BaseAbilitySystemComponent.h"
 #include "Items/AttackData.h"
 
 #define ENABLE_DEBUG_LOG 0
@@ -213,6 +214,14 @@ void UBaseAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallba
 			{
 				FinalAttackData.DamageType = APContext->GetAttackDamageType();
 				FinalAttackData.PoiseDamage = APContext->GetPoiseDamage();
+				FinalAttackData.bUnparriable = APContext->GetUnparriable();
+			}
+
+			//Impact Cue용 EffectContext 캐싱 (판정 후 수동 발동에 사용)
+			UBaseAbilitySystemComponent* BaseASC = Cast<UBaseAbilitySystemComponent>(&Data.Target);
+			if (BaseASC)
+			{
+				BaseASC->CacheDamageEffectContext(Context);
 			}
 
 			//델리게이트 송신 - IDefensePolicy에서 처리

@@ -16,6 +16,17 @@ bool FActionPracticeGameplayEffectContext::NetSerialize(FArchive& Ar, UPackageMa
 	//PoiseDamage 직렬화
 	Ar << PoiseDamage;
 
+	//DefenseResult 직렬화
+	uint8 DefenseResultValue = static_cast<uint8>(DefenseResult);
+	Ar << DefenseResultValue;
+	if (Ar.IsLoading())
+	{
+		DefenseResult = static_cast<EDefenseResult>(DefenseResultValue);
+	}
+
+	//bUnparriable 직렬화
+	Ar << bUnparriable;
+
 	bOutSuccess = true;
 	return true;
 }
@@ -33,7 +44,7 @@ FGameplayEffectContext* FActionPracticeGameplayEffectContext::Duplicate() const
 
 UScriptStruct* FActionPracticeGameplayEffectContext::GetScriptStruct() const
 {
-	return FGameplayEffectContext::GetScriptStruct();
+	return FActionPracticeGameplayEffectContext::StaticStruct();
 }
 
 FActionPracticeGameplayEffectContext* FActionPracticeGameplayEffectContext::GetActionPracticeEffectContext(FGameplayEffectContextHandle& Handle)

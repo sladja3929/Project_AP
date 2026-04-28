@@ -577,15 +577,14 @@ ECollisionChannel UAttackTraceComponent::GetTraceChannel() const
 {
 	//프로젝트 설정에서 커스텀 채널 사용
 	//DefaultEngine.ini에서 설정 필요
-	return ECC_GameTraceChannel1;  //WeaponTrace 채널
+	return ECC_GameTraceChannel1;  //HitDetection 채널
 }
 
 FCollisionQueryParams UAttackTraceComponent::GetCollisionQueryParams() const
 {
-	FCollisionQueryParams Params(TEXT("AttackTrace"), false);
-
+	FCollisionQueryParams Params(TEXT("HitDetection"), false);
+	Params.bReturnPhysicalMaterial = true;
 	AddIgnoredActors(Params);
-
 	return Params;
 }
 
@@ -624,7 +623,7 @@ void UAttackTraceComponent::ToggleWeaponDebugTrace()
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(100, 2.0f, bDrawDebugTrace ? FColor::Green : FColor::Red,
-			FString::Printf(TEXT("Debug: %s"), bDrawDebugTrace ? TEXT("ON") : TEXT("OFF")));
+			FString::Printf(TEXT("[%s] Attack Draw: %s"), *DebugOwnerLabel, bDrawDebugTrace ? TEXT("ON") : TEXT("OFF")));
 	}
 }
 #pragma endregion

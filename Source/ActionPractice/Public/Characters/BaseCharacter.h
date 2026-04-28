@@ -3,12 +3,12 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
-#include "GameplayEffect.h"
+#include "GAS/AbilitySet/AbilitySetDataAsset.h"
+#include "GAS/CharacterStats/CharacterStatsDataAsset.h"
 #include "BaseCharacter.generated.h"
 
 class UAbilitySystemComponent;
 class UAttributeSet;
-class UGameplayAbility;
 class AWeapon;
 class IHitDetectionInterface;
 struct FGameplayTag;
@@ -53,13 +53,16 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAttributeSet> AttributeSet = nullptr;
 
-	//캐릭터 생성 시 부여할 기본 어빌리티들
+	//캐릭터 생성 시 부여할 AbilitySet 목록
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS")
-	TArray<TSubclassOf<UGameplayAbility>> StartAbilities;
+	TArray<TObjectPtr<UAbilitySetDataAsset>> StartAbilitySetsData;
 
-	//캐릭터 생성 시 적용할 기본 이펙트들
+	//캐릭터 초기 스탯 DA (어트리뷰트 초기값 정의)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS")
-	TArray<TSubclassOf<UGameplayEffect>> StartEffects;
+	TObjectPtr<UCharacterStatsDataAsset> CharacterStatsData;
+
+	//부여된 AbilitySet 핸들 (회수용)
+	TArray<FAbilitySetGrantedHandles> GrantedSetHandles;
 
 	//===== Rotation Variables =====
 	FRotator TargetActionRotation;
@@ -81,11 +84,14 @@ protected:
 
 	virtual void InitializeAbilitySystem();
 
-	UFUNCTION(BlueprintCallable, Category = "GAS")
-	void GiveAbility(TSubclassOf<UGameplayAbility> AbilityClass);
+	//초기 어트리뷰트 적용
+	virtual void ApplyInitialAttributes();
 
-	virtual void GrantStartupAbilities();
-	virtual void ApplyStartupEffects();
+	//AbilitySet 부여
+	virtual void GrantStartupAbilitySets();
+
+	//부여된 AbilitySet 전부 회수
+	virtual void RemoveAllAbilitySets();
 
 	//===== Rotation Functions =====
 	void RotateToRotation(const FRotator& TargetRotation, float RotateTime);

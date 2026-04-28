@@ -2,9 +2,9 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
-#include "Characters/BossCharacter.h"
+#include "Characters/EnemyCharacter.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
-#include "GAS/AbilitySystemComponent/BossAbilitySystemComponent.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "Items/AttackData.h"
@@ -35,6 +35,22 @@ void UEnemyAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 	Super::OnGiveAbility(ActorInfo, Spec);
 
 	CacheGameplayTags();
+
+	//DA에서 CooldownDuration을 미리 세팅 (CommitAbility의 ApplyCooldown보다 선행해야 함)
+	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo(ActorInfo);
+	if (EnemyCharacter)
+	{
+		const UEnemyDataAsset* EnemyData = EnemyCharacter->GetEnemyData();
+		if (EnemyData)
+		{
+			FGameplayTagContainer AssetTag = AbilityTags;
+			const FEnemyTaggedAttackData* AttackData = EnemyData->GetAttackDataByTags(AssetTag);
+			if (AttackData)
+			{
+				CooldownDuration = AttackData->CooldownDuration;
+			}
+		}
+	}
 }
 
 void UEnemyAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -53,7 +69,7 @@ void UEnemyAttackAbility::ActivateInitSettings()
 	Super::ActivateInitSettings();
 
 	//보스 데이터 캐싱
-	CacheBossData();
+	CacheEnemyData();
 
 	//HitDetectionSetter 바인딩
 	BindHitDetectionSetter();
@@ -80,30 +96,35 @@ void UEnemyAttackAbility::CacheGameplayTags()
 	}
 }
 
-void UEnemyAttackAbility::CacheBossData()
+void UEnemyAttackAbility::CacheEnemyData()
 {
-	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
-	if (!BossCharacter)
+	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	if (!EnemyCharacter)
 	{
-		DEBUG_LOG(TEXT("CacheBossData: BossCharacter is nullptr. Ability=%s"), *GetName());
+		DEBUG_LOG(TEXT("CacheEnemyData: EnemyCharacter is nullptr. Ability=%s"), *GetName());
 		return;
 	}
 
-	const UEnemyDataAsset* EnemyData = BossCharacter->GetEnemyData();
+	const UEnemyDataAsset* EnemyData = EnemyCharacter->GetEnemyData();
 	if (!EnemyData)
 	{
-		DEBUG_LOG(TEXT("CacheBossData: EnemyData is nullptr. Ability=%s"), *GetName());
+		DEBUG_LOG(TEXT("CacheEnemyData: EnemyData is nullptr. Ability=%s"), *GetName());
 		return;
 	}
 
-	EnemyAttackData = EnemyData->NamedAttackData.Find(AttackName);
+	//어빌리티의 Asset Tag로 DA에서 공격 데이터 조회
+	FGameplayTagContainer AssetTag = AbilityTags;
+	EnemyAttackData = EnemyData->GetAttackDataByTags(AssetTag);
 	if (!EnemyAttackData || EnemyAttackData->ComboSequence.Num() == 0)
 	{
-		DEBUG_LOG(TEXT("CacheBossData: Attack data not found for name: %s"), *AttackName.ToString());
+		DEBUG_LOG(TEXT("CacheEnemyData: Attack data not found for tags: %s"), *AssetTag.ToStringSimple());
 		return;
 	}
 
 	MaxComboCount = EnemyAttackData->ComboSequence.Num();
+
+	//DA에서 읽은 CooldownDuration을 BaseAbility 멤버에 주입
+	CooldownDuration = EnemyAttackData->CooldownDuration;
 
 	//Ability 시작 시 AIController로부터 CurrentTarget 정보 캐싱
 	AEnemyAIController* AIController = GetEnemyAIControllerFromActorInfo();
@@ -112,20 +133,20 @@ void UEnemyAttackAbility::CacheBossData()
 		CachedTargetInfo = AIController->GetCurrentTarget();
 	}
 
-	DEBUG_LOG(TEXT("CacheBossData: Cached AttackName=%s, MaxComboCount=%d"), *AttackName.ToString(), MaxComboCount);
+	DEBUG_LOG(TEXT("CacheEnemyData: Cached Tags=%s, MaxComboCount=%d"), *AssetTag.ToStringSimple(), MaxComboCount);
 }
 
 void UEnemyAttackAbility::BindHitDetectionSetter()
 {
-	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
-	if (!BossCharacter)
+	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	if (!EnemyCharacter)
 	{
-		DEBUG_LOG(TEXT("BindHitDetectionSetter: No BossCharacter"));
+		DEBUG_LOG(TEXT("BindHitDetectionSetter: No EnemyCharacter"));
 		return;
 	}
 
 	//HitDetectionSetter 초기화
-	if (!HitDetectionSetter.Init(BossCharacter->GetHitDetectionInterface()))
+	if (!HitDetectionSetter.Init(EnemyCharacter->GetHitDetectionInterface()))
 	{
 		DEBUG_LOG(TEXT("BindHitDetectionSetter: Failed to init HitDetectionSetter"));
 		return;
@@ -166,8 +187,8 @@ void UEnemyAttackAbility::ExecuteAttack()
 
 void UEnemyAttackAbility::SetHitDetectionConfig()
 {
-	//PrepareHitDetection 호출
-	if (!HitDetectionSetter.PrepareHitDetection(AttackName, ComboCounter))
+	//어빌리티의 Asset Tag로 HitDetection 조회 (기존 FGameplayTagContainer 오버로드 활용)
+	if (!HitDetectionSetter.PrepareHitDetection(AbilityTags, ComboCounter))
 	{
 		DEBUG_LOG(TEXT("Failed to prepare HitDetection"));
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
@@ -178,15 +199,15 @@ void UEnemyAttackAbility::SetHitDetectionConfig()
 void UEnemyAttackAbility::OnHitDetected(AActor* HitActor, const FHitResult& HitResult, FFinalAttackData AttackData)
 {
 	//Source ASC (공격자, AttackAbility 소유자)
-	UBossAbilitySystemComponent* SourceASC = GetBossAbilitySystemComponentFromActorInfo();
+	UEnemyAbilitySystemComponent* SourceASC = GetEnemyAbilitySystemComponentFromActorInfo();
 	if (!HitActor || !SourceASC) return;
 
 	//Target ASC (피격자)
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
 	if (!TargetASC) return;
 
-	//Source ASC에서 GE Spec 생성
-	FGameplayEffectSpecHandle SpecHandle = SourceASC->CreateAttackGameplayEffectSpec(DamageInstantEffect, GetAbilityLevel(), this, AttackData);
+	//Source ASC에서 GE Spec 생성 (HitResult 포함 — Cue에 피격 위치/방향 전달)
+	FGameplayEffectSpecHandle SpecHandle = SourceASC->CreateAttackGameplayEffectSpec(DamageInstantEffect, GetAbilityLevel(), this, AttackData, &HitResult);
 
 	if (SpecHandle.IsValid())
 	{
@@ -223,12 +244,12 @@ UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 	}
 
 	//소프트 레퍼런스를 실제 오브젝트로 로드
-	const auto& ComboData = EnemyAttackData->ComboSequence[ComboCounter];
-	UAnimMontage* Montage = ComboData.AttackMontage.LoadSynchronous();
+	const FEnemyComboAttackUnit& EnemyCombo = EnemyAttackData->ComboSequence[ComboCounter];
+	UAnimMontage* Montage = EnemyCombo.ComboData.AttackMontage.LoadSynchronous();
 	if (!Montage)
 	{
-		DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load montage. AttackName=%s, ComboIndex=%d"),
-			*AttackName.ToString(), ComboCounter);
+		DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load montage. Tags=%s, ComboIndex=%d"),
+			*AbilityTags.ToStringSimple(), ComboCounter);
 		return nullptr;
 	}
 
@@ -311,10 +332,10 @@ void UEnemyAttackAbility::OnTaskMontageInterrupted()
 
 void UEnemyAttackAbility::OnEventRotateToTarget(FGameplayEventData Payload)
 {
-	ABossCharacter* BossCharacter = GetBossCharacterFromActorInfo();
-	if (!BossCharacter)
+	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	if (!EnemyCharacter)
 	{
-		DEBUG_LOG(TEXT("OnEventRotateToTarget: No BossCharacter"));
+		DEBUG_LOG(TEXT("OnEventRotateToTarget: No EnemyCharacter"));
 		return;
 	}
 
@@ -332,9 +353,14 @@ void UEnemyAttackAbility::OnEventRotateToTarget(FGameplayEventData Payload)
 		return;
 	}
 
-	//타겟을 향해 회전
-	BossCharacter->RotateToTarget(TargetActor, RotateTime);
-	DEBUG_LOG(TEXT("OnEventRotateToTarget: Rotating to %s"),	*TargetActor->GetName());
+	//현재 콤보의 RotateTime 사용
+	float CurrentRotateTime = 0.1f;
+	if (EnemyAttackData && ComboCounter < EnemyAttackData->ComboSequence.Num())
+	{
+		CurrentRotateTime = EnemyAttackData->ComboSequence[ComboCounter].RotateTime;
+	}
+	EnemyCharacter->RotateToTarget(TargetActor, CurrentRotateTime);
+	DEBUG_LOG(TEXT("OnEventRotateToTarget: Rotating to %s"), *TargetActor->GetName());
 }
 
 void UEnemyAttackAbility::OnEventCheckCondition(FGameplayEventData Payload)
@@ -355,18 +381,27 @@ void UEnemyAttackAbility::OnEventCheckCondition(FGameplayEventData Payload)
 		return;
 	}
 
-	//거리 체크
-	if (CurrentTargetInfo.Distance > MaxTargetDistance)
+	//현재 콤보의 MaxTargetDistance, MaxTargetAngle 사용
+	float CurrentMaxDistance = 150.0f;
+	float CurrentMaxAngle = 60.0f;
+	if (EnemyAttackData && ComboCounter < EnemyAttackData->ComboSequence.Num())
 	{
-		DEBUG_LOG(TEXT("OnEventCheckCondition: Target too far - Distance: %.2f, Max: %.2f"), CurrentTargetInfo.Distance, MaxTargetDistance);
+		CurrentMaxDistance = EnemyAttackData->ComboSequence[ComboCounter].MaxTargetDistance;
+		CurrentMaxAngle = EnemyAttackData->ComboSequence[ComboCounter].MaxTargetAngle;
+	}
+
+	//거리 체크
+	if (CurrentTargetInfo.Distance > CurrentMaxDistance)
+	{
+		DEBUG_LOG(TEXT("OnEventCheckCondition: Target too far - Distance: %.2f, Max: %.2f"), CurrentTargetInfo.Distance, CurrentMaxDistance);
 		bPerformNextCombo = false;
 		return;
 	}
 
 	//각도 체크 (절대값)
-	if (FMath::Abs(CurrentTargetInfo.AngleToTarget) > MaxTargetAngle)
+	if (FMath::Abs(CurrentTargetInfo.AngleToTarget) > CurrentMaxAngle)
 	{
-		DEBUG_LOG(TEXT("OnEventCheckCondition: Target angle out of range - Angle: %.2f, Max: %.2f"), CurrentTargetInfo.AngleToTarget, MaxTargetAngle);
+		DEBUG_LOG(TEXT("OnEventCheckCondition: Target angle out of range - Angle: %.2f, Max: %.2f"), CurrentTargetInfo.AngleToTarget, CurrentMaxAngle);
 		bPerformNextCombo = false;
 		return;
 	}

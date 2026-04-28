@@ -1,15 +1,15 @@
 ﻿#include "AI/EnemyAIController.h"
 #include "AI/StateTree/GASStateTreeAIComponent.h"
 #include "Characters/ActionPracticeCharacter.h"
-#include "Characters/BossCharacter.h"
+#include "Characters/EnemyCharacter.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 
 #define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
-	DEFINE_LOG_CATEGORY_STATIC(LogBossAIController, Log, All);
-#define DEBUG_LOG(Format, ...) UE_LOG(LogBossAIController, Warning, Format, ##__VA_ARGS__)
+	DEFINE_LOG_CATEGORY_STATIC(LogEnemyAIController, Log, All);
+#define DEBUG_LOG(Format, ...) UE_LOG(LogEnemyAIController, Warning, Format, ##__VA_ARGS__)
 #else
 #define DEBUG_LOG(Format, ...)
 #endif
@@ -55,10 +55,10 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 
 	DEBUG_LOG(TEXT("OnPossess: InPawn=%s"), *GetNameSafe(InPawn));
 
-	BossCharacter = Cast<ABossCharacter>(InPawn);
-	if (!BossCharacter.IsValid())
+	EnemyCharacter = Cast<AEnemyCharacter>(InPawn);
+	if (!EnemyCharacter.IsValid())
 	{
-		DEBUG_LOG(TEXT("OnPossess: Failed to cast Pawn to BossCharacter"));
+		DEBUG_LOG(TEXT("OnPossess: Failed to cast Pawn to EnemyCharacter"));
 		return;
 	}
 
@@ -82,7 +82,7 @@ void AEnemyAIController::OnUnPossess()
 		GASStateTreeAIComponent->StopLogic("Unpossessed");
 	}
 
-	BossCharacter.Reset();
+	EnemyCharacter.Reset();
 
 	Super::OnUnPossess();
 }

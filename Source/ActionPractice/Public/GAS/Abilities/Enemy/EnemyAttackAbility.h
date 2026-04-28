@@ -9,7 +9,7 @@
 
 class UAbilityTask_PlayMontageWithEvents;
 struct FFinalAttackData;
-struct FNamedAttackData;
+struct FEnemyTaggedAttackData;
 
 /***
  *
@@ -22,8 +22,6 @@ class ACTIONPRACTICE_API UEnemyAttackAbility : public UEnemyAbility, public IHit
 public:
 #pragma region "Public Variables"
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
-	FName AttackName = NAME_None;
 
 #pragma endregion
 
@@ -51,7 +49,7 @@ protected:
 	bool bPerformNextCombo = true;
 
 	// ===== 공격 데이터 =====
-	const FNamedAttackData* EnemyAttackData = nullptr;
+	const FEnemyTaggedAttackData* EnemyAttackData = nullptr;
 
 	//Ability 시작 시 캐싱된 Target 정보
 	FCurrentTarget CachedTargetInfo;
@@ -73,16 +71,6 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitCheckConditionEventTask = nullptr;
 
-	// ===== 설정 =====
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config")
-	float RotateTime = 0.1f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config")
-	float MaxTargetDistance = 150.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config")
-	float MaxTargetAngle = 60.0f;
-
 	// ===== 게임플레이 태그 =====
 	FGameplayTag EventNotifyRotateToTargetTag;
 	FGameplayTag EventNotifyCheckConditionTag;
@@ -97,7 +85,7 @@ protected:
 	// ===== 설정 / 초기화 =====
 	virtual void ActivateInitSettings() override;
 	void CacheGameplayTags();
-	void CacheBossData();
+	void CacheEnemyData();
 	void BindHitDetectionSetter();
 
 	// ===== 실행 로직 =====

@@ -109,8 +109,8 @@ const FBlockActionData* FWeaponAbilityStatics::GetBlockDataFromAbility(const UGa
 		return nullptr;
 	}
 
-	if (!WeaponBlockData->BlockIdleMontage || !WeaponBlockData->BlockReactionLightMontage ||
-		!WeaponBlockData->BlockReactionMiddleMontage || !WeaponBlockData->BlockReactionHeavyMontage)
+	if (WeaponBlockData->BlockIdleMontage.IsNull() || WeaponBlockData->BlockReactionLightMontage.IsNull() ||
+		WeaponBlockData->BlockReactionMiddleMontage.IsNull() || WeaponBlockData->BlockReactionHeavyMontage.IsNull())
 	{
 		DEBUG_LOG(TEXT("WeaponAbilityStatics: No Block Montages"))
 		return nullptr;

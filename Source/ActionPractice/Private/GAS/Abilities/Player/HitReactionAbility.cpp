@@ -18,6 +18,9 @@
 
 UHitReactionAbility::UHitReactionAbility()
 {
+	//연속 피격시 재활성화
+	bRetriggerInstancedAbility = true;
+	
 	//피격은 서버에서 시작
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -35,6 +38,12 @@ void UHitReactionAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 		DEBUG_LOG(TEXT("StateAbilityBlockingTag is Invalid"));
 	}
 
+	StateGuardBrokenTag = UGameplayTagsSubsystem::GetStateGuardBrokenTag();
+	if (!StateGuardBrokenTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("StateGuardBrokenTag is Invalid"));
+	}
+
 	AbilityBlockTag = UGameplayTagsSubsystem::GetAbilityBlockTag();
 	if (!AbilityBlockTag.IsValid())
 	{
@@ -47,14 +56,24 @@ void UHitReactionAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	
 	bIsBlockReaction = false;
+	bIsGuardBreakReaction = false;
 
 	if (TriggerEventData)
 	{
 		const float PoiseValue = TriggerEventData->EventMagnitude;
 		DEBUG_LOG(TEXT("HitReaction activated with Poise=%.1f"), PoiseValue);
 
-		//블로킹 상태 확인
-		if (TriggerEventData->TargetTags.HasTag(StateAbilityBlockingTag))
+		//가드 브레이크
+		if (TriggerEventData->TargetTags.HasTag(StateGuardBrokenTag))
+		{
+			bIsGuardBreakReaction = true;
+			DEBUG_LOG(TEXT("Guard Break Reaction detected"));
+			//State.Blocking 태그 수동 추가하지 않음
+			//BlockAbility가 캔슬되면서 자동 제거됨
+		}
+		
+		//가드
+		else if (TriggerEventData->TargetTags.HasTag(StateAbilityBlockingTag))
 		{
 			bIsBlockReaction = true;
 			DEBUG_LOG(TEXT("Block Reaction detected"));
@@ -102,6 +121,25 @@ UAnimMontage* UHitReactionAbility::SetMontageToPlayTask()
 {
 	const EReactionLevel Level = ReactionProcessor.GetReactionLevel();
 
+	//가드 브레이크
+	if (bIsGuardBreakReaction)
+	{
+		const FBlockActionData* BlockData = FWeaponAbilityStatics::GetBlockDataFromAbility(this);
+		if (BlockData && !BlockData->GuardBreakMontage.IsNull())
+		{
+			DEBUG_LOG(TEXT("Playing GuardBreakMontage"));
+			return BlockData->GuardBreakMontage.LoadSynchronous();
+		}
+		
+		//GuardBreakMontage가 없으면 Heavy BlockReaction으로 폴백
+		if (BlockData && !BlockData->BlockReactionHeavyMontage.IsNull())
+		{
+			DEBUG_LOG(TEXT("GuardBreakMontage not set, falling back to BlockReactionHeavy"));
+			return BlockData->BlockReactionHeavyMontage.LoadSynchronous();
+		}
+	}
+
+	//일반 블록 리액션
 	if (bIsBlockReaction)
 	{
 		const FBlockActionData* BlockData = FWeaponAbilityStatics::GetBlockDataFromAbility(this);
@@ -124,6 +162,7 @@ UAnimMontage* UHitReactionAbility::SetMontageToPlayTask()
 		}
 	}
 
+	//일반 피격 리액션
 	switch (Level)
 	{
 		case EReactionLevel::Heavy: return HitReactionHeavyMontage;
@@ -135,8 +174,12 @@ UAnimMontage* UHitReactionAbility::SetMontageToPlayTask()
 
 void UHitReactionAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	//BlockReaction 후처리, 누르고 있으면 계속 방어
-	if (bIsBlockReaction)
+	//BlockReaction 후처리에 필요한 값을 Super 호출 전에 미리 캡처
+	bool bShouldReactivateBlock = false;
+	FGameplayAbilitySpecHandle BlockAbilityHandle;
+
+	//가드 + 가드 브레이크 시 방어 유지
+	if (bIsBlockReaction || bIsGuardBreakReaction)
 	{
 		//State.Blocking 태그 제거
 		if (StateAbilityBlockingTag.IsValid())
@@ -148,35 +191,32 @@ void UHitReactionAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 		DEBUG_LOG(TEXT("bWasCancelled=%d"), bWasCancelled);
 
 		//BlockAbility Spec 찾기
-		FGameplayAbilitySpec* BlockAbilitySpec = nullptr;
-		for (FGameplayAbilitySpec& Spec : GetAbilitySystemComponentFromActorInfo()->GetActivatableAbilities())
+		for (FGameplayAbilitySpec& Spec : ActorInfo->AbilitySystemComponent->GetActivatableAbilities())
 		{
 			if (Spec.Ability && Spec.Ability->GetAssetTags().HasTag(AbilityBlockTag))
 			{
-				BlockAbilitySpec = &Spec;
+				BlockAbilityHandle = Spec.Handle;
 				break;
 			}
 		}
 
-		if (BlockAbilitySpec)
+		if (BlockAbilityHandle.IsValid())
 		{
-			//실시간 입력 상태 확인
-			bool bIsBlockInputPressed = false;
-
 			if (AActionPracticeCharacter* Character = Cast<AActionPracticeCharacter>(ActorInfo->AvatarActor.Get()))
 			{
-				bIsBlockInputPressed = Character->IsBlockInputPressed();
+				bShouldReactivateBlock = Character->IsBlockInputPressed();
 			}
-
-			DEBUG_LOG(TEXT("bIsBlockInputPressed=%d (real-time check)"), bIsBlockInputPressed);
-
-			if (bIsBlockInputPressed)
-			{
-				DEBUG_LOG(TEXT("Block input still pressed, reactivating BlockAbility"));
-				ActorInfo->AbilitySystemComponent->TryActivateAbility(BlockAbilitySpec->Handle);
-			}
+			DEBUG_LOG(TEXT("bIsBlockInputPressed=%d (real-time check)"), bShouldReactivateBlock);
 		}
 	}
 
+	//Super 먼저 호출 → HitReaction 태그/블로킹 태그 정리
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+
+	//HitReaction이 완전히 종료된 후 BlockAbility 재활성화
+	if (bShouldReactivateBlock)
+	{
+		DEBUG_LOG(TEXT("Block input still pressed, reactivating BlockAbility"));
+		ActorInfo->AbilitySystemComponent->TryActivateAbility(BlockAbilityHandle);
+	}
 }

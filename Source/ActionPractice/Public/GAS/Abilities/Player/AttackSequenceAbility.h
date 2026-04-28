@@ -30,6 +30,7 @@ enum class EAttackType : uint8
 	Normal,			//일반 공격
 	Charge,			//차지 공격
 	Sprint,			//스프린트 공격
+	ChargeSprint,
 	Roll			//롤 공격
 };
 
@@ -104,6 +105,9 @@ protected:
 	UPROPERTY()
 	FGameplayEventData PendingBufferPayload;
 
+	//스태미나 부족으로 Idle 복귀 시 몽타주 유지 플래그
+	bool bPreserveMontage = false;
+
 	// ===== 무기 데이터 =====
 	UPROPERTY()
 	TObjectPtr<const UWeaponDataAsset> CachedWeaponDataAsset = nullptr;
@@ -117,6 +121,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
 	TSubclassOf<UGameplayEffect> DamageInstantEffect;
+
+	// 공격 시작 시 취소할 어빌리티 태그 (AbilityTagsToCancel 대체 - 이미 활성화된 어빌리티라 직접 처리)
+	UPROPERTY(EditDefaultsOnly, Category = "Attack")
+	FGameplayTagContainer AbilityTagsToCancelOnAttack;
 
 	// ===== 태스크 =====
 	UPROPERTY()
@@ -163,6 +171,7 @@ protected:
 	// ===== 설정 / 초기화 =====
 	virtual void ActivateInitSettings() override;
 	void CacheWeaponData();
+	void CancelAbilitiesOnAttack();
 	void CacheGameplayTags();
 	void BindHitDetectionSetter();
 	void StopMontageAndEndTask();
@@ -187,7 +196,7 @@ protected:
 	void OnEventAttackInput(FGameplayEventData Payload); //InputPressed 대체 이벤트, IA_Attack과 IA_ChargeAttack 모두 수신
 
 	void ProcessNormalAttackInput(const FGameplayEventData& Payload);
-	void ProcessChargeAttackInput();
+	void ProcessChargeAttackInput(const FGameplayEventData& Payload);
 
 	virtual void OnWaitInputRelease(float TimeHeld) override; 
 	virtual void OnEventInputByBuffer(FGameplayEventData Payload) override;

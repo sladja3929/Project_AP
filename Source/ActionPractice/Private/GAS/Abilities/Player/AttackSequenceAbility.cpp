@@ -13,7 +13,7 @@
 #include "AbilitySystemComponent.h"
 #include "GAS/Abilities/HitDetectionSetter.h"
 
-#define ENABLE_DEBUG_LOG 1
+#define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
 	DEFINE_LOG_CATEGORY_STATIC(LogAttackSequenceAbility, Log, All);
@@ -185,6 +185,9 @@ void UAttackSequenceAbility::CacheWeaponData()
 		return;
 	}
 
+	//패키지 빌드에서 SoftPtr 미로드 방지 — DA 캐싱 시점에 몽타주 프리로드
+	const_cast<UWeaponDataAsset*>(CachedWeaponDataAsset.Get())->PreloadAllMontages();
+
 	DEBUG_LOG(TEXT("WeaponDataAsset cached - AttackData count: %d"), CachedWeaponDataAsset->TaggedAttackData.Num());
 }
 
@@ -220,6 +223,16 @@ void UAttackSequenceAbility::StopMontageAndEndTask()
 		PlayMontageWithEventsTask->EndTask();
 		PlayMontageWithEventsTask = nullptr;
 	}
+}
+
+void UAttackSequenceAbility::CancelAbilitiesOnAttack()
+{
+	if (AbilityTagsToCancelOnAttack.IsEmpty()) return;
+
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!ASC) return;
+
+	ASC->CancelAbilities(&AbilityTagsToCancelOnAttack);
 }
 
 void UAttackSequenceAbility::AddOrRemoveGameplayTag(const FGameplayTag Auth, const FGameplayTag Local, bool bAdd)
@@ -260,13 +273,13 @@ void UAttackSequenceAbility::OnHitDetected(AActor* HitActor, const FHitResult& H
 	//Source ASC (공격자, AttackAbility 소유자)
 	UActionPracticeAbilitySystemComponent* SourceASC = GetActionPracticeAbilitySystemComponentFromActorInfo();
 	if (!HitActor || !SourceASC) return;
-    
+
 	//Target ASC (피격자)
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
 	if (!TargetASC) return;
-    
-	//Source ASC에서 GE Spec 생성
-	FGameplayEffectSpecHandle SpecHandle = SourceASC->CreateAttackGameplayEffectSpec(DamageInstantEffect, GetAbilityLevel(), this, AttackData);
+
+	//Source ASC에서 GE Spec 생성 (HitResult 포함 — Cue에 피격 위치/방향 전달)
+	FGameplayEffectSpecHandle SpecHandle = SourceASC->CreateAttackGameplayEffectSpec(DamageInstantEffect, GetAbilityLevel(), this, AttackData, &HitResult);
     
 	if (SpecHandle.IsValid())
 	{        
@@ -312,6 +325,11 @@ void UAttackSequenceAbility::ChangeAttackType(const EAttackType NewType)
 		CurrentAttackTags.AddTag(AbilityAttackNormalTag);
 		CurrentAttackTags.AddTag(AbilityAttackSprintTag);
 		break;
+
+	case EAttackType::ChargeSprint:
+		CurrentAttackTags.AddTag(AbilityAttackChargeTag);
+		CurrentAttackTags.AddTag(AbilityAttackSprintTag);
+		break;
 		
 	case EAttackType::Roll:
 		CurrentAttackTags.AddTag(AbilityAttackNormalTag);
@@ -341,15 +359,17 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 	switch (PreviousState)
 	{
 	case EAttackSequenceState::Idle:
+		//bPreserveMontage 경로에서 시작된 리스너가 남아있을 수 있으므로 정리
+		END_ABILITY_TASK(WaitCancelAttackEventTask);
 		break;
-		
+
 	case EAttackSequenceState::Prepare:
 		break;
-		
+
 	case EAttackSequenceState::Attacking:
-		
+
 		break;
-		
+
 	case EAttackSequenceState::AfterRecovery:
 		END_ABILITY_TASK(WaitResetComboEventTask);
 		END_ABILITY_TASK(WaitCancelAttackEventTask);
@@ -365,19 +385,50 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 	case EAttackSequenceState::Idle:
 		//None: ComboCounter, MaxComboCount 0
 		ChangeAttackType(EAttackType::None);
-		AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, false);
-		StopMontageAndEndTask();
+		CurrentChargeProgress = EChargeProgress::NoCharge;
+
+		//스태미나 부족 캔슬일 경우
+		if (bPreserveMontage)
+		{
+			//스태미나 부족으로 복귀: 몽타주와 Attacking 태그 유지 (이동 캔슬 유지)
+			bPreserveMontage = false;
+
+			//이동으로 인한 후딜 취소 이벤트 리스닝
+			START_WAIT_EVENT_TASK(WaitCancelAttackEventTask, EventActionCancelAttackTag, OnEventCancelAttack, nullptr, true, true);
+		}
+		
+		else
+		{
+			AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, false);
+			StopMontageAndEndTask();
+		}
+		
 		break;
 
 	case EAttackSequenceState::Prepare:
+		//스테미나 부족시 Idle 복귀 (몽타주 유지)
+		if (!ConsumeStamina())
+		{
+			bPreserveMontage = true;
+			ChangeState(EAttackSequenceState::Idle);
+			break;
+		}
+		
+		CancelAbilitiesOnAttack();
 		StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
 		if (CurrentChargeProgress != EChargeProgress::NoCharge) StartWaitInputReleaseTask(true);
 		break;
 
 	case EAttackSequenceState::Attacking:
-		//스테미나 부족시 아이들 상태로 복귀
-		if (!ConsumeStamina()) ChangeState(EAttackSequenceState::Idle);
-
+		//스테미나 부족시 Idle 복귀 (몽타주 유지)
+		if (!ConsumeStamina())
+		{
+			bPreserveMontage = true;
+			ChangeState(EAttackSequenceState::Idle);
+			break;
+		}
+		
+		CancelAbilitiesOnAttack();
 		SetHitDetectionConfig();
 		AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, true);
 		StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
@@ -409,8 +460,13 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 
 bool UAttackSequenceAbility::ConsumeStamina()
 {
-	SetStaminaCost(CurrentAttackData->ComboSequence[ComboCounter].AttackData.StaminaCost);
+	if (CurrentState == EAttackSequenceState::Attacking)
+	{
+		SetStaminaCost(CurrentAttackData->ComboSequence[ComboCounter].AttackData.StaminaCost);
+	}
 
+	else SetStaminaCost(0);
+	
 	if (!ApplyStaminaCost())
 	{
 		DEBUG_LOG(TEXT("No Stamina"));
@@ -470,6 +526,12 @@ void UAttackSequenceAbility::SetUpPlayMontageWithEventsTask()
 #pragma region "Hander Functions"
 void UAttackSequenceAbility::OnEventAttackInput(FGameplayEventData Payload)
 {
+	//Attacking/Prepare 상태에서는 직접 입력 무시 (버퍼 시스템이 처리)
+	if (CurrentState == EAttackSequenceState::Attacking || CurrentState == EAttackSequenceState::Prepare)
+	{
+		return;
+	}
+
 	DEBUG_LOG(TEXT("AttackSequenceAbility - AttackInput Received"));
 
 	//Normal Attack 입력
@@ -482,7 +544,7 @@ void UAttackSequenceAbility::OnEventAttackInput(FGameplayEventData Payload)
 	else if (Payload.InstigatorTags.HasTag(InputChargeAttackTag))
 	{
 		CurrentChargeProgress = EChargeProgress::WindUp;
-		ProcessChargeAttackInput();
+		ProcessChargeAttackInput(Payload);
 	}
 }
 
@@ -493,10 +555,12 @@ void UAttackSequenceAbility::ProcessNormalAttackInput(const FGameplayEventData& 
 	{
 		ChangeAttackType(EAttackType::Roll);
 	}
+	
 	else if (Payload.InstigatorTags.HasTag(StateSprintingTag))
 	{
 		ChangeAttackType(EAttackType::Sprint);
 	}
+	
 	else
 	{
 		ChangeAttackType(EAttackType::Normal);
@@ -505,10 +569,26 @@ void UAttackSequenceAbility::ProcessNormalAttackInput(const FGameplayEventData& 
 	ChangeState(EAttackSequenceState::Attacking);
 }
 
-void UAttackSequenceAbility::ProcessChargeAttackInput()
+void UAttackSequenceAbility::ProcessChargeAttackInput(const FGameplayEventData& Payload)
 {
-	ChangeAttackType(EAttackType::Charge);
-	ChangeState(EAttackSequenceState::Prepare);
+	//Payload의 태그로 공격 타입 판정 (버퍼 저장 시점 기준)
+	if (Payload.InstigatorTags.HasTag(StateJustRolledTag) || Payload.InstigatorTags.HasTag(StateRollingTag))
+	{
+		ChangeAttackType(EAttackType::Roll);
+		ChangeState(EAttackSequenceState::Attacking);
+	}
+	
+	else if (Payload.InstigatorTags.HasTag(StateSprintingTag))
+	{
+		ChangeAttackType(EAttackType::ChargeSprint);
+		ChangeState(EAttackSequenceState::Attacking);
+	}
+	
+	else
+	{
+		ChangeAttackType(EAttackType::Charge);
+		ChangeState(EAttackSequenceState::Prepare);
+	}	
 }
 
 void UAttackSequenceAbility::OnWaitInputRelease(float TimeHeld)
@@ -554,6 +634,7 @@ void UAttackSequenceAbility::OnEventInputByBuffer(FGameplayEventData Payload)
 	}
 	else if (Payload.InstigatorTags.HasTag(InputChargeAttackTag))
 	{
+		//EventMagnitude로 단발인지 홀드인지 판별
 		if (Payload.EventMagnitude != 0.0f)
 		{
 			DEBUG_LOG(TEXT("Input By Buffer - No Charge true"));
@@ -564,7 +645,7 @@ void UAttackSequenceAbility::OnEventInputByBuffer(FGameplayEventData Payload)
 			CurrentChargeProgress = EChargeProgress::WindUp;
 		}
 
-		ProcessChargeAttackInput();
+		ProcessChargeAttackInput(Payload);
 	}
 }
 
@@ -586,18 +667,21 @@ void UAttackSequenceAbility::ConsumePendingBufferInput()
 	{
 		ProcessNormalAttackInput(Payload);
 	}
+	
 	else if (Payload.InstigatorTags.HasTag(InputChargeAttackTag))
 	{
+		//EventMagnitude로 단발인지 홀드인지 판별
 		if (Payload.EventMagnitude != 0.0f)
 		{
 			CurrentChargeProgress = EChargeProgress::NoCharge;
 		}
+		
 		else
 		{
 			CurrentChargeProgress = EChargeProgress::WindUp;
 		}
 
-		ProcessChargeAttackInput();
+		ProcessChargeAttackInput(Payload);
 	}
 
 	//Payload 초기화
@@ -607,6 +691,15 @@ void UAttackSequenceAbility::ConsumePendingBufferInput()
 void UAttackSequenceAbility::OnEventCancelAttack(FGameplayEventData Payload)
 {
 	DEBUG_LOG(TEXT("AttackSequenceAbility - CancelAttack Notify Received"));
+
+	//이미 Idle 상태(스태미나 부족 복귀)일 때는 ChangeState 가드에 걸리므로 직접 정리
+	if (CurrentState == EAttackSequenceState::Idle)
+	{
+		AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, false);
+		StopMontageAndEndTask();
+		return;
+	}
+
 	ChangeState(EAttackSequenceState::Idle);
 }
 
@@ -638,6 +731,16 @@ void UAttackSequenceAbility::OnTaskMontageCompleted()
 void UAttackSequenceAbility::OnTaskMontageInterrupted()
 {
 	DEBUG_LOG(TEXT("AttackSequenceAbility - Task Montage Interrupted"));
+
+	//피격 인터럽트: 버퍼 입력 초기화
+	bHasPendingBufferInput = false;
+	PendingBufferPayload = FGameplayEventData();
+
+	//차지 진행 초기화
+	CurrentChargeProgress = EChargeProgress::NoCharge;
+
+	//Idle로 강제 복귀 (ChangeAttackType(None), 태그 제거, StopMontageAndEndTask 일괄 처리)
+	ChangeState(EAttackSequenceState::Idle);
 }
 
 void UAttackSequenceAbility::OnCurveRisingEdgeReceived(FName CurveName)

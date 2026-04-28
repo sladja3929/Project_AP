@@ -1,6 +1,7 @@
 #include "Characters/BaseCharacter.h"
 #include "AbilitySystemComponent.h"
-#include "GameplayAbilities/Public/Abilities/GameplayAbility.h"
+#include "GAS/AbilitySet/AbilitySetDataAsset.h"
+#include "GAS/CharacterStats/CharacterStatsDataAsset.h"
 #include "GAS/AttributeSet/BaseAttributeSet.h"
 #include "Items/AttackData.h"
 #include "Net/UnrealNetwork.h"
@@ -58,51 +59,50 @@ void ABaseCharacter::InitializeAbilitySystem()
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
 
-		GrantStartupAbilities();
+		//어트리뷰트 초기화를 먼저 수행 (어빌리티보다 선행해야 함)
+		ApplyInitialAttributes();
 
-		ApplyStartupEffects();
+		GrantStartupAbilitySets();
 	}
 }
 
-void ABaseCharacter::GiveAbility(TSubclassOf<UGameplayAbility> AbilityClass)
+void ABaseCharacter::ApplyInitialAttributes()
 {
-	if (AbilitySystemComponent && AbilityClass)
-	{
-		FGameplayAbilitySpec AbilitySpec(AbilityClass, 1, INDEX_NONE, this);
-		AbilitySystemComponent->GiveAbility(AbilitySpec);
-	}
-}
-
-void ABaseCharacter::GrantStartupAbilities()
-{
-	//서버에서만 어빌리티 부여 (클라이언트에는 복제됨)
 	if (!HasAuthority()) return;
+	if (!AbilitySystemComponent) return;
 
-	for (const auto& StartAbility : StartAbilities)
+	if (CharacterStatsData)
 	{
-		GiveAbility(StartAbility);
+		CharacterStatsData->ApplyInitialAttributes(AbilitySystemComponent);
 	}
 }
 
-void ABaseCharacter::ApplyStartupEffects()
+void ABaseCharacter::GrantStartupAbilitySets()
 {
-	//서버에서만 시작 효과 적용 (클라이언트에는 ActiveGameplayEffect로 복제됨)
+	//서버에서만 부여 (클라이언트에는 복제됨)
 	if (!HasAuthority()) return;
+	if (!AbilitySystemComponent) return;
 
-	FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
-	EffectContext.AddSourceObject(this);
-
-	for (const auto& StartEffect : StartEffects)
+	for (const TObjectPtr<UAbilitySetDataAsset>& AbilitySet : StartAbilitySetsData)
 	{
-		if (StartEffect)
+		if (AbilitySet)
 		{
-			FGameplayEffectSpecHandle SpecHandle = AbilitySystemComponent->MakeOutgoingSpec(StartEffect, 1, EffectContext);
-			if (SpecHandle.IsValid())
-			{
-				AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-			}
+			FAbilitySetGrantedHandles& Handles = GrantedSetHandles.AddDefaulted_GetRef();
+			AbilitySet->GiveToAbilitySystem(AbilitySystemComponent, &Handles, this);
 		}
 	}
+}
+
+void ABaseCharacter::RemoveAllAbilitySets()
+{
+	if (!AbilitySystemComponent) return;
+
+	for (FAbilitySetGrantedHandles& Handles : GrantedSetHandles)
+	{
+		Handles.RemoveFromASC(AbilitySystemComponent);
+	}
+
+	GrantedSetHandles.Empty();
 }
 
 void ABaseCharacter::RotateToRotation(const FRotator& TargetRotation, float RotateTime)

@@ -1,9 +1,10 @@
 #include "GAS/Abilities/Enemy/EnemyAbility.h"
+#include "Characters/EnemyCharacter.h"
 #include "Characters/BossCharacter.h"
-#include "GAS/AttributeSet/BossAttributeSet.h"
+#include "GAS/AttributeSet/EnemyAttributeSet.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
-#include "GAS/AbilitySystemComponent/BossAbilitySystemComponent.h"
+#include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "AI/EnemyAIController.h"
 
 #define ENABLE_DEBUG_LOG 0
@@ -40,12 +41,22 @@ void UEnemyAbility::ActivateInitSettings()
 	Super::ActivateInitSettings();
 }
 
-UBossAbilitySystemComponent* UEnemyAbility::GetBossAbilitySystemComponentFromActorInfo() const
+AEnemyCharacter* UEnemyAbility::GetEnemyCharacterFromActorInfo() const
+{
+	return Cast<AEnemyCharacter>(GetActorInfo().AvatarActor.Get());
+}
+
+AEnemyCharacter* UEnemyAbility::GetEnemyCharacterFromActorInfo(const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	return Cast<AEnemyCharacter>(ActorInfo->AvatarActor.Get());
+}
+
+UEnemyAbilitySystemComponent* UEnemyAbility::GetEnemyAbilitySystemComponentFromActorInfo() const
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
 	if (ASC)
 	{
-		return Cast<UBossAbilitySystemComponent>(ASC);
+		return Cast<UEnemyAbilitySystemComponent>(ASC);
 	}
 	return nullptr;
 }
@@ -60,9 +71,9 @@ ABossCharacter* UEnemyAbility::GetBossCharacterFromActorInfo(const FGameplayAbil
 	return Cast<ABossCharacter>(ActorInfo->AvatarActor.Get());
 }
 
-UBossAttributeSet* UEnemyAbility::GetBossAttributeSetFromActorInfo() const
+UEnemyAttributeSet* UEnemyAbility::GetEnemyAttributeSetFromActorInfo() const
 {
-	ABossCharacter* Character = GetBossCharacterFromActorInfo();
+	AEnemyCharacter* Character = GetEnemyCharacterFromActorInfo();
 	if (Character)
 	{
 		return Character->GetAttributeSet();
@@ -70,9 +81,9 @@ UBossAttributeSet* UEnemyAbility::GetBossAttributeSetFromActorInfo() const
 	return nullptr;
 }
 
-UBossAttributeSet* UEnemyAbility::GetBossAttributeSetFromActorInfo(const FGameplayAbilityActorInfo* ActorInfo) const
+UEnemyAttributeSet* UEnemyAbility::GetEnemyAttributeSetFromActorInfo(const FGameplayAbilityActorInfo* ActorInfo) const
 {
-	ABossCharacter* Character = GetBossCharacterFromActorInfo(ActorInfo);
+	AEnemyCharacter* Character = GetEnemyCharacterFromActorInfo(ActorInfo);
 	if (Character)
 	{
 		return Character->GetAttributeSet();
@@ -82,7 +93,7 @@ UBossAttributeSet* UEnemyAbility::GetBossAttributeSetFromActorInfo(const FGamepl
 
 AEnemyAIController* UEnemyAbility::GetEnemyAIControllerFromActorInfo() const
 {
-	ABossCharacter* Character = GetBossCharacterFromActorInfo();
+	AEnemyCharacter* Character = GetEnemyCharacterFromActorInfo();
 	if (Character)
 	{
 		return Character->GetEnemyAIController();
@@ -92,7 +103,7 @@ AEnemyAIController* UEnemyAbility::GetEnemyAIControllerFromActorInfo() const
 
 AEnemyAIController* UEnemyAbility::GetEnemyAIControllerFromActorInfo(const FGameplayAbilityActorInfo* ActorInfo) const
 {
-	ABossCharacter* Character = GetBossCharacterFromActorInfo(ActorInfo);
+	AEnemyCharacter* Character = GetEnemyCharacterFromActorInfo(ActorInfo);
 	if (Character)
 	{
 		return Character->GetEnemyAIController();

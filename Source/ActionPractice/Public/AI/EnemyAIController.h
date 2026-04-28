@@ -7,7 +7,7 @@
 class AActionPracticeCharacter;
 class UStateTreeAIComponent;
 class UGASStateTreeAIComponent;
-class ABossCharacter;
+class AEnemyCharacter;
 class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 
@@ -55,7 +55,7 @@ public:
 	AEnemyAIController();
 
 	FORCEINLINE UGASStateTreeAIComponent* GetStateTreeComponent() const { return GASStateTreeAIComponent; }
-	FORCEINLINE ABossCharacter* GetBossCharacter() const { return BossCharacter.Get(); }
+	FORCEINLINE AEnemyCharacter* GetEnemyCharacter() const { return EnemyCharacter.Get(); }
 	FORCEINLINE AActor* GetCurrentTargetActor() const { return CurrentTarget.Actor.Get(); }
 	FORCEINLINE const FCurrentTarget& GetCurrentTarget() const { return CurrentTarget; }
 
@@ -85,7 +85,7 @@ protected:
 private:
 #pragma region "Private Variables"
 
-	TWeakObjectPtr<ABossCharacter> BossCharacter;
+	TWeakObjectPtr<AEnemyCharacter> EnemyCharacter;
 
 #pragma endregion
 

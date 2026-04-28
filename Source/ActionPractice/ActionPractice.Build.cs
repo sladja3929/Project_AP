@@ -24,19 +24,16 @@ public class ActionPractice : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"NetCore"
+			"NetCore",
+			"Niagara",
+			"PhysicsCore",
+			"NavigationSystem"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
 		PublicIncludePaths.AddRange(new string[] {
-			"ActionPractice",
-			"ActionPractice/Variant_Platforming",
-			"ActionPractice/Variant_Combat",
-			"ActionPractice/Variant_Combat/AI",
-			"ActionPractice/Variant_SideScrolling",
-			"ActionPractice/Variant_SideScrolling/Gameplay",
-			"ActionPractice/Variant_SideScrolling/AI"
+			"ActionPractice"
 		});
 
 		// Uncomment if you are using Slate UI

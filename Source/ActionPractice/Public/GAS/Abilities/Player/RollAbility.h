@@ -24,7 +24,7 @@ protected:
 #pragma region "Protected Variables"
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Roll")
-	class UAnimMontage* RollMontage = nullptr;
+	TObjectPtr<UAnimMontage> RollMontage = nullptr;
 
 	//무적 상태 Gameplay Effect
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Roll")

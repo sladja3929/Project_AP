@@ -4,7 +4,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "ActionPracticeGameMode.generated.h"
 
-class ABossCharacter;
+class AEnemyCharacter;
 
 /**
  *  Simple GameMode for a third person game
@@ -16,7 +16,7 @@ class AActionPracticeGameMode : public AGameModeBase
 
 public:
 	UPROPERTY(EditDefaultsOnly, Category = "Boss")
-	TSubclassOf<ABossCharacter> BossClass;
+	TSubclassOf<AEnemyCharacter> BossClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Boss")
 	FVector BossSpawnLocation = FVector(0, 0, 100);
@@ -30,9 +30,12 @@ public:
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	virtual void BeginPlay() override;
 
+	//Phase 6에서 구현 예정: 보스 초기화 (호출 지점만 고정)
+	void ResetAllEnemies();
+
 protected:
 	UPROPERTY()
-	TObjectPtr<ABossCharacter> SpawnedBoss = nullptr;
+	TObjectPtr<AEnemyCharacter> SpawnedBoss = nullptr;
 };
 
 

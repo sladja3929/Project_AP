@@ -70,19 +70,6 @@ bool FHitDetectionSetter::PrepareHitDetection(const FGameplayTagContainer& Asset
 	return true;
 }
 
-bool FHitDetectionSetter::PrepareHitDetection(const FName& AttackName, const int32 ComboCounter)
-{
-	if(!HitDetection)
-	{
-		DEBUG_LOG(TEXT("PrepareHitDetection: HitDetection is nullptr"));
-		return false;
-	}
-
-	HitDetection->PrepareHitDetection(AttackName, ComboCounter);
-
-	DEBUG_LOG(TEXT("PrepareHitDetection: Called with AttackName=%s, ComboCounter=%d"), *AttackName.ToString(), ComboCounter);
-	return true;
-}
 
 bool FHitDetectionSetter::IsValid() const
 {

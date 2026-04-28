@@ -41,9 +41,11 @@ protected:
 	FHitReactionProcessor ReactionProcessor;
 
 	FGameplayTag StateAbilityBlockingTag;
+	FGameplayTag StateGuardBrokenTag;
 	FGameplayTag AbilityBlockTag;
 
 	bool bIsBlockReaction = false;
+	bool bIsGuardBreakReaction = false;
 
 #pragma endregion
 
