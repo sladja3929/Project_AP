@@ -108,6 +108,9 @@ protected:
 	//스태미나 부족으로 Idle 복귀 시 몽타주 유지 플래그
 	bool bPreserveMontage = false;
 
+	//비-Idle 상태에서 OnWeaponChanged 수신 시 표시. Idle 진입 시 재캐싱
+	bool bWeaponDataDirty = false;
+
 	// ===== 무기 데이터 =====
 	UPROPERTY()
 	TObjectPtr<const UWeaponDataAsset> CachedWeaponDataAsset = nullptr;
@@ -206,9 +209,13 @@ protected:
 
 	UFUNCTION()
 	void OnEventCancelAttack(FGameplayEventData Payload);
-	
+
 	UFUNCTION()
 	void OnEventResetCombo(FGameplayEventData Payload);
+
+	//무기 변경 이벤트 핸들러 (OnRep_RightWeapon 후 클라이언트 캐시 갱신용)
+	UFUNCTION()
+	void OnWeaponChanged(bool bIsLeftHand);
 	
 	//몽타주 핸들러
 	virtual void OnTaskMontageCompleted() override;
