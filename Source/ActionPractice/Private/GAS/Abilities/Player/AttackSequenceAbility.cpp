@@ -9,6 +9,7 @@
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 #include "Characters/ActionPracticeCharacter.h"
+#include "Characters/WeaponManagerComponent.h"
 #include "Items/WeaponDataAsset.h"
 #include "AbilitySystemComponent.h"
 #include "GAS/Abilities/HitDetectionSetter.h"
@@ -60,6 +61,19 @@ void UAttackSequenceAbility::ActivateInitSettings()
 
 	//무기 데이터 캐싱
 	CacheWeaponData();
+
+	//무기 변경 이벤트 바인딩 (OnRep_RightWeapon 타이밍 흡수)
+	if (AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo())
+	{
+		if (UWeaponManagerComponent* WMC = Character->GetWeaponManagerComponent())
+		{
+			//중복 바인딩 방지
+			WMC->OnWeaponChanged.RemoveDynamic(this, &UAttackSequenceAbility::OnWeaponChanged);
+			WMC->OnWeaponChanged.AddDynamic(this, &UAttackSequenceAbility::OnWeaponChanged);
+		}
+	}
+
+	bWeaponDataDirty = false;
 
 	//HitDetectionSetter 바인딩
 	BindHitDetectionSetter();
@@ -383,6 +397,13 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 	switch (CurrentState)
 	{
 	case EAttackSequenceState::Idle:
+		//Idle 진입 시점에 보류된 무기 캐시 갱신 적용 (비-Idle 중 OnWeaponChanged 수신분)
+		if (bWeaponDataDirty)
+		{
+			CacheWeaponData();
+			bWeaponDataDirty = false;
+		}
+
 		//None: ComboCounter, MaxComboCount 0
 		ChangeAttackType(EAttackType::None);
 		CurrentChargeProgress = EChargeProgress::NoCharge;
@@ -709,6 +730,26 @@ void UAttackSequenceAbility::OnEventResetCombo(FGameplayEventData Payload)
 	ComboCounter = 0;
 }
 
+void UAttackSequenceAbility::OnWeaponChanged(bool bIsLeftHand)
+{
+	//왼손 무기는 공격 데이터에 영향 없음
+	if (bIsLeftHand) return;
+
+	DEBUG_LOG(TEXT("AttackSequenceAbility - OnWeaponChanged received (Right). State=%s"),
+		*UEnum::GetValueAsName(CurrentState).ToString());
+
+	//Idle 상태: 즉시 재캐싱
+	//비-Idle 상태: 진행 중인 공격이 OLD WeaponDataAsset 포인터를 참조 중일 수 있으므로 보류
+	if (CurrentState == EAttackSequenceState::Idle)
+	{
+		CacheWeaponData();
+	}
+	else
+	{
+		bWeaponDataDirty = true;
+	}
+}
+
 void UAttackSequenceAbility::OnTaskMontageCompleted()
 {
 	DEBUG_LOG(TEXT("AttackSequenceAbility - Task Montage Completed"));
@@ -800,6 +841,17 @@ void UAttackSequenceAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
 	END_ABILITY_TASK(WaitInputByBufferEventTask);
 	END_ABILITY_TASK(WaitResetComboEventTask);
 	END_ABILITY_TASK(WaitCancelAttackEventTask);
+
+	//무기 변경 이벤트 언바인딩
+	if (AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo())
+	{
+		if (UWeaponManagerComponent* WMC = Character->GetWeaponManagerComponent())
+		{
+			WMC->OnWeaponChanged.RemoveDynamic(this, &UAttackSequenceAbility::OnWeaponChanged);
+		}
+	}
+
+	bWeaponDataDirty = false;
 
 	//HitDetectionSetter 언바인딩
 	HitDetectionSetter.UnBind();
