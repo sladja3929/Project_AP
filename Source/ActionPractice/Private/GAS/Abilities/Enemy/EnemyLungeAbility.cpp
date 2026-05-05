@@ -17,6 +17,17 @@
 #define DEBUG_LOG(Format, ...)
 #endif
 
+/***
+* 안내문: 이 파일은 5월 5일에 추적 로직이 변경되었습니다.
+* 해당 날짜 이전에 제출된 포트폴리오로 오신 분은 이전 버전(아래 링크)로 이동해주세요.
+* https://github.com/sladja3929/Project_AP/blob/4d96964cc86a25aa09ad5def79bb05b708445c06/Source/ActionPractice/Private/GAS/Abilities/Enemy/EnemyLungeAbility.cpp
+*
+* 변경점: Dedicated Client 환경 시뮬프록시의 몽타주 서버-클라이언트 ensure 실패로 인한 에러 수정
+* 이전 버전: 매 틱마다 CMC의 RootMotionSource->TargetLocation 값 수정
+* 문제점: 직접 TargetLocation을 수정할 경우 루트 모션 리플리케이션을 위한 무결성 검사에서 Server-Client 간 TargetLocation 차이가 발생하여 크래시 발생
+* 변경 버전: 수동 주기(유저 설정)마다 CMC의 RootMotionSource 자체를 재생성 후 적용 + 워프 이동을 막기 위한 StartLocation 역산
+*/
+
 UEnemyLungeAbility::UEnemyLungeAbility()
 {
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
