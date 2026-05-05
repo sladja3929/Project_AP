@@ -1,5 +1,4 @@
 #include "GAS/Abilities/Enemy/EnemyLungeAbility.h"
-#include "Abilities/Tasks/AbilityTask_ApplyRootMotionMoveToForce.h"
 #include "Characters/EnemyCharacter.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
 #include "AI/EnemyAIController.h"
@@ -88,12 +87,8 @@ void UEnemyLungeAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle
 
 void UEnemyLungeAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	//이동 태스크 정리
-	if (LungeMovementTask)
-	{
-		LungeMovementTask->EndTask();
-		LungeMovementTask = nullptr;
-	}
+	//RootMotionSource 정리 (어빌리티 중도 취소 대비)
+	StopLungeMovement();
 
 	//이벤트 태스크 정리
 	END_ABILITY_TASK(WaitTrackingTargetEventTask);
@@ -103,6 +98,11 @@ void UEnemyLungeAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, con
 	//상태 초기화
 	CachedLungeConfig = nullptr;
 	CachedDestination = FVector::ZeroVector;
+	OriginalLungeStartLocation = FVector::ZeroVector;
+	LungeStartWorldTime = 0.0f;
+	LungeOriginalDuration = 0.0f;
+	LastSourceStartLocation = FVector::ZeroVector;
+	LastSourceTargetLocation = FVector::ZeroVector;
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -119,25 +119,43 @@ void UEnemyLungeAbility::OnEventTrackingTarget(FGameplayEventData Payload)
 	}
 
 	//이동 중이 아니면 위치 캐싱만
-	if (!LungeMovementTask) return;
+	if (!IsLungeActive()) return;
 
-	//CMC에 등록된 RootMotionSource를 직접 갱신 (태스크 멤버는 protected라 접근 불가)
 	AEnemyCharacter* Enemy = GetEnemyCharacterFromActorInfo();
 	if (!Enemy) return;
-
 	UCharacterMovementComponent* CMC = Enemy->GetCharacterMovement();
 	if (!CMC) return;
+	UWorld* World = GetWorld();
+	if (!World) return;
 
-	//태스크 생성 시 사용한 TaskInstanceName("LungeMove")으로 소스 탐색
-	for (TSharedPtr<FRootMotionSource>& Source : CMC->CurrentRootMotion.RootMotionSources)
-	{
-		if (Source.IsValid() && Source->InstanceName == FName("LungeMove"))
-		{
-			FRootMotionSource_MoveToForce* MoveToForce = static_cast<FRootMotionSource_MoveToForce*>(Source.Get());
-			MoveToForce->TargetLocation = CachedDestination;
-			break;
-		}
-	}
+	const float Elapsed = World->GetTimeSeconds() - LungeStartWorldTime;
+	//거의 끝나면 재타게팅 의미 없음
+	if (Elapsed >= LungeOriginalDuration - 0.05f) return;
+
+	const float Alpha = Elapsed / LungeOriginalDuration;
+	const float OneMinusAlpha = 1.0f - Alpha;
+
+	//분모 안전 가드 (위 0.05초 가드로 사실상 도달 불가지만 방어)
+	if (OneMinusAlpha < KINDA_SMALL_NUMBER) return;
+
+	//옛 source의 lerp 직선상 현재 진행 위치 (HeightCurve 영향 제외한 그라운드 위치)
+	const FVector OldLerpGround = FMath::Lerp(LastSourceStartLocation, LastSourceTargetLocation, Alpha);
+
+	//새 직선이 OldLerpGround를 정확히 지나도록 NewStart 역산
+	//→ 재타게팅 직후 캐릭터 위치가 새 lerp 직선 위에 그대로 놓이므로 시각적 도약 0
+	const FVector NewStart = (OldLerpGround - Alpha * CachedDestination) / OneMinusAlpha;
+
+	//같은 source의 TargetLocation in-place 변형 대신 source 인스턴스를 통째로 교체
+	//→ 시뮬프록시 ConvertRootMotionServerIDsToLocalIDs의 Matches 충돌(ensure trip) 회피
+	//Duration/CurrentTime 보존으로 HeightCurve 궤적 연속성 유지
+	//StartLocation은 역산값 사용으로 시각적 도약 제거
+	CMC->RemoveRootMotionSourceByID(CurrentLungeSourceID);
+	CurrentLungeSourceID = AddLungeRootMotionSource(
+		CMC,
+		NewStart,
+		CachedDestination,
+		LungeOriginalDuration,
+		Elapsed);
 }
 
 void UEnemyLungeAbility::OnEventLungeStart(FGameplayEventData Payload)
@@ -151,26 +169,10 @@ void UEnemyLungeAbility::OnEventLungeStart(FGameplayEventData Payload)
 
 void UEnemyLungeAbility::OnEventLungeEnd(FGameplayEventData Payload)
 {
-	//Lunging ANS End — 이동 태스크 정리
+	//Lunging ANS End — RootMotionSource 정리
 	DEBUG_LOG(TEXT("OnEventLungeEnd"));
 
-	if (LungeMovementTask)
-	{
-		LungeMovementTask->EndTask();
-		LungeMovementTask = nullptr;
-	}
-}
-
-void UEnemyLungeAbility::OnLungeMovementFinished()
-{
-	//MoveToForce 태스크 시간 만료 — 이동 태스크 정리
-	DEBUG_LOG(TEXT("OnLungeMovementFinished"));
-
-	if (LungeMovementTask)
-	{
-		LungeMovementTask->EndTask();
-		LungeMovementTask = nullptr;
-	}
+	StopLungeMovement();
 }
 
 #pragma endregion
@@ -185,40 +187,84 @@ void UEnemyLungeAbility::StartLungeMovement(float Duration)
 		DEBUG_LOG(TEXT("StartLungeMovement: Enemy or LungeConfig is nullptr"));
 		return;
 	}
+	UCharacterMovementComponent* CMC = Enemy->GetCharacterMovement();
+	if (!CMC) return;
+	UWorld* World = GetWorld();
+	if (!World) return;
 
 	Duration = FMath::Max(Duration, 0.05f);
 
+	//출발점/시작시간/Duration 캐싱 (재타게팅 시 source 재생성에 사용)
+	OriginalLungeStartLocation = Enemy->GetActorLocation();
+	LungeStartWorldTime = World->GetTimeSeconds();
+	LungeOriginalDuration = Duration;
+
 	DEBUG_LOG(TEXT("StartLungeMovement: Start=%s, Dest=%s, Duration=%.2f"),
-		*Enemy->GetActorLocation().ToString(),
+		*OriginalLungeStartLocation.ToString(),
 		*CachedDestination.ToString(),
 		Duration);
 
-	LungeMovementTask = UAbilityTask_ApplyRootMotionMoveToForce::ApplyRootMotionMoveToForce(
-		this,
-		FName("LungeMove"),
+	CurrentLungeSourceID = AddLungeRootMotionSource(
+		CMC,
+		OriginalLungeStartLocation,
 		CachedDestination,
 		Duration,
-		false,  //bSetNewMovementMode
-		CachedLungeConfig->HeightCurve ? EMovementMode::MOVE_Falling : EMovementMode::MOVE_Walking,
-		false,  //bRestrictSpeedToExpected
-		CachedLungeConfig->HeightCurve.Get(), //PathOffsetCurve (UCurveVector*)
-		ERootMotionFinishVelocityMode::ClampVelocity,
-		FVector::ZeroVector,
-		0.0f
-	);
+		0.0f);
+}
 
-	if (LungeMovementTask)
+void UEnemyLungeAbility::StopLungeMovement()
+{
+	if (CurrentLungeSourceID == 0) return;
+
+	if (AEnemyCharacter* Enemy = GetEnemyCharacterFromActorInfo())
 	{
-		//시간 만료 + 목적지 도달, 또는 시간 만료만 — 둘 다 같은 콜백
-		LungeMovementTask->OnTimedOutAndDestinationReached.AddDynamic(this, &UEnemyLungeAbility::OnLungeMovementFinished);
-		LungeMovementTask->OnTimedOut.AddDynamic(this, &UEnemyLungeAbility::OnLungeMovementFinished);
-		LungeMovementTask->ReadyForActivation();
-		DEBUG_LOG(TEXT("StartLungeMovement: MoveToForce task started"));
+		if (UCharacterMovementComponent* CMC = Enemy->GetCharacterMovement())
+		{
+			CMC->RemoveRootMotionSourceByID(CurrentLungeSourceID);
+		}
 	}
-	else
+	CurrentLungeSourceID = 0;
+}
+
+bool UEnemyLungeAbility::IsLungeActive() const
+{
+	return CurrentLungeSourceID != 0;
+}
+
+uint16 UEnemyLungeAbility::AddLungeRootMotionSource(
+	UCharacterMovementComponent* CMC,
+	const FVector& StartLocation,
+	const FVector& TargetLocation,
+	float Duration,
+	float TimeOffset)
+{
+	if (!CMC || !CachedLungeConfig) return 0;
+
+	TSharedPtr<FRootMotionSource_MoveToForce> Source = MakeShared<FRootMotionSource_MoveToForce>();
+	Source->InstanceName = FName("LungeMove");
+	Source->AccumulateMode = ERootMotionAccumulateMode::Override;
+	Source->Settings.SetFlag(ERootMotionSourceSettingsFlags::UseSensitiveLiftoffCheck);
+	Source->Priority = 1000;
+	Source->StartLocation = StartLocation;
+	Source->TargetLocation = TargetLocation;
+	Source->Duration = Duration;
+	Source->bRestrictSpeedToExpected = false;
+	Source->PathOffsetCurve = CachedLungeConfig->HeightCurve;
+	Source->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::ClampVelocity;
+
+	//재타게팅 시 시간 보존 (TimeOffset > 0이면 source 내부 시간을 진행된 만큼 앞당김)
+	if (TimeOffset > 0.0f)
 	{
-		DEBUG_LOG(TEXT("StartLungeMovement: Failed to create MoveToForce task"));
+		Source->SetTime(TimeOffset);
 	}
+
+	const uint16 NewID = CMC->ApplyRootMotionSource(Source);
+
+	//역산용 직선 정보 캐싱 (다음 재타게팅 시 OldLerpGround 계산에 사용)
+	LastSourceStartLocation = StartLocation;
+	LastSourceTargetLocation = TargetLocation;
+
+	return NewID;
 }
 
 #pragma endregion

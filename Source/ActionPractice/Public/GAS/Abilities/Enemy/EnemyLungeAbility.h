@@ -4,7 +4,7 @@
 #include "GAS/Abilities/Enemy/EnemyAttackAbility.h"
 #include "EnemyLungeAbility.generated.h"
 
-class UAbilityTask_ApplyRootMotionMoveToForce;
+class UCharacterMovementComponent;
 struct FEnemyLungeConfig;
 
 /***
@@ -49,9 +49,23 @@ protected:
 	//TrackingTarget ANS에서 갱신되는 타겟 위치
 	FVector CachedDestination = FVector::ZeroVector;
 
-	//이동 태스크
-	UPROPERTY()
-	TObjectPtr<UAbilityTask_ApplyRootMotionMoveToForce> LungeMovementTask = nullptr;
+	//lunge 시작 위치 (lerp 출발점 보존용 — 재타게팅 시 source 재생성에 사용)
+	FVector OriginalLungeStartLocation = FVector::ZeroVector;
+
+	//lunge 시작 월드시간 (Elapsed 계산용)
+	float LungeStartWorldTime = 0.0f;
+
+	//lunge 원래 Duration (재타게팅 시 보존)
+	float LungeOriginalDuration = 0.0f;
+
+	//활성 RootMotionSource의 LocalID (0 == ERootMotionSourceID::Invalid)
+	uint16 CurrentLungeSourceID = 0;
+
+	//마지막으로 등록한 source의 StartLocation (재타게팅 시 OldLerpGround 계산용)
+	FVector LastSourceStartLocation = FVector::ZeroVector;
+
+	//마지막으로 등록한 source의 TargetLocation (재타게팅 시 OldLerpGround 계산용)
+	FVector LastSourceTargetLocation = FVector::ZeroVector;
 
 	// ===== 이벤트 태스크 =====
 	UPROPERTY()
@@ -79,6 +93,15 @@ protected:
 
 	// ===== 이동 =====
 	void StartLungeMovement(float Duration);
+	void StopLungeMovement();
+	bool IsLungeActive() const;
+
+	//새 RootMotionSource 인스턴스를 만들어 CMC에 등록. LocalID 반환 (0 == 실패)
+	uint16 AddLungeRootMotionSource(UCharacterMovementComponent* CMC,
+		const FVector& StartLocation,
+		const FVector& TargetLocation,
+		float Duration,
+		float TimeOffset);
 
 	// ===== 이벤트 핸들러 =====
 	UFUNCTION()
@@ -89,10 +112,6 @@ protected:
 
 	UFUNCTION()
 	void OnEventLungeEnd(FGameplayEventData Payload);
-
-	//MoveToForce 태스크 완료 콜백 (void() 시그니처)
-	UFUNCTION()
-	void OnLungeMovementFinished();
 
 	// ===== 오버라이드 =====
 
