@@ -184,6 +184,10 @@ protected:
 	virtual void CreateAbilitySystemComponent() override;
 	virtual void CreateAttributeSet() override;
 
+	// ===== Possession =====
+	virtual void PossessedBy(AController* NewController) override;
+	virtual void OnRep_Owner() override;
+
 	bool IsAttackSequenceAutoActivateReady() const;
 
 	// ===== Input Handler Additional Functions =====

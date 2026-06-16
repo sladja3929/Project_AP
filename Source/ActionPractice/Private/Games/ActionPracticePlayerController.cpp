@@ -143,6 +143,7 @@ void AActionPracticePlayerController::SetupInputComponent()
 void AActionPracticePlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
+
 	CachedCharacter = Cast<AActionPracticeCharacter>(InPawn);
 
 	//서버: 기본 리스폰 Bonfire 초기화 (아직 설정되지 않은 경우에만)
