@@ -71,6 +71,9 @@ protected:
 	float TotalRotationTime = 0;
 	bool bIsRotatingForAction = false;
 
+	//GAS 초기화 멱등성 가드 (possess/OnRep 양 경로 중복 호출 방지)
+	bool bAbilitySystemInitialized = false;
+
 #pragma endregion
 
 #pragma region "Protected Functions"

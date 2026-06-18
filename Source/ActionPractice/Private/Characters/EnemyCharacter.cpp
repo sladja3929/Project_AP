@@ -94,6 +94,10 @@ void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	//플레이어와 달리 적은 possess 콜백 흐름에 묶이지 않으므로 BeginPlay 시점에 직접 GAS 초기화
+	//(BaseCharacter::BeginPlay에서 호출하던 안전망을 자식 클래스로 이동)
+	InitializeAbilitySystem();
+
 	DEBUG_LOG(TEXT("EnemyCharacter::BeginPlay: This=%p, ASC=%p, AttributeSet=%p"),
 		this,
 		AbilitySystemComponent.Get(),

@@ -75,9 +75,10 @@ Plugins/**/Intermediate/*
 DerivedDataCache/*
 
 # AI Configuration files
-*CLAUDE.md
-.claude
+.claude/settings.local.json
 .env
+.env.*
+!.env.example
 *repopackpy-output.txt
 *repomix-output.txt
 *repomix-output.xml

@@ -464,6 +464,26 @@ void AActionPracticeCharacter::InitializeAbilitySystem()
 	Super::InitializeAbilitySystem();
 }
 
+void AActionPracticeCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	//서버: possess 시점(= Owner가 Controller로 맞춰진 뒤) GAS 초기화
+	InitializeAbilitySystem();
+}
+
+void AActionPracticeCharacter::OnRep_Owner()
+{
+	Super::OnRep_Owner();
+
+	//클라이언트: Owner(Controller) 복제 도착 시 GAS 초기화
+	//서버는 PossessedBy에서 초기화하므로 여기서는 클라만 처리
+	if (!HasAuthority())
+	{
+		InitializeAbilitySystem();
+	}
+}
+
 void AActionPracticeCharacter::CreateAbilitySystemComponent()
 {
 	AbilitySystemComponent = CreateDefaultSubobject<UActionPracticeAbilitySystemComponent>(TEXT("AbilitySystemComponent"));

@@ -31,7 +31,8 @@ void ABaseCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	InitializeAbilitySystem();
+	//GAS 초기화는 possess 타이밍으로 이동 (ActionPracticeCharacter::PossessedBy / OnRep_Owner)
+	//단, possess가 없는 케이스(적 캐릭터 등)를 위해 자식에서 필요 시 직접 호출
 }
 
 void ABaseCharacter::Tick(float DeltaTime)
@@ -55,6 +56,9 @@ void ABaseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 void ABaseCharacter::InitializeAbilitySystem()
 {
+	//중복 초기화 방지 (PossessedBy/OnRep_Owner 양쪽에서 호출될 수 있음)
+	if (bAbilitySystemInitialized) return;
+
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
@@ -63,6 +67,8 @@ void ABaseCharacter::InitializeAbilitySystem()
 		ApplyInitialAttributes();
 
 		GrantStartupAbilitySets();
+
+		bAbilitySystemInitialized = true;
 	}
 }
 
