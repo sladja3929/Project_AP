@@ -120,7 +120,7 @@ void UParryAbility::OnCurveRisingEdgeReceived(FName CurveName)
 		UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
 		if (ASC && StateParryingTag.IsValid())
 		{
-			ASC->AddLooseGameplayTag(StateParryingTag);
+			AddParryingTag_Predicted();
 			DEBUG_LOG(TEXT("ParryWindow OPEN - State.Parrying added"));
 		}
 	}
@@ -143,12 +143,52 @@ void UParryAbility::OnCurveFallingEdgeReceived(FName CurveName)
 void UParryAbility::CleanupParryingTag()
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
-	if (ASC && StateParryingTag.IsValid())
+	if (!ASC || !StateParryingTag.IsValid())
 	{
-		while (ASC->HasMatchingGameplayTag(StateParryingTag))
+		return;
+	}
+
+	const bool bIsAuthority = HasAuthority(&CurrentActivationInfo);
+
+	while (ASC->HasMatchingGameplayTag(StateParryingTag))
+	{
+		ASC->RemoveLooseGameplayTag(StateParryingTag);
+
+		//서버: 추가 시 사용한 복제 태그도 대칭 제거
+		if (bIsAuthority)
 		{
-			ASC->RemoveLooseGameplayTag(StateParryingTag);
+			ASC->RemoveMinimalReplicationGameplayTag(StateParryingTag);
 		}
+	}
+}
+
+void UParryAbility::AddParryingTag_Predicted()
+{
+	UActionPracticeAbilitySystemComponent* APASC = GetActionPracticeAbilitySystemComponentFromActorInfo();
+
+	if (!APASC || !StateParryingTag.IsValid())
+	{
+		return;
+	}
+
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	const bool bIsAuthority = HasAuthority(&CurrentActivationInfo);
+	const bool bIsLocallyControlled = ActorInfo && ActorInfo->IsLocallyControlled();
+
+	//서버: 권위 태그 적용 + MinimalReplication 복제 (판정용 + 프록시 가시성)
+	if (bIsAuthority)
+	{
+		APASC->AddLooseGameplayTag(StateParryingTag);
+		APASC->AddMinimalReplicationGameplayTag(StateParryingTag);
+		return;
+	}
+
+	//소유 클라(비권위): 예측 윈도우 안에서 태그 예측 적용
+	if (bIsLocallyControlled)
+	{
+		FScopedPredictionWindow ScopedPrediction(APASC, true);
+
+		APASC->AddLooseGameplayTag(StateParryingTag);
 	}
 }
 #pragma endregion
