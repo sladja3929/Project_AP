@@ -58,5 +58,8 @@ private:
 	//State.Parrying 태그 안전 제거
 	void CleanupParryingTag();
 
+	//패리 윈도우 진입: 소유 클라는 예측 윈도우로 적용, 서버는 권위+복제
+	void AddParryingTag_Predicted();
+	
 #pragma endregion
 };
