@@ -545,14 +545,14 @@ void UAttackTraceComponent::PerformInterpolationTrace(
 		TArray<FHitResult> SubHits;
 
 		GetWorld()->SweepMultiByChannel(
-			SubHits,
-			InterpStart,
-			InterpEnd,
-			FQuat::Identity,
-			GetTraceChannel(),
-			FCollisionShape::MakeCapsule(Radius, (InterpEnd - InterpStart).Size() * 0.5f),
-			Params
-		);
+		SubHits,
+		InterpStart,
+		InterpEnd,
+		FQuat::Identity,
+		GetTraceChannel(),
+		FCollisionShape::MakeSphere(Radius),
+		Params
+);
 
 		OutHits.Append(SubHits);
 
