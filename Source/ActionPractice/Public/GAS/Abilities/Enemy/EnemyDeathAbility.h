@@ -33,10 +33,6 @@ protected:
 	//태그
 	FGameplayTag StateDeadTag;
 
-	//캐시된 사망 몽타주 (EnemyDataAsset에서 가져옴)
-	UPROPERTY()
-	TObjectPtr<UAnimMontage> CachedDeathMontage = nullptr;
-
 #pragma endregion
 
 #pragma region "Protected Functions"

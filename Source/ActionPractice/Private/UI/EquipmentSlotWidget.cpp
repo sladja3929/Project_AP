@@ -7,6 +7,8 @@
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
 #include "Items/UsableItemDataAsset.h"
+#include "Engine/Texture2D.h"
+#include "Engine/AssetManager.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -42,6 +44,16 @@ void UEquipmentSlotWidget::NativeDestruct()
 	{
 		ItemManager->OnEquippedItemChanged.RemoveDynamic(this, &UEquipmentSlotWidget::RefreshItemSlot);
 	}
+
+	//진행 중인 모든 아이콘 비동기 로드 취소 (위젯 파괴 후 콜백이 파괴된 이미지를 건드리지 않도록)
+	for (TPair<UImage*, FSlotIconRequest>& Pair : PendingIconRequests)
+	{
+		if (Pair.Value.Handle.IsValid())
+		{
+			Pair.Value.Handle->CancelHandle();
+		}
+	}
+	PendingIconRequests.Empty();
 
 	Super::NativeDestruct();
 }
@@ -166,30 +178,113 @@ void UEquipmentSlotWidget::SetSlotIcon(UImage* TargetImage, const UBaseItemDataA
 		return;
 	}
 
-	UTexture2D* IconTexture = nullptr;
+	//이 이미지에 진행 중이던 이전 아이콘 로드 취소 (슬롯 재사용 시 오래된 콜백이 새 아이콘을 덮어쓰지 않도록)
+	CancelPendingIconLoad(TargetImage);
 
-	if (ItemDA && !ItemDA->Icon.IsNull())
+	//아이콘이 지정되지 않은 슬롯 — 빈 텍스처/숨김 즉시 반영
+	if (!ItemDA || ItemDA->Icon.IsNull())
 	{
-		//TSoftObjectPtr 동기 로드
-		IconTexture = ItemDA->Icon.LoadSynchronous();
+		ApplyEmptySlotIcon(TargetImage);
+		return;
 	}
 
-	if (IconTexture)
+	const TSoftObjectPtr<UTexture2D> SoftIcon = ItemDA->Icon;
+
+	//이미 로드된 경우(이전 로드/프리로드로 메모리에 존재) 즉시 반영
+	if (UTexture2D* Loaded = SoftIcon.Get())
 	{
-		DEBUG_LOG(TEXT("SlotIcon: Texture=%s (ptr=%p)"), *GetNameSafe(IconTexture), IconTexture);
-		TargetImage->SetBrushFromTexture(IconTexture);
+		DEBUG_LOG(TEXT("SlotIcon: Texture=%s (already loaded)"), *GetNameSafe(Loaded));
+		TargetImage->SetBrushFromTexture(Loaded);
 		TargetImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-		DEBUG_LOG(TEXT("SlotIcon: Icon Changed"));
+		return;
+	}
+
+	//AssetManager 미초기화 등 비동기 불가 시 동기 폴백
+	if (!UAssetManager::IsInitialized())
+	{
+		if (UTexture2D* Sync = SoftIcon.LoadSynchronous())
+		{
+			TargetImage->SetBrushFromTexture(Sync);
+			TargetImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		}
+		else
+		{
+			ApplyEmptySlotIcon(TargetImage);
+		}
+		return;
+	}
+
+	//로드 중에는 빈 슬롯 텍스처 표시, 완료 콜백에서 실제 아이콘 반영
+	ApplyEmptySlotIcon(TargetImage);
+
+	const FSoftObjectPath IconPath = SoftIcon.ToSoftObjectPath();
+	TWeakObjectPtr<UEquipmentSlotWidget> WeakThis(this);
+	TWeakObjectPtr<UImage> WeakImage(TargetImage);
+
+	FStreamableManager& StreamableManager = UAssetManager::Get().GetStreamableManager();
+	TSharedPtr<FStreamableHandle> Handle = StreamableManager.RequestAsyncLoad(
+		IconPath,
+		FStreamableDelegate::CreateLambda([WeakThis, WeakImage, SoftIcon, IconPath]()
+		{
+			UEquipmentSlotWidget* StrongThis = WeakThis.Get();
+			UImage* Image = WeakImage.Get();
+
+			//위젯/이미지가 파괴됐으면 조용히 반환
+			if (!StrongThis || !Image)
+			{
+				return;
+			}
+
+			//세대 검증: 이 콜백의 요청 경로가 이 이미지의 최신 요청과 일치할 때만 반영 (슬롯 재사용/풀링 대비)
+			const FSlotIconRequest* Latest = StrongThis->PendingIconRequests.Find(Image);
+			if (!Latest || Latest->Path != IconPath)
+			{
+				return;
+			}
+
+			if (UTexture2D* Texture = SoftIcon.Get())
+			{
+				Image->SetBrushFromTexture(Texture);
+				Image->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+			}
+
+			//반영 완료 — 브러시(UImage UPROPERTY)가 텍스처 참조를 유지하므로 핸들 해제 안전
+			StrongThis->PendingIconRequests.Remove(Image);
+		}),
+		FStreamableManager::DefaultAsyncLoadPriority);
+
+	FSlotIconRequest Request;
+	Request.Handle = Handle;
+	Request.Path = IconPath;
+	PendingIconRequests.Add(TargetImage, MoveTemp(Request));
+}
+
+void UEquipmentSlotWidget::CancelPendingIconLoad(UImage* TargetImage)
+{
+	if (FSlotIconRequest* Existing = PendingIconRequests.Find(TargetImage))
+	{
+		if (Existing->Handle.IsValid())
+		{
+			Existing->Handle->CancelHandle();
+		}
+		PendingIconRequests.Remove(TargetImage);
+	}
+}
+
+void UEquipmentSlotWidget::ApplyEmptySlotIcon(UImage* TargetImage)
+{
+	if (!TargetImage)
+	{
+		return;
 	}
 
 	//할당된 아이콘이 없으면 기본(비었음) 아이콘 사용
-	else if (EmptySlotTexture)
+	if (EmptySlotTexture)
 	{
 		TargetImage->SetBrushFromTexture(EmptySlotTexture);
 		TargetImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 		DEBUG_LOG(TEXT("SlotIcon: No Icon, EmptySlotTexture"));
 	}
-	
 	else
 	{
 		TargetImage->SetVisibility(ESlateVisibility::Collapsed);

@@ -510,13 +510,28 @@ UAnimMontage* UAttackSequenceAbility::SetMontageToPlayTask()
 		//공격 몽타주 로드
 		if (CurrentState == EAttackSequenceState::Attacking)
 		{
-			Montage = ComboData.AttackMontage.LoadSynchronous();
+			//프리로드 완료분은 .Get()으로 즉시 획득(사실상 no-op), 미완료 시에만 동기 폴백
+			//폴백은 비동기 전환 실패가 아니라 입력 반응성 + 데디서버 코옵 결정론을 위해 의도적으로 남긴 안전망이다
+			//폴백 로그가 뜨는 지점 = 프리로드 트리거 배치가 잘못된 지점 (목표는 로그가 한 번도 안 뜨는 상태)
+			Montage = ComboData.AttackMontage.Get();
+
+			if (!Montage && !ComboData.AttackMontage.IsNull())
+			{
+				DEBUG_LOG(TEXT("[AsyncPreload] AttackSequence AttackMontage not preloaded, sync fallback: %s"), *ComboData.AttackMontage.ToString());
+				Montage = ComboData.AttackMontage.LoadSynchronous();
+			}
 		}
 
 		//차지 몽타주 로드
 		else if (CurrentState == EAttackSequenceState::Prepare)
 		{
-			Montage = ComboData.SubAttackMontage.LoadSynchronous();
+			Montage = ComboData.SubAttackMontage.Get();
+
+			if (!Montage && !ComboData.SubAttackMontage.IsNull())
+			{
+				DEBUG_LOG(TEXT("[AsyncPreload] AttackSequence SubAttackMontage not preloaded, sync fallback: %s"), *ComboData.SubAttackMontage.ToString());
+				Montage = ComboData.SubAttackMontage.LoadSynchronous();
+			}
 		}
 		
 		if (!Montage)

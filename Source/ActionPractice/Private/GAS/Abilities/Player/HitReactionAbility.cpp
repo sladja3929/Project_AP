@@ -128,14 +128,33 @@ UAnimMontage* UHitReactionAbility::SetMontageToPlayTask()
 		if (BlockData && !BlockData->GuardBreakMontage.IsNull())
 		{
 			DEBUG_LOG(TEXT("Playing GuardBreakMontage"));
-			return BlockData->GuardBreakMontage.LoadSynchronous();
+
+			//프리로드 완료분은 .Get()으로 즉시 획득(사실상 no-op), 미완료 시에만 동기 폴백(의도적 결정론 안전망)
+			UAnimMontage* Montage = BlockData->GuardBreakMontage.Get();
+
+			if (!Montage)
+			{
+				DEBUG_LOG(TEXT("[AsyncPreload] HitReaction GuardBreakMontage not preloaded, sync fallback: %s"), *BlockData->GuardBreakMontage.ToString());
+				Montage = BlockData->GuardBreakMontage.LoadSynchronous();
+			}
+
+			return Montage;
 		}
-		
+
 		//GuardBreakMontage가 없으면 Heavy BlockReaction으로 폴백
 		if (BlockData && !BlockData->BlockReactionHeavyMontage.IsNull())
 		{
 			DEBUG_LOG(TEXT("GuardBreakMontage not set, falling back to BlockReactionHeavy"));
-			return BlockData->BlockReactionHeavyMontage.LoadSynchronous();
+
+			UAnimMontage* Montage = BlockData->BlockReactionHeavyMontage.Get();
+
+			if (!Montage)
+			{
+				DEBUG_LOG(TEXT("[AsyncPreload] HitReaction BlockReactionHeavy(GuardBreak fallback) not preloaded, sync fallback: %s"), *BlockData->BlockReactionHeavyMontage.ToString());
+				Montage = BlockData->BlockReactionHeavyMontage.LoadSynchronous();
+			}
+
+			return Montage;
 		}
 	}
 
@@ -145,20 +164,37 @@ UAnimMontage* UHitReactionAbility::SetMontageToPlayTask()
 		const FBlockActionData* BlockData = FWeaponAbilityStatics::GetBlockDataFromAbility(this);
 		if (BlockData)
 		{
+			//레벨별 소프트 포인터 선택 후 공용 .Get() + 동기 폴백 경로로 통일
+			const TSoftObjectPtr<UAnimMontage>* SoftMontage = nullptr;
+
 			switch (Level)
 			{
 				case EReactionLevel::Heavy:
 					DEBUG_LOG(TEXT("Playing BlockReactionHeavy"));
-					return BlockData->BlockReactionHeavyMontage.LoadSynchronous();
+					SoftMontage = &BlockData->BlockReactionHeavyMontage;
+					break;
 				case EReactionLevel::Middle:
 					DEBUG_LOG(TEXT("Playing BlockReactionMiddle"));
-					return BlockData->BlockReactionMiddleMontage.LoadSynchronous();
+					SoftMontage = &BlockData->BlockReactionMiddleMontage;
+					break;
 				case EReactionLevel::Light:
 					DEBUG_LOG(TEXT("Playing BlockReactionLight"));
-					return BlockData->BlockReactionLightMontage.LoadSynchronous();
+					SoftMontage = &BlockData->BlockReactionLightMontage;
+					break;
 				default:
 					return nullptr;
 			}
+
+			//프리로드 완료분은 .Get()으로 즉시 획득(사실상 no-op), 미완료 시에만 동기 폴백(의도적 결정론 안전망)
+			UAnimMontage* Montage = SoftMontage->Get();
+
+			if (!Montage && !SoftMontage->IsNull())
+			{
+				DEBUG_LOG(TEXT("[AsyncPreload] HitReaction BlockReaction montage not preloaded, sync fallback: %s"), *SoftMontage->ToString());
+				Montage = SoftMontage->LoadSynchronous();
+			}
+
+			return Montage;
 		}
 	}
 

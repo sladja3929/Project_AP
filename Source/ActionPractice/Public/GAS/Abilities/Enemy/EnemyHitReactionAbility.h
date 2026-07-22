@@ -35,16 +35,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HitReaction")
 	FHitReactionProcessor ReactionProcessor;
 
-	//EnemyDataAsset에서 캐시한 몽타주
-	UPROPERTY()
-	TObjectPtr<UAnimMontage> CachedHitReactionLightMontage = nullptr;
-
-	UPROPERTY()
-	TObjectPtr<UAnimMontage> CachedHitReactionMiddleMontage = nullptr;
-
-	UPROPERTY()
-	TObjectPtr<UAnimMontage> CachedHitReactionHeavyMontage = nullptr;
-
 	//태그
 	FGameplayTag StateHitReactionTag;
 
@@ -67,6 +57,7 @@ protected:
 
 private:
 #pragma region "Private Variables"
+
 #pragma endregion
 
 #pragma region "Private Functions"

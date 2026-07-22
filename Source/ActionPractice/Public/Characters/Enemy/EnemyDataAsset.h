@@ -5,7 +5,6 @@
 #include "GameplayTagContainer.h"
 #include "Items/AttackData.h"
 #include "Engine/StreamableManager.h"
-#include "Engine/AssetManager.h"
 #include "EnemyDataAsset.generated.h"
 
 class UAnimMontage;
@@ -94,32 +93,32 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Attack Definitions", meta = (TitleProperty = "AttackTags"))
     TArray<FEnemyTaggedAttackData> TaggedAttackData;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Death")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Death", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> DeathMontage;
 
     // ===== HitReaction Montages =====
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HitReaction")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HitReaction", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> HitReactionLightMontage;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HitReaction")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HitReaction", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> HitReactionMiddleMontage;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HitReaction")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HitReaction", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> HitReactionHeavyMontage;
 
     // ===== Groggy Montages =====
 
     //그로기 시작 (쓰러짐)
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> GroggyStartMontage;
 
     //그로기 루프 (바닥에서 대기, 루프 몽타주)
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> GroggyLoopMontage;
 
     //그로기 종료 (일어남)
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> GroggyEndMontage;
 
     //그로기 루프 지속 시간 (초)
@@ -154,95 +153,24 @@ public:
         return Names;
     }
 
-    void PreloadAllMontages()
+    //AssetManager PrimaryAssetTypesToScan의 "EnemyData" 타입과 매핑 (Combat 번들 ChangeBundleState용)
+    virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
-        //이미 프리로드 됐으면 스킵 (LoadedMontageCache가 하드 레퍼런스로 붙잡고 있음)
-        if (bMontagesPreloaded) return;
-
-        TArray<FSoftObjectPath> AssetsToLoad;
-
-        for (const FEnemyTaggedAttackData& AttackData : TaggedAttackData)
-        {
-            for (const FEnemyComboAttackUnit& EnemyCombo : AttackData.ComboSequence)
-            {
-                if (!EnemyCombo.ComboData.AttackMontage.IsNull())
-                {
-                    AssetsToLoad.Add(EnemyCombo.ComboData.AttackMontage.ToSoftObjectPath());
-                }
-
-                //Charge 유형일 때만 SubAttackMontage 프리로드
-                if (AttackData.AttackType == EComboAttackType::Charge && !EnemyCombo.ComboData.SubAttackMontage.IsNull())
-                {
-                    AssetsToLoad.Add(EnemyCombo.ComboData.SubAttackMontage.ToSoftObjectPath());
-                }
-            }
-        }
-
-        //사망 몽타주 프리로드
-        if (!DeathMontage.IsNull())
-        {
-            AssetsToLoad.Add(DeathMontage.ToSoftObjectPath());
-        }
-
-        //히트리액션 몽타주 프리로드
-        if (!HitReactionLightMontage.IsNull())
-        {
-            AssetsToLoad.Add(HitReactionLightMontage.ToSoftObjectPath());
-        }
-        if (!HitReactionMiddleMontage.IsNull())
-        {
-            AssetsToLoad.Add(HitReactionMiddleMontage.ToSoftObjectPath());
-        }
-        if (!HitReactionHeavyMontage.IsNull())
-        {
-            AssetsToLoad.Add(HitReactionHeavyMontage.ToSoftObjectPath());
-        }
-
-        //그로기 몽타주 프리로드
-        if (!GroggyStartMontage.IsNull())
-        {
-            AssetsToLoad.Add(GroggyStartMontage.ToSoftObjectPath());
-        }
-        if (!GroggyLoopMontage.IsNull())
-        {
-            AssetsToLoad.Add(GroggyLoopMontage.ToSoftObjectPath());
-        }
-        if (!GroggyEndMontage.IsNull())
-        {
-            AssetsToLoad.Add(GroggyEndMontage.ToSoftObjectPath());
-        }
-
-        //Asset Manager를 통한 로딩
-        if (AssetsToLoad.Num() > 0 && UAssetManager::IsInitialized())
-        {
-            UAssetManager& AssetManager = UAssetManager::Get();
-            FStreamableManager& StreamableManager = AssetManager.GetStreamableManager();
-
-            //로드된 몽타주를 UPROPERTY 하드 레퍼런스에 보관해야 GC로부터 보호됨
-            //StreamableManager.LoadSynchronous는 핸들 없이 호출되면 반환 직후 GC 대상이 되고,
-            //TSoftObjectPtr 필드도 WeakObjectPtr 기반이라 하드 레퍼런스를 유지하지 못함
-            LoadedMontageCache.Reset(AssetsToLoad.Num());
-            for (const FSoftObjectPath& AssetPath : AssetsToLoad)
-            {
-                if (UObject* Loaded = StreamableManager.LoadSynchronous(AssetPath))
-                {
-                    if (UAnimMontage* Montage = Cast<UAnimMontage>(Loaded))
-                    {
-                        LoadedMontageCache.Add(Montage);
-                    }
-                }
-            }
-        }
-
-        bMontagesPreloaded = true;
+        return FPrimaryAssetId(TEXT("EnemyData"), GetFName());
     }
 
-private:
-    //PreloadAllMontages로 로드된 몽타주를 GC로부터 보호하기 위한 하드 레퍼런스 캐시
-    //쿡 빌드에서 GC가 돌면 프리로드된 몽타주가 수거되어 몽타주 재생이 실패할 수 있기 때문에 DA가 직접 붙잡아 둔다
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UAnimMontage>> LoadedMontageCache;
+    //모든 몽타주를 Combat 번들로 비동기 배치 프리로드 (공격 콤보 + 사망 + 히트리액션 + 그로기 전부)
+    //AEnemyCharacter::BeginPlay에서 fire-and-forget으로 호출된다 (호출 시그니처 파라미터 없음 유지)
+    void PreloadAllMontages();
 
-    UPROPERTY(Transient)
-    bool bMontagesPreloaded = false;
+    virtual void BeginDestroy() override;
+
+private:
+    //Combat 번들 로드 핸들 — UPROPERTY 아닌 순수 C++ 멤버
+    //ChangeBundleStateForPrimaryAssets가 반환하는 핸들을 보관해 AssetManager 참조 유지 시맨틱에
+    //의존하지 않고 로드된 몽타주 참조를 확정적으로 붙잡는다 (에셋 N개 배열 캐시 → 번들 핸들 1개로 축소)
+    TSharedPtr<FStreamableHandle> BundleHandle;
+
+    //중복 프리로드 요청 방지 플래그
+    bool bPreloadRequested = false;
 };

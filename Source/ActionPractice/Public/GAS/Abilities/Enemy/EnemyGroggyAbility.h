@@ -40,17 +40,7 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_PlayMontageWithEvents> PlayMontageWithEventsTask = nullptr;
 
-	//EnemyDataAsset에서 캐시한 몽타주
-	UPROPERTY()
-	TObjectPtr<UAnimMontage> CachedGroggyStartMontage = nullptr;
-
-	UPROPERTY()
-	TObjectPtr<UAnimMontage> CachedGroggyLoopMontage = nullptr;
-
-	UPROPERTY()
-	TObjectPtr<UAnimMontage> CachedGroggyEndMontage = nullptr;
-
-	//그로기 루프 지속 시간
+	//그로기 루프 지속 시간 (EnemyDataAsset에서 캐시한 설정값)
 	float CachedGroggyLoopDuration = 3.0f;
 
 	//현재 그로기 단계
@@ -86,6 +76,7 @@ protected:
 
 private:
 #pragma region "Private Variables"
+
 #pragma endregion
 
 #pragma region "Private Functions"

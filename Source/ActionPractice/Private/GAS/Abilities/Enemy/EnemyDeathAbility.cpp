@@ -31,16 +31,8 @@ void UEnemyDeathAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInf
 
 	StateDeadTag = UGameplayTagsSubsystem::GetStateDeadTag();
 
-	//EnemyDataAsset에서 사망 몽타주 캐싱
-	AEnemyCharacter* Enemy = GetEnemyCharacterFromActorInfo(ActorInfo);
-	if (Enemy)
-	{
-		const UEnemyDataAsset* EnemyData = Enemy->GetEnemyData();
-		if (EnemyData && !EnemyData->DeathMontage.IsNull())
-		{
-			CachedDeathMontage = EnemyData->DeathMontage.LoadSynchronous();
-		}
-	}
+	//사망 몽타주는 EnemyDataAsset의 Combat 번들(AEnemyCharacter::BeginPlay에서 로드)로 이미 프리로드된다
+	//사용 시점(SetMontageToPlayTask)에서 .Get() + 동기 폴백으로 읽으므로 어빌리티 개별 프리로드는 불필요
 
 	if (!StateDeadTag.IsValid())
 	{
@@ -61,19 +53,8 @@ void UEnemyDeathAbility::ActivateAbility(
 	//서버 전용 사망 처리 (어빌리티 취소, 이동 비활성, AI 정지)
 	ExecuteDeathServerLogic();
 
-	//사망 몽타주 재생 또는 즉시 사망 처리
-	if (CachedDeathMontage)
-	{
-		StartMontageWithEventsTask();
-	}
-	else
-	{
-		//몽타주 없으면 즉시 사망 상태 완료
-		FreezeAnimPose();
-		AddStateDeadTag();
-		HideHealthBar();
-		DEBUG_LOG(TEXT("No death montage — immediate death state"));
-	}
+	//사망 몽타주 재생 시도 — 몽타주가 없으면 StartMontageWithEventsTask 내부에서 즉시 사망 처리
+	StartMontageWithEventsTask();
 }
 
 #pragma region "Activate Initialization"
@@ -110,7 +91,24 @@ void UEnemyDeathAbility::ExecuteDeathServerLogic()
 
 UAnimMontage* UEnemyDeathAbility::SetMontageToPlayTask()
 {
-	return CachedDeathMontage;
+	//EnemyDataAsset의 DeathMontage를 Combat 번들 프리로드분에서 .Get()으로 획득, 미완료 시 동기 폴백
+	const AEnemyCharacter* Enemy = GetEnemyCharacterFromActorInfo();
+	const UEnemyDataAsset* EnemyData = Enemy ? Enemy->GetEnemyData() : nullptr;
+	if (!EnemyData)
+	{
+		return nullptr;
+	}
+
+	const TSoftObjectPtr<UAnimMontage>& SoftMontage = EnemyData->DeathMontage;
+	UAnimMontage* Montage = SoftMontage.Get();
+
+	if (!Montage && !SoftMontage.IsNull())
+	{
+		DEBUG_LOG(TEXT("[AsyncPreload] Death montage not preloaded, sync fallback: %s"), *SoftMontage.ToString());
+		Montage = SoftMontage.LoadSynchronous();
+	}
+
+	return Montage;
 }
 
 void UEnemyDeathAbility::SetUpPlayMontageWithEventsTask()

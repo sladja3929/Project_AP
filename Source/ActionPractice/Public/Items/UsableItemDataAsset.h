@@ -4,7 +4,6 @@
 #include "Items/BaseItemDataAsset.h"
 #include "GameplayEffect.h"
 #include "Engine/StreamableManager.h"
-#include "Engine/AssetManager.h"
 #include "UsableItemDataAsset.generated.h"
 
 class UAnimMontage;
@@ -34,8 +33,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Info", meta = (EditCondition = "ItemType != EUsableItemType::Tool", EditConditionHides, ClampMin = 1))
 	int32 MaxStackCount = 1;
 
-	//사용 몽타주 (비동기 로딩용 Soft)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Usage")
+	//사용 몽타주 (비동기 로딩용 Soft, Combat 번들로 프리로드)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Usage", meta = (AssetBundles = "Combat"))
 	TSoftObjectPtr<UAnimMontage> UseMontage;
 
 	//적용할 GE 클래스
@@ -72,8 +71,18 @@ public:
 
 #pragma region "Public Functions"
 
-	//몽타주 프리로드
-	void PreloadMontage();
+	//AssetManager PrimaryAssetTypesToScan의 "UsableItem" 타입과 매핑 (Combat 번들 ChangeBundleState용)
+	virtual FPrimaryAssetId GetPrimaryAssetId() const override
+	{
+		return FPrimaryAssetId(TEXT("UsableItem"), GetFName());
+	}
+
+	//사용 몽타주(Combat 번들) + 사용 메시(StaticMesh, RequestAsyncLoad) 프리로드
+	//UseMontage는 ChangeBundleState(Combat)로, UseMesh는 별도 RequestAsyncLoad 핸들로 로드한다 (메커니즘 혼합)
+	//ItemManagerComponent의 슬롯 장착/전환 시점에서 fire-and-forget으로 호출된다
+	void PreloadAssets();
+
+	virtual void BeginDestroy() override;
 
 	FORCEINLINE bool IsTool() const { return ItemType == EUsableItemType::Tool; }
 	FORCEINLINE bool IsConsumable() const { return ItemType == EUsableItemType::Consumable; }
@@ -93,6 +102,18 @@ protected:
 
 private:
 #pragma region "Private Variables"
+
+	//UseMontage용 Combat 번들 로드 핸들 — UPROPERTY 아닌 순수 C++ 멤버
+	//ChangeBundleStateForPrimaryAssets 반환 핸들을 보관해 몽타주 참조를 확정적으로 유지한다
+	TSharedPtr<FStreamableHandle> BundleHandle;
+
+	//UseMesh(StaticMesh, Visual)용 RequestAsyncLoad 핸들 — 번들과 별도 메커니즘
+	//UseMesh는 순수 시각 표현이라 Combat 번들에 넣지 않고 기존 방식 유지 + 데디서버 스킵
+	TSharedPtr<FStreamableHandle> PreloadHandle;
+
+	//중복 프리로드 요청 방지 플래그
+	bool bPreloadRequested = false;
+
 #pragma endregion
 
 #pragma region "Private Functions"
