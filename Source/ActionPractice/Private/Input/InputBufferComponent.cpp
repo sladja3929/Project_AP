@@ -210,12 +210,14 @@ void UInputBufferComponent::ExecuteBuffer()
 	if (BufferedActionTag.IsValid())
 	{
 		//★ consume-before-dispatch: dispatch 중 재귀가 들어와도 빈 버퍼를 보도록 멤버를 먼저 클리어
+		//클리어 대상 멤버 중 dispatch가 읽어야 하는 값은 반드시 로컬로 스냅샷해서 인자로 넘길 것
 		const FGameplayTag TagToActivate = BufferedActionTag;
+		const bool bReleasedSnapshot = bBufferedActionReleased;
 		BufferedActionTag = FGameplayTag();
 		BufferPriority = -1;
 		bBufferedActionReleased = false;
 
-		ActivateAbilityByTag(TagToActivate);
+		ActivateAbilityByTag(TagToActivate, bReleasedSnapshot);
 		DEBUG_LOG(TEXT("ExecuteBuffer: Normal buffer executed"));
 		return;
 	}
@@ -229,7 +231,8 @@ void UInputBufferComponent::ExecuteBuffer()
 
 		for (const FGameplayTag& Tag : HoldToActivate)
 		{
-			ActivateAbilityByTag(Tag);
+			//홀드 액션은 정의상 아직 눌린 상태이므로 release=false
+			ActivateAbilityByTag(Tag, false);
 		}
 		DEBUG_LOG(TEXT("ExecuteBuffer: Hold buffers executed"));
 		return;
@@ -238,7 +241,7 @@ void UInputBufferComponent::ExecuteBuffer()
 	DEBUG_LOG(TEXT("ExecuteBuffer: No buffered action"));
 }
 
-void UInputBufferComponent::ActivateAbilityByTag(FGameplayTag ActionTag)
+void UInputBufferComponent::ActivateAbilityByTag(FGameplayTag ActionTag, bool bWasReleased)
 {
 	if (!ActionTag.IsValid() || !OwnerCharacter || !CachedInputActionData)
 	{
@@ -252,10 +255,10 @@ void UInputBufferComponent::ActivateAbilityByTag(FGameplayTag ActionTag)
 		return;
 	}
 
-	ActivateAbility(InputAction);
+	ActivateAbility(InputAction, bWasReleased);
 }
 
-void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
+void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction, bool bWasReleased)
 {
 	if (!InputAction || !OwnerCharacter || !CachedInputActionData) return;
 	
@@ -279,9 +282,10 @@ void UInputBufferComponent::ActivateAbility(const UInputAction* InputAction)
 			EventData.InstigatorTags.AddTag(CachedInputActionData->FindTagByInputAction(InputAction)); //타깃 어빌리티만 활성화
 
 			//버퍼 저장 시점의 상태 태그 추가
+			//주의: BufferedStateTags는 ExecuteBuffer의 consume 단계에서 클리어하지 말 것 (여기서 읽음)
 			EventData.InstigatorTags.AppendTags(BufferedStateTags);
 
-			EventData.EventMagnitude = bBufferedActionReleased ? 1.0f : 0.0f; //release 여부를 EventMagnitude를 통해 전달
+			EventData.EventMagnitude = bWasReleased ? 1.0f : 0.0f; //release 여부를 EventMagnitude를 통해 전달
 			EventData.EventTag = EventActionInputByBufferTag;
 
 			APASC->HandleGameplayEvent_NetPredicted(EventActionInputByBufferTag, &EventData);

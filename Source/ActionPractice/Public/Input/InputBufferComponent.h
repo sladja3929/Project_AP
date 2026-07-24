@@ -84,7 +84,8 @@ protected:
 
 	void BufferInputInternal(FGameplayTag InputActionTag, bool bIsReleased);
 
-    void ActivateAbilityByTag(FGameplayTag ActionTag);
+    //bWasReleased: 버퍼 소비 시점에 스냅샷된 release 여부 (멤버가 이미 클리어되었을 수 있으므로 인자로 전달)
+    void ActivateAbilityByTag(FGameplayTag ActionTag, bool bWasReleased);
 
     void CaptureCurrentStateTags();
 
@@ -105,7 +106,7 @@ private:
 
     bool CheckActionRule(FGameplayTag ActionTag, int32& OutPriority, EInputBehavior& OutInputBehavior) const;
 
-    void ActivateAbility(const UInputAction* InputAction);
+    void ActivateAbility(const UInputAction* InputAction, bool bWasReleased);
 
 #pragma endregion
 };
