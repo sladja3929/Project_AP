@@ -266,12 +266,9 @@ void UAttackSequenceAbility::AddOrRemoveGameplayTag(const FGameplayTag Auth, con
 
 void UAttackSequenceAbility::SetHitDetectionConfig()
 {
-	//HitDetectionSetter가 바인딩되지 않았으면 재시도
-	if (!HitDetectionSetter.IsValid())
-	{
-		DEBUG_LOG(TEXT("HitDetectionSetter not bound, retrying..."));
-		BindHitDetectionSetter();
-	}
+	//매 공격마다 무조건 재바인딩 - 무기 재장착(전략 토글)으로 HitDetection 인터페이스가 교체될 수 있으므로
+	//현재 RightWeapon의 컴포넌트로 항상 다시 Init/Bind (Init 선행 UnBind로 구 컴포넌트 delegate 정리)
+	BindHitDetectionSetter();
 
 	//PrepareHitDetection 호출
 	if (!HitDetectionSetter.PrepareHitDetection(CurrentAttackTags, ComboCounter))

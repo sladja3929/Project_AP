@@ -11,6 +11,10 @@
 
 bool FHitDetectionSetter::Init(const TScriptInterface<IHitDetectionInterface>& InHitDetection)
 {
+	//HitDetection을 새 인터페이스로 교체하기 전에 구 컴포넌트 delegate에서 핸들 제거
+	//(교체 후 UnBind하면 구 컴포넌트의 delegate 핸들을 제거하지 못하는 버그 방지)
+	UnBind();
+
 	HitDetection = InHitDetection;
 
 	if(!HitDetection)

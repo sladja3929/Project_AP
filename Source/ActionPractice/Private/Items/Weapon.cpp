@@ -8,7 +8,7 @@
 #include "GameplayTagContainer.h"
 #include "Characters/ActionPracticeCharacter.h"
 #include "Characters/HitDetection/WeaponAttackComponent.h"
-#include "Characters/HitDetection/WeaponCCDComponent.h"
+#include "Characters/HitDetection/CapsuleOverlapComponent.h"
 #include "GAS/AttributeSet/ActionPracticeAttributeSet.h"
 #include "Net/UnrealNetwork.h"
 
@@ -41,7 +41,10 @@ AWeapon::AWeapon()
 
     // 콜리전 컴포넌트 추가
     AttackTraceComponent = CreateDefaultSubobject<UWeaponAttackComponent>(TEXT("TraceComponent"));
-    CCDComponent = CreateDefaultSubobject<UWeaponCCDComponent>(TEXT("CCDComponent"));
+    OverlapComponent = CreateDefaultSubobject<UCapsuleOverlapComponent>(TEXT("CCDComponent"));
+
+    //오버랩 캡슐을 칼날(WeaponMesh)에 부착 (칼날을 덮는 상대 트랜스폼/크기는 BP에서 조정)
+    OverlapComponent->SetupAttachment(WeaponMesh);
 
     // 기본 콜리전 설정
     WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -113,7 +116,7 @@ const FTaggedAttackData* AWeapon::GetWeaponAttackDataByTag(const FGameplayTagCon
 TScriptInterface<IHitDetectionInterface> AWeapon::GetHitDetectionComponent() const
 {
     if (bIsTraceDetectionOrNot) return AttackTraceComponent;
-    return CCDComponent;
+    return OverlapComponent;
 }
 
 
@@ -250,9 +253,9 @@ void AWeapon::BindDelegates()
 		AttackTraceHitHandle = AttackTraceComponent->OnHit.AddUObject(this, &AWeapon::HandleWeaponHit);
 	}
 
-	if (CCDComponent)
+	if (OverlapComponent)
 	{
-		CCDHitHandle = CCDComponent->OnWeaponHit.AddUObject(this, &AWeapon::HandleWeaponHit);
+		OverlapHitHandle = OverlapComponent->OnWeaponHit.AddUObject(this, &AWeapon::HandleWeaponHit);
 	}
 	
 	if (!OwnerCharacter)
@@ -291,10 +294,10 @@ void AWeapon::UnbindDelegates()
 		AttackTraceHitHandle.Reset();
 	}
 
-	if (CCDHitHandle.IsValid() && CCDComponent)
+	if (OverlapHitHandle.IsValid() && OverlapComponent)
 	{
-		CCDComponent->OnWeaponHit.Remove(CCDHitHandle);
-		CCDHitHandle.Reset();
+		OverlapComponent->OnWeaponHit.Remove(OverlapHitHandle);
+		OverlapHitHandle.Reset();
 	}
 	
 	if (!OwnerCharacter)

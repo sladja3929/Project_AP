@@ -1,4 +1,4 @@
-﻿#include "Characters/HitDetection/WeaponCCDComponent.h"
+﻿#include "Characters/HitDetection/CapsuleOverlapComponent.h"
 #include "Items/Weapon.h"
 #include "Items/WeaponDataAsset.h"
 #include "Characters/ActionPracticeCharacter.h"
@@ -11,36 +11,38 @@
 #define ENABLE_DEBUG_LOG 0
 
 #if ENABLE_DEBUG_LOG
-	DEFINE_LOG_CATEGORY_STATIC(LogWeaponCCDComponent, Log, All);
-#define DEBUG_LOG(Format, ...) UE_LOG(LogWeaponCCDComponent, Warning, Format, ##__VA_ARGS__)
+	DEFINE_LOG_CATEGORY_STATIC(LogCapsuleOverlapComponent, Log, All);
+#define DEBUG_LOG(Format, ...) UE_LOG(LogCapsuleOverlapComponent, Warning, Format, ##__VA_ARGS__)
 #else
 #define DEBUG_LOG(Format, ...)
 #endif
 
-UWeaponCCDComponent::UWeaponCCDComponent()
+UCapsuleOverlapComponent::UCapsuleOverlapComponent()
 {
     PrimaryComponentTick.bCanEverTick = true;
     PrimaryComponentTick.bStartWithTickEnabled = false;
-    
-    SetUseCCD(true);
-    
+
     //오버랩 이벤트
-    OnComponentBeginOverlap.AddDynamic(this, &UWeaponCCDComponent::OnCapsuleBeginOverlap);
+    OnComponentBeginOverlap.AddDynamic(this, &UCapsuleOverlapComponent::OnCapsuleBeginOverlap);
 }
 
-void UWeaponCCDComponent::BeginPlay()
+void UCapsuleOverlapComponent::BeginPlay()
 {
     SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    SetCollisionObjectType(ECC_GameTraceChannel1); //WeaponTrace
+    SetCollisionObjectType(ECC_GameTraceChannel1); //WeaponTrace(HitDetection)
     SetCollisionResponseToAllChannels(ECR_Ignore);
-    SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-    SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
+    //AttackTrace와 동일하게 PhysicsBody 메시 바디만 판정
+    //적 히트 바디(HItDetectionPhysics 프로파일)는 ObjectType=PhysicsBody이며 HitDetection 채널을 Block함
+    //적 루트 캡슐(Pawn 프로파일)은 HitDetection 채널을 Ignore하므로 오버랩 대상이 아님 → 바디 단위 정합
+    SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Overlap);
+    //오버랩 이벤트는 양쪽 컴포넌트 모두 활성화되어야 발생 (캡슐은 기본 true이나 명시)
+    SetGenerateOverlapEvents(true);
     
     
     OwnerWeapon = Cast<AWeapon>(GetOwner());
     if (!OwnerWeapon)
     {
-        DEBUG_LOG(TEXT("WeaponCCDComponent: Owner is not a weapon!"));
+        DEBUG_LOG(TEXT("CapsuleOverlapComponent: Owner is not a weapon!"));
         return;
     }
 
@@ -95,28 +97,31 @@ void UWeaponCCDComponent::BeginPlay()
     // 고정 크기로 캡슐 설정
     SetCapsuleSize(DefaultCapsuleRadius, DefaultCapsuleHalfHeight);
     
-    DEBUG_LOG(TEXT("WeaponCCD initialized - Radius: %.2f (fixed), HalfHeight: %.2f"), 
+    DEBUG_LOG(TEXT("CapsuleOverlap initialized - Radius: %.2f (fixed), HalfHeight: %.2f"),
               DefaultCapsuleRadius, DefaultCapsuleHalfHeight);
     
     Super::BeginPlay();
 }
 
-void UWeaponCCDComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UCapsuleOverlapComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-    
-    if (bIsDetecting && bDrawDebugCapsule)
+
+    if (bIsDetecting)
     {
-        DrawDebugCCDTrajectory();
+        //윈도우 동안 캡슐이 이동한 프레임 수 집계 (드로잉 on/off와 무관하게 항상 카운트)
+        ++DebugOverlapUpdateCounter;
+
+        //디버그 드로잉 전용 (판정은 OnComponentBeginOverlap에서 수행)
+        if (bDrawDebugCapsule)
+        {
+            DrawDebugCapsuleShape();
+        }
     }
-    
-    //위치 업데이트 (디버그용)
-    PreviousCapsuleLocation = GetComponentLocation();
-    PreviousCapsuleRotation = GetComponentQuat();
 }
 
 #pragma region "HitDetectionInterface Implementation"
-void UWeaponCCDComponent::PrepareHitDetection(const FGameplayTagContainer& AttackTags, const int32 ComboIndex)
+void UCapsuleOverlapComponent::PrepareHitDetection(const FGameplayTagContainer& AttackTags, const int32 ComboIndex)
 {
     CurrentComboIndex = ComboIndex;
     
@@ -135,7 +140,7 @@ void UWeaponCCDComponent::PrepareHitDetection(const FGameplayTagContainer& Attac
               AttackTags.Num(), ComboIndex);
 }
 
-void UWeaponCCDComponent::HandleHitDetectionStart(const FGameplayEventData& Payload)
+void UCapsuleOverlapComponent::HandleHitDetectionStart(const FGameplayEventData& Payload)
 {
     if (!bIsPrepared)
     {
@@ -147,28 +152,29 @@ void UWeaponCCDComponent::HandleHitDetectionStart(const FGameplayEventData& Payl
     SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     bIsDetecting = true;
     SetComponentTickEnabled(true);
-    
-    //초기 위치 저장
-    PreviousCapsuleLocation = GetComponentLocation();
-    PreviousCapsuleRotation = GetComponentQuat();
-    
-    DEBUG_LOG(TEXT("HitDetection Started - CCD Active"));
+
+    DebugOverlapUpdateCounter = 0;
+
+    DEBUG_LOG(TEXT("HitDetection Started - Overlap Active"));
 }
 
-void UWeaponCCDComponent::HandleHitDetectionEnd(const FGameplayEventData& Payload)
+void UCapsuleOverlapComponent::HandleHitDetectionEnd(const FGameplayEventData& Payload)
 {
-    //충돌 비활성화
+    //충돌 비활성화 (Tick off)
     SetCollisionEnabled(ECollisionEnabled::NoCollision);
     bIsDetecting = false;
-    bIsPrepared = false;
     SetComponentTickEnabled(false);
-    
-    UnbindEventCallbacks();
+    //프레임 드랍으로 HitDetectionEnd가 HitDetectionStart보다 먼저 도착할 수 있기 때문에
+    //bIsPrepared를 여기서 false로 설정하지 않고 다음 PrepareHitDetection에서 관리
+    //언바인딩도 여기서 하지 않고 EndPlay에서만 수행 (AttackTraceComponent와 동일 정책)
+
+    //AttackTrace의 StopTrace 카운터 로그와 대칭
+    DEBUG_LOG(TEXT("HitDetection Ended - Overlap update frames: %d"), DebugOverlapUpdateCounter);
 }
 #pragma endregion
 
 #pragma region "Event Binding"
-void UWeaponCCDComponent::BindEventCallbacks()
+void UCapsuleOverlapComponent::BindEventCallbacks()
 {
     if (!OwnerWeapon) return;
     
@@ -203,7 +209,7 @@ void UWeaponCCDComponent::BindEventCallbacks()
         });
 }
 
-void UWeaponCCDComponent::UnbindEventCallbacks()
+void UCapsuleOverlapComponent::UnbindEventCallbacks()
 {
     if (CachedASC)
     {
@@ -232,7 +238,7 @@ void UWeaponCCDComponent::UnbindEventCallbacks()
 #pragma endregion
 
 #pragma region "Collision Handling"
-void UWeaponCCDComponent::OnCapsuleBeginOverlap(UPrimitiveComponent* OverlappedComponent,
+void UCapsuleOverlapComponent::OnCapsuleBeginOverlap(UPrimitiveComponent* OverlappedComponent,
                                                 AActor* OtherActor,
                                                 UPrimitiveComponent* OtherComp,
                                                 int32 OtherBodyIndex,
@@ -248,86 +254,94 @@ void UWeaponCCDComponent::OnCapsuleBeginOverlap(UPrimitiveComponent* OverlappedC
 
     if (!bIsDetecting || !OtherActor) return;
 
-    if (ValidateHit(OtherActor))
+    //HitResult 구성 (Sweep이면 그대로, 아니면 수동 구성)
+    FHitResult HitResult;
+
+    if (bFromSweep)
     {
-        FHitResult HitResult;
-        
-        if (bFromSweep)
+        //Sweep 결과 그대로 사용
+        HitResult = SweepResult;
+    }
+    else
+    {
+        //Overlap의 경우 수동으로 HitResult 구성
+        HitResult.HitObjectHandle = FActorInstanceHandle(OtherActor);
+        HitResult.Component = OtherComp;
+        HitResult.Location = GetComponentLocation();
+        HitResult.ImpactPoint = GetComponentLocation();
+        HitResult.Normal = (OtherActor->GetActorLocation() - GetComponentLocation()).GetSafeNormal();
+        HitResult.ImpactNormal = HitResult.Normal;
+        HitResult.Distance = 0.0f;
+        HitResult.bBlockingHit = false;
+        HitResult.bStartPenetrating = true;
+
+        //본 정보가 필요한 경우
+        if (OtherComp)
         {
-            //Sweep 결과 그대로 사용
-            HitResult = SweepResult;
+            HitResult.BoneName = NAME_None;
+            HitResult.FaceIndex = INDEX_NONE;
         }
-        else
-        {
-            //Overlap의 경우 수동으로 HitResult 구성
-            HitResult.HitObjectHandle = FActorInstanceHandle(OtherActor);
-            HitResult.Component = OtherComp;
-            HitResult.Location = GetComponentLocation();
-            HitResult.ImpactPoint = GetComponentLocation();
-            HitResult.Normal = (OtherActor->GetActorLocation() - GetComponentLocation()).GetSafeNormal();
-            HitResult.ImpactNormal = HitResult.Normal;
-            HitResult.Distance = 0.0f;
-            HitResult.bBlockingHit = false;
-            HitResult.bStartPenetrating = true;
-            
-            //본 정보가 필요한 경우
-            if (OtherComp)
-            {
-                HitResult.BoneName = NAME_None;
-                HitResult.FaceIndex = INDEX_NONE;
-            }
-        }
-        
+    }
+
+    if (ValidateHit(OtherActor, HitResult, bCurrentIsMultiHit))
+    {
         ProcessHit(OtherActor, HitResult);
     }
 }
 
-bool UWeaponCCDComponent::ValidateHit(AActor* HitActor)
+bool UCapsuleOverlapComponent::ValidateHit(AActor* HitActor, const FHitResult& HitResult, bool bIsMultiHit)
 {
     if (!HitActor || !OwnerWeapon) return false;
-    
+
     //자기 자신과 소유자 제외
     AActionPracticeCharacter* WeaponOwner = OwnerWeapon->GetOwnerCharacter();
     if (HitActor == OwnerWeapon || HitActor == WeaponOwner) return false;
-    
-    //중복 히트 체크
+
+    //중복 체크 (AttackTraceComponent::ValidateHit과 동일 계약)
     float CurrentTime = GetWorld()->GetTimeSeconds();
-    for (const FHitRecord& Record : HitRecords)
+    if (FHitValidationData* ValidationData = HitValidationMap.Find(HitActor))
     {
-        if (Record.HitActor == HitActor && 
-            CurrentTime - Record.HitTime < HitCooldownTime)
+        //다단히트가 아닐 경우, 이미 있으면 리턴
+        if (!bIsMultiHit) return false;
+
+        if (CurrentTime - ValidationData->LastHitTime < HitCooldownTime)
         {
             return false;
         }
+
+        ValidationData->LastHitTime = CurrentTime;
+        ValidationData->HitCount++;
     }
-    
+    else
+    {
+        FHitValidationData NewData;
+        NewData.HitActor = HitActor;
+        NewData.LastHitTime = CurrentTime;
+        NewData.HitCount = 1;
+        HitValidationMap.Add(HitActor, NewData);
+    }
+
     return true;
 }
 
-void UWeaponCCDComponent::ProcessHit(AActor* HitActor, const FHitResult& HitResult)
+void UCapsuleOverlapComponent::ProcessHit(AActor* HitActor, const FHitResult& HitResult)
 {
-    //히트 기록
-    FHitRecord NewRecord;
-    NewRecord.HitActor = HitActor;
-    NewRecord.HitTime = GetWorld()->GetTimeSeconds();
-    HitRecords.Add(NewRecord);
-    
-    DEBUG_LOG(TEXT("CCD Hit: %s at %s"), 
-              *HitActor->GetName(), 
+    DEBUG_LOG(TEXT("Overlap Hit: %s at %s"),
+              *HitActor->GetName(),
               *HitResult.Location.ToString());
-    
+
     //이벤트 브로드캐스트
     OnWeaponHit.Broadcast(HitActor, HitResult, CurrentAttackData);
 }
 
-void UWeaponCCDComponent::ResetHitActors()
+void UCapsuleOverlapComponent::ResetHitActors()
 {
-    HitRecords.Empty();
+    HitValidationMap.Empty();
 }
 #pragma endregion
 
 #pragma region "Configuration"
-bool UWeaponCCDComponent::LoadAttackConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex)
+bool UCapsuleOverlapComponent::LoadAttackConfig(const FGameplayTagContainer& AttackTags, int32 ComboIndex)
 {
     if (!OwnerWeapon) return false;
 
@@ -343,13 +357,18 @@ bool UWeaponCCDComponent::LoadAttackConfig(const FGameplayTagContainer& AttackTa
     CurrentAttackData.DamageType = AttackInfo.DamageType;
     CurrentAttackData.FinalDamage = OwnerWeapon->GetCalculatedDamage() * AttackInfo.DamageMultiplier;
     CurrentAttackData.PoiseDamage = AttackInfo.PoiseDamage;
+    CurrentAttackData.bUnparriable = AttackInfo.bUnparriable;
+
+    //다단히트 여부 캐싱 - FAttackStats에 다단히트 필드가 없으므로
+    //AttackTraceComponent(PerformSlashTrace가 ValidateHit에 false 전달)와 동일하게 false 유지
+    bCurrentIsMultiHit = false;
 
     // UpdateCapsuleSize 호출 제거 - 고정 크기 유지
 
     return true;
 }
 
-void UWeaponCCDComponent::UpdateCapsuleSize(EAttackDamageType DamageType)
+void UCapsuleOverlapComponent::UpdateCapsuleSize(EAttackDamageType DamageType)
 {
     switch (DamageType)
     {
@@ -378,61 +397,26 @@ void UWeaponCCDComponent::UpdateCapsuleSize(EAttackDamageType DamageType)
 }
 #pragma endregion
 
-void UWeaponCCDComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void UCapsuleOverlapComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     UnbindEventCallbacks();
     Super::EndPlay(EndPlayReason);
 }
 
 #pragma region "Debug And Profiling"
-void UWeaponCCDComponent::DrawDebugCCDTrajectory()
+void UCapsuleOverlapComponent::DrawDebugCapsuleShape()
 {
     if (!bDrawDebugCapsule) return;
-    
-    FVector CurrentLocation = GetComponentLocation();
-    FQuat CurrentRotation = GetComponentQuat();
-    
-    //현재 캡슐 그리기
-    DrawDebugCapsule(GetWorld(), 
-                    CurrentLocation,
+
+    //현재 캡슐 1개만 그림 (보간 궤적 제거)
+    DrawDebugCapsule(GetWorld(),
+                    GetComponentLocation(),
                     GetScaledCapsuleHalfHeight(),
                     GetScaledCapsuleRadius(),
-                    CurrentRotation,
-                    DebugCCDColor,
+                    GetComponentQuat(),
+                    DebugDrawColor,
                     false,
-                    DebugCCDDuration);
-    
-    //CCD 궤적 (이전 위치에서 현재 위치까지)
-    if (!PreviousCapsuleLocation.IsZero())
-    {
-        //보간된 중간 위치들 표시
-        int32 NumInterpolations = 5;
-        for (int32 i = 1; i <= NumInterpolations; ++i)
-        {
-            float Alpha = (float)i / (float)NumInterpolations;
-            FVector InterpLocation = FMath::Lerp(PreviousCapsuleLocation, CurrentLocation, Alpha);
-            FQuat InterpRotation = FQuat::Slerp(PreviousCapsuleRotation, CurrentRotation, Alpha);
-            
-            DrawDebugCapsule(GetWorld(),
-                           InterpLocation,
-                           GetScaledCapsuleHalfHeight(),
-                           GetScaledCapsuleRadius(),
-                           InterpRotation,
-                           FColor(DebugCCDColor.R, DebugCCDColor.G, DebugCCDColor.B, 50), //반투명
-                           false,
-                           DebugCCDDuration);
-        }
-        
-        //궤적 선
-        DrawDebugLine(GetWorld(),
-                     PreviousCapsuleLocation,
-                     CurrentLocation,
-                     FColor::Yellow,
-                     false,
-                     DebugCCDDuration,
-                     0,
-                     2.0f);
-    }
+                    DebugDrawDuration);
 }
 
 #pragma endregion

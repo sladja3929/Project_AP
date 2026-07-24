@@ -6,6 +6,7 @@
 #include "GAS/GameplayTagsDataAsset.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GAS/GameplayTagsSubsystem.h"
+#include "ProfilingDebugging/MiscTrace.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -58,6 +59,11 @@ void UAnimNotifyState_HitDetection::NotifyBegin(USkeletalMeshComponent* MeshComp
     // Duration을 EventMagnitude에 저장
     EventData.EventMagnitude = TotalDuration;
 
+    //두 히트디텍션 모드(AttackTrace/CapsuleOverlap)가 공유하는 단일 지점 — 모드 무관하게 동일 윈도우가 마킹됨
+    //가드를 통과해 실제 이벤트를 보내는 지점에 둬야 컴포넌트 로그와 1:1 (블렌드 전환의 헛발 NotifyBegin은 위에서 걸러짐)
+    //Insights에서 이 구간을 선택해 씬쿼리 타이머를 비교 (캡처 시 -trace=...,bookmark 필요)
+    TRACE_BOOKMARK(TEXT("HitDetectionWindow_Begin"));
+
     ASC->HandleGameplayEvent(UGameplayTagsSubsystem::GetEventNotifyHitDetectionStartTag(), &EventData);
 }
 
@@ -83,6 +89,9 @@ void UAnimNotifyState_HitDetection::NotifyEnd(USkeletalMeshComponent* MeshComp, 
     EventData.Instigator = Owner;
     EventData.Target = Owner;
     EventData.EventTag = UGameplayTagsSubsystem::GetEventNotifyHitDetectionEndTag();
+
+    //Begin과 대칭 — 가드 통과 후 실제 이벤트 송신 지점에 마킹 (헛발 NotifyEnd 배제)
+    TRACE_BOOKMARK(TEXT("HitDetectionWindow_End"));
 
     ASC->HandleGameplayEvent(UGameplayTagsSubsystem::GetEventNotifyHitDetectionEndTag(), &EventData);
 }
