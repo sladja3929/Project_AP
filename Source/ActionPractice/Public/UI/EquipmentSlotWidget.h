@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Engine/StreamableManager.h"
 #include "EquipmentSlotWidget.generated.h"
 
 class UImage;
@@ -90,8 +91,27 @@ protected:
 
 private:
 #pragma region "Private Variables"
+
+	//진행 중인 슬롯 아이콘 비동기 로드 요청 (이미지별)
+	//Handle: 로드 중 텍스처 GC 방지 + 슬롯 재사용/위젯 파괴 시 취소용
+	//Path: 오래된 콜백이 새 아이콘을 덮어쓰지 않도록 판별하는 세대 검증용
+	struct FSlotIconRequest
+	{
+		TSharedPtr<FStreamableHandle> Handle;
+		FSoftObjectPath Path;
+	};
+
+	TMap<UImage*, FSlotIconRequest> PendingIconRequests;
+
 #pragma endregion
 
 #pragma region "Private Functions"
+
+	//대상 이미지에 진행 중이던 아이콘 비동기 로드가 있으면 취소
+	void CancelPendingIconLoad(UImage* TargetImage);
+
+	//아이콘이 없는 슬롯에 빈 텍스처(없으면 Collapsed) 적용
+	void ApplyEmptySlotIcon(UImage* TargetImage);
+
 #pragma endregion
 };

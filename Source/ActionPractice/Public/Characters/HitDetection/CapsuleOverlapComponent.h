@@ -5,28 +5,17 @@
 #include "GameplayTagContainer.h"
 #include "Items/AttackData.h"
 #include "Characters/HitDetection/HitDetectionInterface.h"
+#include "Characters/HitDetection/AttackTraceComponent.h"
 #include "GameplayAbilities/Public/GameplayEffectTypes.h"
-#include "WeaponCCDComponent.generated.h"
+#include "CapsuleOverlapComponent.generated.h"
 
 class UAbilitySystemComponent;
 class AWeapon;
 struct FWeaponDataAsset;
 struct FFinalAttackData;
 
-USTRUCT()
-struct FHitRecord
-{
-    GENERATED_BODY()
-    
-    UPROPERTY()
-    TObjectPtr<AActor> HitActor = nullptr;
-    
-    UPROPERTY()
-    float HitTime = 0.0f;
-};
-
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class ACTIONPRACTICE_API UWeaponCCDComponent : public UCapsuleComponent, public IHitDetectionInterface
+class ACTIONPRACTICE_API UCapsuleOverlapComponent : public UCapsuleComponent, public IHitDetectionInterface
 {
     GENERATED_BODY()
 
@@ -47,7 +36,7 @@ public:
 #pragma endregion
  
 #pragma region "Public Functions"
-    UWeaponCCDComponent();
+    UCapsuleOverlapComponent();
     
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -81,22 +70,21 @@ protected:
     //현재 공격 정보
     int32 CurrentComboIndex = 0;
     FFinalAttackData CurrentAttackData;
-    
-    //히트 기록
+
+    //다단히트 여부 (AttackTrace와 동일하게 LoadAttackConfig에서 캐싱)
+    bool bCurrentIsMultiHit = false;
+
+    //히트 기록 (AttackTraceComponent와 동일한 중복 판정 계약)
     UPROPERTY()
-    TArray<FHitRecord> HitRecords;
-    
+    TMap<AActor*, FHitValidationData> HitValidationMap;
+
     //이벤트 핸들
     FDelegateHandle HitDetectionStartHandle;
     FDelegateHandle HitDetectionEndHandle;
-    
+
     //상태
     bool bIsDetecting = false;
     bool bIsPrepared = false;
-    
-    //디버그용 이전 위치 (CCD 궤적 표시)
-    FVector PreviousCapsuleLocation;
-    FQuat PreviousCapsuleRotation;
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -110,7 +98,7 @@ protected:
                                UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
                                bool bFromSweep, const FHitResult& SweepResult);
     
-    bool ValidateHit(AActor* HitActor);
+    bool ValidateHit(AActor* HitActor, const FHitResult& HitResult, bool bIsMultiHit);
     void ProcessHit(AActor* HitActor, const FHitResult& HitResult);
     
     //캡슐 설정
@@ -121,15 +109,19 @@ protected:
 #pragma region "Debug And Profiling"
 public:
     //디버그 설정
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DebugCCD")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DebugOverlap")
     bool bDrawDebugCapsule = true;
-    
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DebugCCD")
-    float DebugCCDDuration = 2.0f;
-    
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DebugCCD")
-    FColor DebugCCDColor = FColor::Red;
 
-    void DrawDebugCCDTrajectory();
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DebugOverlap")
+    float DebugDrawDuration = 2.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DebugOverlap")
+    FColor DebugDrawColor = FColor::Red;
+
+    //윈도우당 캡슐이 이동(=오버랩 갱신)한 프레임 수. AttackTrace의 DebugSweepTraceCounter와 대칭 지표
+    //kinematic 컴포넌트의 오버랩 갱신은 이동당 1회이므로 프레임 수가 갱신 횟수의 정직한 근사
+    int32 DebugOverlapUpdateCounter = 0;
+
+    void DrawDebugCapsuleShape();
 #pragma endregion
 };

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Engine/StreamableManager.h"
 #include "NotificationEntryWidget.generated.h"
 
 class UTextBlock;
@@ -26,6 +27,8 @@ public:
 	//자동 제거 타이머 시작 — 컨테이너에서 AddChild 이후 호출
 	void StartAutoRemoveTimer(float InDuration);
 
+	virtual void NativeDestruct() override;
+
 #pragma endregion
 
 protected:
@@ -47,6 +50,9 @@ private:
 #pragma region "Private Variables"
 
 	FTimerHandle AutoRemoveTimerHandle;
+
+	//진행 중인 아이콘 비동기 로드 핸들 (로드 중 GC 방지 + 위젯 재사용/파괴 시 취소용)
+	TSharedPtr<FStreamableHandle> IconLoadHandle;
 
 #pragma endregion
 

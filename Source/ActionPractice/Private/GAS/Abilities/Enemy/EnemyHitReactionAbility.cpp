@@ -27,27 +27,8 @@ void UEnemyHitReactionAbility::OnGiveAbility(const FGameplayAbilityActorInfo* Ac
 
 	StateHitReactionTag = UGameplayTagsSubsystem::GetStateHitReactionTag();
 
-	//EnemyDataAsset에서 몽타주 캐싱
-	AEnemyCharacter* Enemy = GetEnemyCharacterFromActorInfo(ActorInfo);
-	if (Enemy)
-	{
-		const UEnemyDataAsset* EnemyData = Enemy->GetEnemyData();
-		if (EnemyData)
-		{
-			if (!EnemyData->HitReactionLightMontage.IsNull())
-			{
-				CachedHitReactionLightMontage = EnemyData->HitReactionLightMontage.LoadSynchronous();
-			}
-			if (!EnemyData->HitReactionMiddleMontage.IsNull())
-			{
-				CachedHitReactionMiddleMontage = EnemyData->HitReactionMiddleMontage.LoadSynchronous();
-			}
-			if (!EnemyData->HitReactionHeavyMontage.IsNull())
-			{
-				CachedHitReactionHeavyMontage = EnemyData->HitReactionHeavyMontage.LoadSynchronous();
-			}
-		}
-	}
+	//피격 리액션 몽타주는 EnemyDataAsset의 Combat 번들(AEnemyCharacter::BeginPlay 로드)로 이미 프리로드된다
+	//사용 시점(SetMontageToPlayTask)에서 .Get() + 동기 폴백으로 읽으므로 어빌리티 개별 프리로드는 불필요
 }
 #pragma endregion
 
@@ -85,18 +66,40 @@ void UEnemyHitReactionAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
+
 #pragma endregion
 
 #pragma region "IMontageAbilityInterface"
 UAnimMontage* UEnemyHitReactionAbility::SetMontageToPlayTask()
 {
+	//리액션 레벨에 해당하는 몽타주를 EnemyDataAsset(Combat 번들 프리로드분)에서 .Get(), 미완료 시 동기 폴백
+	const AEnemyCharacter* Enemy = GetEnemyCharacterFromActorInfo();
+	const UEnemyDataAsset* EnemyData = Enemy ? Enemy->GetEnemyData() : nullptr;
+	if (!EnemyData)
+	{
+		return nullptr;
+	}
+
+	const TSoftObjectPtr<UAnimMontage>* SoftMontage = nullptr;
+	const TCHAR* LevelName = TEXT("Light");
+
 	switch (ReactionProcessor.GetReactionLevel())
 	{
-	case EReactionLevel::Heavy: return CachedHitReactionHeavyMontage;
-	case EReactionLevel::Middle: return CachedHitReactionMiddleMontage;
-	case EReactionLevel::Light: return CachedHitReactionLightMontage;
-	default: return CachedHitReactionLightMontage;
+	case EReactionLevel::Heavy:  SoftMontage = &EnemyData->HitReactionHeavyMontage;  LevelName = TEXT("Heavy");  break;
+	case EReactionLevel::Middle: SoftMontage = &EnemyData->HitReactionMiddleMontage; LevelName = TEXT("Middle"); break;
+	case EReactionLevel::Light:
+	default:                     SoftMontage = &EnemyData->HitReactionLightMontage;  LevelName = TEXT("Light");  break;
 	}
+
+	UAnimMontage* Montage = SoftMontage->Get();
+
+	if (!Montage && !SoftMontage->IsNull())
+	{
+		DEBUG_LOG(TEXT("[AsyncPreload] HitReaction %s montage not preloaded, sync fallback: %s"), LevelName, *SoftMontage->ToString());
+		Montage = SoftMontage->LoadSynchronous();
+	}
+
+	return Montage;
 }
 
 void UEnemyHitReactionAbility::SetUpPlayMontageWithEventsTask()
@@ -114,6 +117,7 @@ void UEnemyHitReactionAbility::SetUpPlayMontageWithEventsTask()
 
 void UEnemyHitReactionAbility::StartMontageWithEventsTask()
 {
+	//폴백 로그는 SetMontageToPlayTask 내부([AsyncPreload])에서 일원화 처리된다
 	UAnimMontage* MontageToPlay = SetMontageToPlayTask();
 	if (!MontageToPlay)
 	{

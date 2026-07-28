@@ -6,7 +6,6 @@
 #include "WeaponEnums.h"
 #include "AttackData.h"
 #include "Engine/StreamableManager.h"
-#include "Engine/AssetManager.h"
 #include "WeaponDataAsset.generated.h"
 
 class UAnimMontage;
@@ -37,19 +36,19 @@ struct FBlockActionData
 {
     GENERATED_BODY()
     
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> BlockIdleMontage;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> BlockReactionLightMontage;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> BlockReactionMiddleMontage;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> BlockReactionHeavyMontage;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> GuardBreakMontage;
 
     //방어 데미지 감소량
@@ -62,7 +61,7 @@ struct FBlockActionData
     float GuardStrength = 50.0f;
 
     //패리 몽타주
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Parry")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Parry", meta = (AssetBundles = "Combat"))
     TSoftObjectPtr<UAnimMontage> ParryMontage;
 
     //패리 판정 각도 (가드 각도와 별도, 정면 기준 편측 각도)
@@ -126,92 +125,24 @@ public:
         return Names;
     }
 
-    void PreloadAllMontages()
+    //AssetManager PrimaryAssetTypesToScan의 "WeaponData" 타입과 매핑 (Combat 번들 ChangeBundleState용)
+    virtual FPrimaryAssetId GetPrimaryAssetId() const override
     {
-        //이미 프리로드 됐으면 스킵 (LoadedMontageCache가 하드 레퍼런스로 붙잡고 있음)
-        if (bMontagesPreloaded) return;
-
-        TArray<FSoftObjectPath> AssetsToLoad;
-
-        for (FTaggedAttackData& TaggedData : TaggedAttackData)
-        {
-            for (FComboAttackUnit& ComboUnit : TaggedData.ComboSequence)
-            {
-                if (!ComboUnit.AttackMontage.IsNull())
-                {
-                    AssetsToLoad.Add(ComboUnit.AttackMontage.ToSoftObjectPath());
-                }
-
-                //Charge 유형일 때만 SubAttackMontage 프리로드
-                if (TaggedData.AttackType == EComboAttackType::Charge && !ComboUnit.SubAttackMontage.IsNull())
-                {
-                    AssetsToLoad.Add(ComboUnit.SubAttackMontage.ToSoftObjectPath());
-                }
-            }
-        }
-
-        if (!BlockData.BlockIdleMontage.IsNull())
-        {
-            AssetsToLoad.Add(BlockData.BlockIdleMontage.ToSoftObjectPath());
-        }
-
-        if (!BlockData.BlockReactionLightMontage.IsNull())
-        {
-            AssetsToLoad.Add(BlockData.BlockReactionLightMontage.ToSoftObjectPath());
-        }
-
-        if (!BlockData.BlockReactionMiddleMontage.IsNull())
-        {
-            AssetsToLoad.Add(BlockData.BlockReactionMiddleMontage.ToSoftObjectPath());
-        }
-
-        if (!BlockData.BlockReactionHeavyMontage.IsNull())
-        {
-            AssetsToLoad.Add(BlockData.BlockReactionHeavyMontage.ToSoftObjectPath());
-        }
-
-        if (!BlockData.GuardBreakMontage.IsNull())
-        {
-            AssetsToLoad.Add(BlockData.GuardBreakMontage.ToSoftObjectPath());
-        }
-
-        if (!BlockData.ParryMontage.IsNull())
-        {
-            AssetsToLoad.Add(BlockData.ParryMontage.ToSoftObjectPath());
-        }
-
-        //Asset Manager를 통한 로딩
-        if (AssetsToLoad.Num() > 0 && UAssetManager::IsInitialized())
-        {
-            UAssetManager& AssetManager = UAssetManager::Get();
-            FStreamableManager& StreamableManager = AssetManager.GetStreamableManager();
-
-            //로드된 몽타주를 UPROPERTY 하드 레퍼런스에 보관해야 GC로부터 보호됨
-            //StreamableManager.LoadSynchronous는 핸들 없이 호출되면 반환 직후 GC 대상이 되고,
-            //TSoftObjectPtr 필드도 WeakObjectPtr 기반이라 하드 레퍼런스를 유지하지 못함
-            LoadedMontageCache.Reset(AssetsToLoad.Num());
-            for (const FSoftObjectPath& AssetPath : AssetsToLoad)
-            {
-                if (UObject* Loaded = StreamableManager.LoadSynchronous(AssetPath))
-                {
-                    if (UAnimMontage* Montage = Cast<UAnimMontage>(Loaded))
-                    {
-                        LoadedMontageCache.Add(Montage);
-                    }
-                }
-            }
-        }
-
-        bMontagesPreloaded = true;
+        return FPrimaryAssetId(TEXT("WeaponData"), GetFName());
     }
 
-private:
-    //PreloadAllMontages로 로드된 몽타주를 GC로부터 보호하기 위한 하드 레퍼런스 캐시
-    //WeaponSwitch로 이전 무기 액터가 Destroy되며 GC가 유발되면 프리로드된 몽타주가 수거되어
-    //쿡 빌드에서 몽타주 재생이 실패할 수 있기 때문에 DA가 직접 붙잡아 둔다
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<UAnimMontage>> LoadedMontageCache;
+    //모든 무기 몽타주를 Combat 번들로 비동기 배치 프리로드 (콤보 AttackMontage + Charge SubAttackMontage + 블록/패리류 전부)
+    //AWeapon::BeginPlay / UAttackSequenceAbility::CacheWeaponData에서 fire-and-forget으로 호출된다
+    void PreloadAllMontages();
 
-    UPROPERTY(Transient)
-    bool bMontagesPreloaded = false;
+    virtual void BeginDestroy() override;
+
+private:
+    //Combat 번들 로드 핸들 — UPROPERTY 아닌 순수 C++ 멤버
+    //ChangeBundleStateForPrimaryAssets가 반환하는 핸들을 보관해 AssetManager 참조 유지 시맨틱에
+    //의존하지 않고 로드된 몽타주 참조를 확정적으로 붙잡는다 (에셋 N개 배열 캐시 → 번들 핸들 1개로 축소)
+    TSharedPtr<FStreamableHandle> BundleHandle;
+
+    //중복 프리로드 요청 방지 플래그
+    bool bPreloadRequested = false;
 };

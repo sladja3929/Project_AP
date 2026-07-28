@@ -7,6 +7,12 @@
 -현업에서 자주 사용하는 기술들을 제공할 것
 -프로젝트는 Game, Editor, Dedicated Server 타깃을 모두 고려할 것
 
+#빌드
+-빌드는 반드시 아래 명령 한 가지 형태로만 실행할 것 (git bash 기준, 경로/인자 변형 금지 — 권한 프롬프트 난립 방지)
+-"C:/Program Files/Epic Games/UE_5.7/Engine/Build/BatchFiles/Build.bat" ActionPracticeEditor Win64 Development "D:/unreal/ActionPractice/ActionPractice.uproject" -waitmutex
+-데디케이티드 서버 타깃 빌드가 필요하면 타깃명만 ActionPracticeServer로 바꾸고 나머지 형태는 동일하게 유지할 것
+-cmd.exe 래퍼, 백슬래시 경로(C:\...), UnrealBuildTool.exe 직접 호출 등 다른 형태로 조합하지 말 것
+
 #코드 컨벤션
 -중괄호는 Allman 스타일
 -주석은 //와 텍스트를 붙일 것 -> "//주석 내용"

@@ -5,11 +5,10 @@
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Math/UnrealMathUtility.h"
-#include "Animation/AnimMontage.h"
 #include "GameplayTagContainer.h"
 #include "Characters/ActionPracticeCharacter.h"
 #include "Characters/HitDetection/WeaponAttackComponent.h"
-#include "Characters/HitDetection/WeaponCCDComponent.h"
+#include "Characters/HitDetection/CapsuleOverlapComponent.h"
 #include "GAS/AttributeSet/ActionPracticeAttributeSet.h"
 #include "Net/UnrealNetwork.h"
 
@@ -42,7 +41,10 @@ AWeapon::AWeapon()
 
     // 콜리전 컴포넌트 추가
     AttackTraceComponent = CreateDefaultSubobject<UWeaponAttackComponent>(TEXT("TraceComponent"));
-    CCDComponent = CreateDefaultSubobject<UWeaponCCDComponent>(TEXT("CCDComponent"));
+    OverlapComponent = CreateDefaultSubobject<UCapsuleOverlapComponent>(TEXT("CCDComponent"));
+
+    //오버랩 캡슐을 칼날(WeaponMesh)에 부착 (칼날을 덮는 상대 트랜스폼/크기는 BP에서 조정)
+    OverlapComponent->SetupAttachment(WeaponMesh);
 
     // 기본 콜리전 설정
     WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -51,6 +53,14 @@ AWeapon::AWeapon()
 
 void AWeapon::BeginPlay()
 {
+    //무기 몽타주 프리로드를 게터 내부의 lazy 로드에서 장착(BeginPlay) 시점으로 이동
+    //WeaponData는 BP 디폴트 값이라 복제 대기 없이 즉시 유효하며, 서버/클라 모두 BeginPlay가 호출되어
+    //데디케이티드 서버에서도 몽타주가 준비된다 (OwnerCharacter 유효성과 무관하게 선행 실행)
+    if (WeaponData)
+    {
+        WeaponData->PreloadAllMontages();
+    }
+
     OwnerCharacter = Cast<AActionPracticeCharacter>(GetOwner());
     if (!OwnerCharacter)
     {
@@ -81,10 +91,7 @@ const FBlockActionData* AWeapon::GetWeaponBlockData() const
 {
     if (!WeaponData) return nullptr;
 
-    // 첫 번째 몽타주를 체크해서, 로드가 안되었으면 로드
-    const TSoftObjectPtr<UAnimMontage>& FirstMontage = WeaponData->BlockData.BlockIdleMontage;
-    if (!FirstMontage.IsNull() && !FirstMontage.IsValid()) WeaponData->PreloadAllMontages();
-    
+    //프리로드는 BeginPlay(장착 시점)에서 선행 수행됨 - 게터 내부 lazy 로드 제거
     return &WeaponData->BlockData;
 }
 
@@ -93,20 +100,7 @@ const FTaggedAttackData* AWeapon::GetWeaponAttackDataByTag(const FGameplayTagCon
 {
     if (!WeaponData) return nullptr;
 
-    // 첫 번째 몽타주를 체크해서, 로드가 안되었으면 로드
-    for (const FTaggedAttackData& TaggedData : WeaponData->TaggedAttackData)
-    {
-        if (TaggedData.ComboSequence.Num() > 0)
-        {
-            const TSoftObjectPtr<UAnimMontage>& FirstMontage = TaggedData.ComboSequence[0].AttackMontage;
-            if (!FirstMontage.IsNull() && !FirstMontage.IsValid())
-            {
-                WeaponData->PreloadAllMontages();
-                break;
-            }
-        }
-    }
-
+    //프리로드는 BeginPlay(장착 시점)에서 선행 수행됨 - 게터 내부 lazy 로드 제거
     // 정확한 매칭: 전달받은 태그 컨테이너와 정확히 일치하는 키를 찾음
     for (const FTaggedAttackData& TaggedData : WeaponData->TaggedAttackData)
     {
@@ -122,7 +116,7 @@ const FTaggedAttackData* AWeapon::GetWeaponAttackDataByTag(const FGameplayTagCon
 TScriptInterface<IHitDetectionInterface> AWeapon::GetHitDetectionComponent() const
 {
     if (bIsTraceDetectionOrNot) return AttackTraceComponent;
-    return CCDComponent;
+    return OverlapComponent;
 }
 
 
@@ -259,9 +253,9 @@ void AWeapon::BindDelegates()
 		AttackTraceHitHandle = AttackTraceComponent->OnHit.AddUObject(this, &AWeapon::HandleWeaponHit);
 	}
 
-	if (CCDComponent)
+	if (OverlapComponent)
 	{
-		CCDHitHandle = CCDComponent->OnWeaponHit.AddUObject(this, &AWeapon::HandleWeaponHit);
+		OverlapHitHandle = OverlapComponent->OnWeaponHit.AddUObject(this, &AWeapon::HandleWeaponHit);
 	}
 	
 	if (!OwnerCharacter)
@@ -300,10 +294,10 @@ void AWeapon::UnbindDelegates()
 		AttackTraceHitHandle.Reset();
 	}
 
-	if (CCDHitHandle.IsValid() && CCDComponent)
+	if (OverlapHitHandle.IsValid() && OverlapComponent)
 	{
-		CCDComponent->OnWeaponHit.Remove(CCDHitHandle);
-		CCDHitHandle.Reset();
+		OverlapComponent->OnWeaponHit.Remove(OverlapHitHandle);
+		OverlapHitHandle.Reset();
 	}
 	
 	if (!OwnerCharacter)

@@ -111,5 +111,10 @@ private:
 	UFUNCTION(Server, Reliable)
 	void Server_CycleQuickSlot();
 
+	//현재 장착 슬롯 아이템의 몽타주/메시를 프리로드
+	//슬롯 초기화(BeginPlay)/전환(CycleQuickSlot)/복제(OnRep) 시점에 호출해
+	//사용 시점의 동기 로드 hitch를 앞당긴다 (서버/클라 모두)
+	void PreloadEquippedItemAssets();
+
 #pragma endregion
 };

@@ -73,7 +73,17 @@ UAnimMontage* UParryAbility::SetMontageToPlayTask()
 	if (BlockData && !BlockData->ParryMontage.IsNull())
 	{
 		DEBUG_LOG(TEXT("Playing ParryMontage from BlockData"));
-		return BlockData->ParryMontage.LoadSynchronous();
+
+		//프리로드 완료분은 .Get()으로 즉시 획득(사실상 no-op), 미완료 시에만 동기 폴백(의도적 결정론 안전망)
+		UAnimMontage* Montage = BlockData->ParryMontage.Get();
+
+		if (!Montage)
+		{
+			DEBUG_LOG(TEXT("[AsyncPreload] Parry ParryMontage not preloaded, sync fallback: %s"), *BlockData->ParryMontage.ToString());
+			Montage = BlockData->ParryMontage.LoadSynchronous();
+		}
+
+		return Montage;
 	}
 
 	DEBUG_LOG(TEXT("No ParryMontage found in BlockData"));

@@ -8,7 +8,7 @@
 #include "Weapon.generated.h"
 
 struct FOnAttributeChangeData;
-class UWeaponCCDComponent;
+class UCapsuleOverlapComponent;
 class AActionPracticeCharacter;
 class UWeaponDataAsset;
 class UStaticMeshComponent;
@@ -27,7 +27,7 @@ class AWeapon : public AActor
 public:
 #pragma region "Public Variables"
 
-	//HitDetection에 WeaponTraceComponent를 사용할지, WeaponCCDComponent를 사용할지
+	//HitDetection에 WeaponTraceComponent를 사용할지, CapsuleOverlapComponent를 사용할지
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug")
 	bool bIsTraceDetectionOrNot = true;
 	
@@ -84,7 +84,7 @@ protected:
 	TObjectPtr<UWeaponAttackComponent> AttackTraceComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UWeaponCCDComponent> CCDComponent;
+	TObjectPtr<UCapsuleOverlapComponent> OverlapComponent;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Stats")
 	FString WeaponName;
@@ -101,7 +101,7 @@ protected:
 
 	//WeaponHit 델리게이트 핸들
 	FDelegateHandle AttackTraceHitHandle;
-	FDelegateHandle CCDHitHandle;
+	FDelegateHandle OverlapHitHandle;
 	
 #pragma endregion
 

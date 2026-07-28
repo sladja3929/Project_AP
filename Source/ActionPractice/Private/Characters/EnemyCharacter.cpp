@@ -59,6 +59,10 @@ AEnemyCharacter::AEnemyCharacter()
 	//Collision Settings
 	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Pawn"));
 	GetMesh()->SetCollisionProfileName(TEXT("HitDetectionPhysics"));
+	//USkeletalMeshComponent은 기본적으로 오버랩 이벤트를 생성하지 않음(생성자에서 false)
+	//CapsuleOverlapComponent(순수 오버랩 방식)가 이 메시와 OnComponentBeginOverlap을 받으려면 명시적으로 켜야 함
+	//AttackTrace(SweepByChannel)는 이 플래그와 무관하므로 영향 없음
+	GetMesh()->SetGenerateOverlapEvents(true);
 
 	CreateAbilitySystemComponent();
 	CreateAttributeSet();

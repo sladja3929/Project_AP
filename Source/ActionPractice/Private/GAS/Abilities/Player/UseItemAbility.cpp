@@ -125,9 +125,8 @@ void UUseItemAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 		return;
 	}
 
-	//몽타주 프리로드 (TSoftObjectPtr이므로)
-	const_cast<UUsableItemDataAsset*>(CachedItemDA.Get())->PreloadMontage();
-
+	//프리로드는 ItemManagerComponent의 슬롯 장착/전환 시점으로 이동됨
+	//(사용 시점의 LoadSynchronous 폴백은 유지 - 프리로드가 끝나 있으면 사실상 no-op)
 	SetWeaponsVisibility(false);
 	SpawnItemMesh();
 
@@ -149,7 +148,16 @@ UAnimMontage* UUseItemAbility::SetMontageToPlayTask()
 		return nullptr;
 	}
 
-	UAnimMontage* Montage = CachedItemDA->UseMontage.LoadSynchronous();
+	//프리로드 완료분은 .Get()으로 즉시 획득(사실상 no-op), 미완료 시에만 동기 폴백
+	//폴백은 비동기 전환 실패가 아니라 입력 반응성 + 데디서버 코옵 결정론을 위해 의도적으로 남긴 안전망이다
+	UAnimMontage* Montage = CachedItemDA->UseMontage.Get();
+
+	if (!Montage && !CachedItemDA->UseMontage.IsNull())
+	{
+		DEBUG_LOG(TEXT("[AsyncPreload] UseItem UseMontage not preloaded, sync fallback: %s"), *CachedItemDA->UseMontage.ToString());
+		Montage = CachedItemDA->UseMontage.LoadSynchronous();
+	}
+
 	if (!Montage)
 	{
 		DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load UseMontage"));
@@ -268,6 +276,10 @@ void UUseItemAbility::SpawnItemMesh()
 {
 	if (!CachedItemDA) return;
 
+	//손 소품 메시는 순수 시각 표현(NoCollision)이라 데디케이티드 서버에서는 스폰/로드 스킵
+	//몽타주 재생(어빌리티 타이밍)은 별도 경로라 영향 없고, 클린업(RemoveItemMesh)은 null 안전
+	if (IsRunningDedicatedServer()) return;
+
 	//소켓이 지정되지 않았으면 소품 미표시
 	if (CachedItemDA->UseSocketName.IsNone()) return;
 
@@ -280,8 +292,16 @@ void UUseItemAbility::SpawnItemMesh()
 	USkeletalMeshComponent* CharacterMesh = Character->GetMesh();
 	if (!CharacterMesh) return;
 
-	//TSoftObjectPtr 동기 로드
-	UStaticMesh* ItemMesh = CachedItemDA->UseMesh.LoadSynchronous();
+	//프리로드 완료분은 .Get()으로 즉시 획득(사실상 no-op), 미완료 시에만 동기 폴백(의도적 결정론 안전망)
+	//UseMesh IsNull은 위에서 이미 조기 반환 처리됨 — 여기 도달 시 소프트 포인터는 지정된 상태
+	UStaticMesh* ItemMesh = CachedItemDA->UseMesh.Get();
+
+	if (!ItemMesh)
+	{
+		DEBUG_LOG(TEXT("[AsyncPreload] UseItem UseMesh not preloaded, sync fallback: %s"), *CachedItemDA->UseMesh.ToString());
+		ItemMesh = CachedItemDA->UseMesh.LoadSynchronous();
+	}
+
 	if (!ItemMesh)
 	{
 		DEBUG_LOG(TEXT("SpawnItemMesh: Failed to load UseMesh"));

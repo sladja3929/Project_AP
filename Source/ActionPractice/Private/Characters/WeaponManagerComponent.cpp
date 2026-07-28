@@ -5,11 +5,14 @@
 #include "Items/WeaponEnums.h"
 #include "Characters/HitDetection/HitDetectionInterface.h"
 #include "Characters/HitDetection/WeaponAttackComponent.h"
+#include "Characters/HitDetection/CapsuleOverlapComponent.h"
 #include "Components/InputComponent.h"
 #include "Engine/Engine.h"
 #include "GameFramework/PlayerController.h"
 #include "Net/UnrealNetwork.h"
 #include "Animation/AnimInstance.h"
+#include "AbilitySystemComponent.h"
+#include "GAS/GameplayTagsSubsystem.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -46,6 +49,9 @@ void UWeaponManagerComponent::BeginPlay()
 		if (PC->InputComponent)
 		{
 			PC->InputComponent->BindKey(EKeys::One, IE_Pressed, this, &UWeaponManagerComponent::ToggleWeaponDebugTrace);
+
+			//"3" 키로 히트디텍션 전략 토글 (무기 재장착 방식)
+			PC->InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &UWeaponManagerComponent::ToggleHitDetectionStrategy);
 		}
 	}
 }
@@ -114,6 +120,9 @@ void UWeaponManagerComponent::EquipWeapon(TSubclassOf<AWeapon> NewWeaponClass, b
 			AWeapon* EquippedWeapon = bIsLeftHand ? LeftWeapon.Get() : RightWeapon.Get();
 			UpdateAnimationLayer(EquippedWeapon, bIsLeftHand);
 		}
+
+		//새 무기에 현재 히트디텍션 전략 주입 (디버그 상태 주입과 대칭)
+		NewWeapon->bIsTraceDetectionOrNot = bUseTraceDetection;
 
 		//새 무기에 현재 디버그 상태 주입 (리스닝 서버/싱글 플레이 경로)
 		ApplyDebugTraceToCurrentWeapons();
@@ -328,6 +337,54 @@ void UWeaponManagerComponent::ToggleWeaponDebugTrace()
 	}
 }
 
+void UWeaponManagerComponent::ToggleHitDetectionStrategy()
+{
+	AActionPracticeCharacter* OwnerCharacter = GetOwner<AActionPracticeCharacter>();
+	if (!OwnerCharacter) return;
+
+	//공격 중(Attacking 태그)에는 토글 무시
+	if (UAbilitySystemComponent* ASC = OwnerCharacter->GetAbilitySystemComponent())
+	{
+		const bool bAttacking =
+			ASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateAbilityAttackingAuthTag()) ||
+			ASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateAbilityAttackingLocalTag());
+
+		if (bAttacking)
+		{
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(101, 2.0f, FColor::Yellow,
+					TEXT("HitDetection: 공격 중에는 전략을 변경할 수 없습니다"));
+			}
+			return;
+		}
+	}
+
+	//오른손 무기가 없으면 재장착 대상이 없음
+	if (!RightWeapon)
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(101, 2.0f, FColor::Red,
+				TEXT("HitDetection: 오른손 무기가 없습니다"));
+		}
+		return;
+	}
+
+	//토글 상태 반전 후 현재 오른손 무기 클래스로 재장착 (구 무기 파괴 -> 양쪽 컴포넌트 EndPlay -> 바인딩 원천 차단)
+	bUseTraceDetection = !bUseTraceDetection;
+
+	TSubclassOf<AWeapon> CurrentRightClass = RightWeapon->GetClass();
+	EquipWeapon(CurrentRightClass, false, false);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(101, 2.0f, FColor::Cyan,
+			FString::Printf(TEXT("HitDetection: %s"),
+				bUseTraceDetection ? TEXT("AttackTrace") : TEXT("CapsuleOverlap")));
+	}
+}
+
 void UWeaponManagerComponent::ApplyDebugTraceToCurrentWeapons()
 {
 	auto ApplyTo = [this](AWeapon* Weapon)
@@ -336,6 +393,12 @@ void UWeaponManagerComponent::ApplyDebugTraceToCurrentWeapons()
 		if (UWeaponAttackComponent* TraceComp = Weapon->FindComponentByClass<UWeaponAttackComponent>())
 		{
 			TraceComp->bDrawDebugTrace = bWeaponDebugTrace;
+		}
+
+		//키 1 한 번으로 두 히트디텍션 기법 드로잉을 함께 제어 (측정 시 조건 1 충족 편의)
+		if (UCapsuleOverlapComponent* OverlapComp = Weapon->FindComponentByClass<UCapsuleOverlapComponent>())
+		{
+			OverlapComp->bDrawDebugCapsule = bWeaponDebugTrace;
 		}
 	};
 

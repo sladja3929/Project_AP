@@ -33,6 +33,9 @@ void UItemManagerComponent::BeginPlay()
 	{
 		Slots = DefaultSlots;
 		DEBUG_LOG(TEXT("Inventory initialized with %d slots"), Slots.Num());
+
+		//장착 슬롯 프리로드 (클라이언트는 OnRep_Slots 시점에 수행)
+		PreloadEquippedItemAssets();
 	}
 }
 
@@ -81,6 +84,10 @@ void UItemManagerComponent::CycleQuickSlot()
 
 	//서버에서 인덱스 변경
 	EquippedIndex = (EquippedIndex + 1) % Slots.Num();
+
+	//전환된 슬롯 아이템 프리로드 (클라이언트는 OnRep_EquippedIndex 시점에 수행)
+	PreloadEquippedItemAssets();
+
 	OnEquippedItemChanged.Broadcast();
 	DEBUG_LOG(TEXT("QuickSlot cycled to index %d"), EquippedIndex);
 }
@@ -227,11 +234,28 @@ int32 UItemManagerComponent::GetSlotCount() const
 void UItemManagerComponent::OnRep_Slots()
 {
 	DEBUG_LOG(TEXT("OnRep_Slots: %d slots replicated"), Slots.Num());
+
+	//클라이언트 측 장착 슬롯 프리로드
+	PreloadEquippedItemAssets();
+
 	OnEquippedItemChanged.Broadcast();
 }
 
 void UItemManagerComponent::OnRep_EquippedIndex()
 {
 	DEBUG_LOG(TEXT("OnRep_EquippedIndex: %d"), EquippedIndex);
+
+	//클라이언트 측 전환된 슬롯 프리로드
+	PreloadEquippedItemAssets();
+
 	OnEquippedItemChanged.Broadcast();
+}
+
+void UItemManagerComponent::PreloadEquippedItemAssets()
+{
+	const UUsableItemDataAsset* ItemDA = GetEquippedItemDA();
+	if (!ItemDA) return;
+
+	//PreloadAssets는 non-const지만 DA 상태(캐시)만 채우므로 const_cast 사용
+	const_cast<UUsableItemDataAsset*>(ItemDA)->PreloadAssets();
 }

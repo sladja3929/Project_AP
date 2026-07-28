@@ -108,6 +108,9 @@ private:
 	//디버그 트레이스 표시 상태 (무기 스위치에도 유지)
 	bool bWeaponDebugTrace = false;
 
+	//히트디텍션 전략 토글 상태의 단일 소스 (true=AttackTrace, false=CapsuleOverlap)
+	bool bUseTraceDetection = true;
+
 #pragma endregion
 
 #pragma region "Private Functions"
@@ -126,6 +129,9 @@ private:
 
 	//현재 장착된 무기 WeaponAttackComponent들에 디버그 상태 주입
 	void ApplyDebugTraceToCurrentWeapons();
+
+	//"3" 키로 히트디텍션 전략(AttackTrace <-> CapsuleOverlap) 토글 - 오른손 무기 재장착 방식
+	void ToggleHitDetectionStrategy();
 
 #pragma endregion
 };

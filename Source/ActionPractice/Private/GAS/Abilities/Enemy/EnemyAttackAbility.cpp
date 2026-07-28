@@ -243,9 +243,17 @@ UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 		return nullptr;
 	}
 
-	//소프트 레퍼런스를 실제 오브젝트로 로드
+	//프리로드 완료분은 .Get()으로 즉시 획득(사실상 no-op), 미완료 시에만 동기 폴백
+	//폴백은 비동기 전환 실패가 아니라 입력 반응성 + 데디서버 코옵 결정론을 위해 의도적으로 남긴 안전망이다
 	const FEnemyComboAttackUnit& EnemyCombo = EnemyAttackData->ComboSequence[ComboCounter];
-	UAnimMontage* Montage = EnemyCombo.ComboData.AttackMontage.LoadSynchronous();
+	UAnimMontage* Montage = EnemyCombo.ComboData.AttackMontage.Get();
+
+	if (!Montage && !EnemyCombo.ComboData.AttackMontage.IsNull())
+	{
+		DEBUG_LOG(TEXT("[AsyncPreload] EnemyAttack AttackMontage not preloaded, sync fallback: %s"), *EnemyCombo.ComboData.AttackMontage.ToString());
+		Montage = EnemyCombo.ComboData.AttackMontage.LoadSynchronous();
+	}
+
 	if (!Montage)
 	{
 		DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load montage. Tags=%s, ComboIndex=%d"),

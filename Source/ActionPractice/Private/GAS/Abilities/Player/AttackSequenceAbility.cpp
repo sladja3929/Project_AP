@@ -266,12 +266,9 @@ void UAttackSequenceAbility::AddOrRemoveGameplayTag(const FGameplayTag Auth, con
 
 void UAttackSequenceAbility::SetHitDetectionConfig()
 {
-	//HitDetectionSetter가 바인딩되지 않았으면 재시도
-	if (!HitDetectionSetter.IsValid())
-	{
-		DEBUG_LOG(TEXT("HitDetectionSetter not bound, retrying..."));
-		BindHitDetectionSetter();
-	}
+	//매 공격마다 무조건 재바인딩 - 무기 재장착(전략 토글)으로 HitDetection 인터페이스가 교체될 수 있으므로
+	//현재 RightWeapon의 컴포넌트로 항상 다시 Init/Bind (Init 선행 UnBind로 구 컴포넌트 delegate 정리)
+	BindHitDetectionSetter();
 
 	//PrepareHitDetection 호출
 	if (!HitDetectionSetter.PrepareHitDetection(CurrentAttackTags, ComboCounter))
@@ -510,13 +507,28 @@ UAnimMontage* UAttackSequenceAbility::SetMontageToPlayTask()
 		//공격 몽타주 로드
 		if (CurrentState == EAttackSequenceState::Attacking)
 		{
-			Montage = ComboData.AttackMontage.LoadSynchronous();
+			//프리로드 완료분은 .Get()으로 즉시 획득(사실상 no-op), 미완료 시에만 동기 폴백
+			//폴백은 비동기 전환 실패가 아니라 입력 반응성 + 데디서버 코옵 결정론을 위해 의도적으로 남긴 안전망이다
+			//폴백 로그가 뜨는 지점 = 프리로드 트리거 배치가 잘못된 지점 (목표는 로그가 한 번도 안 뜨는 상태)
+			Montage = ComboData.AttackMontage.Get();
+
+			if (!Montage && !ComboData.AttackMontage.IsNull())
+			{
+				DEBUG_LOG(TEXT("[AsyncPreload] AttackSequence AttackMontage not preloaded, sync fallback: %s"), *ComboData.AttackMontage.ToString());
+				Montage = ComboData.AttackMontage.LoadSynchronous();
+			}
 		}
 
 		//차지 몽타주 로드
 		else if (CurrentState == EAttackSequenceState::Prepare)
 		{
-			Montage = ComboData.SubAttackMontage.LoadSynchronous();
+			Montage = ComboData.SubAttackMontage.Get();
+
+			if (!Montage && !ComboData.SubAttackMontage.IsNull())
+			{
+				DEBUG_LOG(TEXT("[AsyncPreload] AttackSequence SubAttackMontage not preloaded, sync fallback: %s"), *ComboData.SubAttackMontage.ToString());
+				Montage = ComboData.SubAttackMontage.LoadSynchronous();
+			}
 		}
 		
 		if (!Montage)
