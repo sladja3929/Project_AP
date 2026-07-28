@@ -7,7 +7,7 @@
 + 언리얼의 다양한 기술들을 사용해보며 엔진에 숙달
 
 ## 시연 영상
-[![Video Label](http://img.youtube.com/vi/nQO876QBIO0/0.jpg)](https://www.youtube.com/watch?v=nQO876QBIO0)
+[![Video Label](http://img.youtube.com/vi/8BAXYkZO6do/0.jpg)](https://www.youtube.com/watch?v=8BAXYkZO6do)
 
 ## 환경
 + 플랫폼: Windows PC
