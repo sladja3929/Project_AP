@@ -626,13 +626,9 @@ void AActionPracticePlayerController::UpdateLockOnCamera()
 	ULockOnComponent* LockOnComp = CachedCharacter->GetLockOnComponent();
 	if (!LockOnComp || !LockOnComp->IsLockedOn()) return;
 
+	//타겟 무효 판정과 해제는 LockOnComponent의 유지 타이머로 일원화했다. 여기서는 카메라만 처리한다
 	AActor* Target = LockOnComp->GetLockOnTarget();
-	if (!IsValid(Target))
-	{
-		DEBUG_LOG(TEXT("UpdateLockOnCamera: LockOn target is invalid, releasing lock-on"));
-		LockOnComp->SetLockedOnTarget(nullptr);
-		return;
-	}
+	if (!IsValid(Target)) return;
 
 	const FVector TargetLocation = Target->GetActorLocation();
 	const FVector CharacterLocation = CachedCharacter->GetActorLocation();

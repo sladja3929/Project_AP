@@ -239,7 +239,8 @@ void AEnemyCharacter::Multicast_ReleaseLockOn_Implementation()
 
 	if (LockOnComp->GetLockOnTarget() == this)
 	{
-		LockOnComp->SetLockedOnTarget(nullptr);
+		//해제만 하지 않고 자동 재지정까지 컴포넌트에 위임한다 (내부에서 로컬 컨트롤 여부를 검사)
+		LockOnComp->HandleTargetLost(this);
 	}
 }
 
