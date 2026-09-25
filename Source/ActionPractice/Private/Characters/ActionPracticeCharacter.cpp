@@ -387,7 +387,12 @@ void AActionPracticeCharacter::CancelActionForMove()
 #pragma region "Look Functions"
 void AActionPracticeCharacter::ExecuteLook(const FVector2D& LookAxisVector)
 {
-	if (LockOnComponent->IsLockedOn() && LockOnComponent->GetLockOnTarget()) return;
+	//락온 중에는 시점 입력을 카메라가 아니라 좌우 타겟 전환에 사용한다
+	if (LockOnComponent->IsLockedOn() && LockOnComponent->GetLockOnTarget())
+	{
+		LockOnComponent->AccumulateSwitchInput(LookAxisVector);
+		return;
+	}
 
 	AddControllerYawInput(LookAxisVector.X);
 	AddControllerPitchInput(LookAxisVector.Y);
