@@ -98,11 +98,6 @@ void UEnemyLungeAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, con
 	//상태 초기화
 	CachedLungeConfig = nullptr;
 	CachedDestination = FVector::ZeroVector;
-	OriginalLungeStartLocation = FVector::ZeroVector;
-	LungeStartWorldTime = 0.0f;
-	LungeOriginalDuration = 0.0f;
-	LastSourceStartLocation = FVector::ZeroVector;
-	LastSourceTargetLocation = FVector::ZeroVector;
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -125,37 +120,48 @@ void UEnemyLungeAbility::OnEventTrackingTarget(FGameplayEventData Payload)
 	if (!Enemy) return;
 	UCharacterMovementComponent* CMC = Enemy->GetCharacterMovement();
 	if (!CMC) return;
-	UWorld* World = GetWorld();
-	if (!World) return;
 
-	const float Elapsed = World->GetTimeSeconds() - LungeStartWorldTime;
+	//CMC에 등록된 소스 인스턴스 조회. 없으면 Duration 만료로 정리된 상태
+	const TSharedPtr<FRootMotionSource> Source = CMC->GetRootMotionSourceByID(CurrentLungeSourceID);
+	if (!Source.IsValid() || Source->GetScriptStruct() != FRootMotionSource_MoveToDynamicForce::StaticStruct())
+	{
+		DEBUG_LOG(TEXT("OnEventTrackingTarget: Lunge source not found — stop movement"));
+		StopLungeMovement();
+		return;
+	}
+
+	const float Duration = Source->GetDuration();
+	const float Elapsed = Source->GetTime();
+
 	//거의 끝나면 재타게팅 의미 없음
-	if (Elapsed >= LungeOriginalDuration - 0.05f) return;
+	if (Duration <= 0.0f || Elapsed >= Duration - 0.05f) return;
 
-	const float Alpha = Elapsed / LungeOriginalDuration;
+	//소스 자신의 진행 시간 기준 진행률 (PrepareRootMotion의 MoveFraction과 동일 기준)
+	const float Alpha = Elapsed / Duration;
 	const float OneMinusAlpha = 1.0f - Alpha;
 
 	//분모 안전 가드 (위 0.05초 가드로 사실상 도달 불가지만 방어)
 	if (OneMinusAlpha < KINDA_SMALL_NUMBER) return;
 
-	//옛 source의 lerp 직선상 현재 진행 위치 (HeightCurve 영향 제외한 그라운드 위치)
-	const FVector OldLerpGround = FMath::Lerp(LastSourceStartLocation, LastSourceTargetLocation, Alpha);
+	const TSharedPtr<FRootMotionSource_MoveToDynamicForce> MoveSource = StaticCastSharedPtr<FRootMotionSource_MoveToDynamicForce>(Source);
+
+	//현재 lerp 직선상 진행 위치 (HeightCurve 영향 제외한 그라운드 위치)
+	const FVector OldLerpGround = FMath::Lerp(MoveSource->StartLocation, MoveSource->TargetLocation, Alpha);
 
 	//새 직선이 OldLerpGround를 정확히 지나도록 NewStart 역산
-	//→ 재타게팅 직후 캐릭터 위치가 새 lerp 직선 위에 그대로 놓이므로 시각적 도약 0
+	//→ 재타게팅 직후 lerp 목표점이 그대로 유지되므로 시각적 도약 0
 	const FVector NewStart = (OldLerpGround - Alpha * CachedDestination) / OneMinusAlpha;
 
-	//같은 source의 TargetLocation in-place 변형 대신 source 인스턴스를 통째로 교체
-	//→ 시뮬프록시 ConvertRootMotionServerIDsToLocalIDs의 Matches 충돌(ensure trip) 회피
-	//Duration/CurrentTime 보존으로 HeightCurve 궤적 연속성 유지
-	//StartLocation은 역산값 사용으로 시각적 도약 제거
-	CMC->RemoveRootMotionSourceByID(CurrentLungeSourceID);
-	CurrentLungeSourceID = AddLungeRootMotionSource(
-		CMC,
-		NewStart,
-		CachedDestination,
-		LungeOriginalDuration,
-		Elapsed);
+	//소스 교체 없이 같은 인스턴스의 StartLocation(setter 없음, 직접 대입)과 TargetLocation 갱신
+	//MoveToDynamicForce::Matches는 Start/Target을 비교하지 않음 → 같은 소스 수정이 시뮬프록시 ID 매칭에 안전
+	//UpdateStateFrom이 StartLocation/TargetLocation을 둘 다 복사 → 시뮬프록시에도 전달
+	//PathOffset 기준 방향(Target − Start)이 바뀌므로 HeightCurve의 X/Y 성분은 회전될 수 있음 (Z 성분은 영향 없음)
+	//InitialTargetLocation은 최초 목적지 유지 (변경 금지)
+	MoveSource->StartLocation = NewStart;
+	MoveSource->SetTargetLocation(CachedDestination);
+
+	DEBUG_LOG(TEXT("OnEventTrackingTarget: Alpha=%.3f, NewStart=%s, Dest=%s"),
+		Alpha, *NewStart.ToString(), *CachedDestination.ToString());
 }
 
 void UEnemyLungeAbility::OnEventLungeStart(FGameplayEventData Payload)
@@ -189,27 +195,28 @@ void UEnemyLungeAbility::StartLungeMovement(float Duration)
 	}
 	UCharacterMovementComponent* CMC = Enemy->GetCharacterMovement();
 	if (!CMC) return;
-	UWorld* World = GetWorld();
-	if (!World) return;
+
+	//LungeStart 중복 수신 시 이전 소스가 CMC에 남지 않도록 정리
+	if (IsLungeActive())
+	{
+		StopLungeMovement();
+	}
 
 	Duration = FMath::Max(Duration, 0.05f);
 
-	//출발점/시작시간/Duration 캐싱 (재타게팅 시 source 재생성에 사용)
-	OriginalLungeStartLocation = Enemy->GetActorLocation();
-	LungeStartWorldTime = World->GetTimeSeconds();
-	LungeOriginalDuration = Duration;
+	//소스 등록은 이동 시작 시 1회. 이후 재타게팅은 같은 인스턴스의 Start/Target 갱신으로 처리
+	const FVector StartLocation = Enemy->GetActorLocation();
 
 	DEBUG_LOG(TEXT("StartLungeMovement: Start=%s, Dest=%s, Duration=%.2f"),
-		*OriginalLungeStartLocation.ToString(),
+		*StartLocation.ToString(),
 		*CachedDestination.ToString(),
 		Duration);
 
 	CurrentLungeSourceID = AddLungeRootMotionSource(
 		CMC,
-		OriginalLungeStartLocation,
+		StartLocation,
 		CachedDestination,
-		Duration,
-		0.0f);
+		Duration);
 }
 
 void UEnemyLungeAbility::StopLungeMovement()
@@ -235,36 +242,25 @@ uint16 UEnemyLungeAbility::AddLungeRootMotionSource(
 	UCharacterMovementComponent* CMC,
 	const FVector& StartLocation,
 	const FVector& TargetLocation,
-	float Duration,
-	float TimeOffset)
+	float Duration)
 {
 	if (!CMC || !CachedLungeConfig) return 0;
 
-	TSharedPtr<FRootMotionSource_MoveToForce> Source = MakeShared<FRootMotionSource_MoveToForce>();
+	TSharedPtr<FRootMotionSource_MoveToDynamicForce> Source = MakeShared<FRootMotionSource_MoveToDynamicForce>();
 	Source->InstanceName = FName("LungeMove");
 	Source->AccumulateMode = ERootMotionAccumulateMode::Override;
 	Source->Settings.SetFlag(ERootMotionSourceSettingsFlags::UseSensitiveLiftoffCheck);
 	Source->Priority = 1000;
 	Source->StartLocation = StartLocation;
+	//최초 목적지 (이후 변경 금지, 네트 직렬화용)
+	Source->InitialTargetLocation = TargetLocation;
 	Source->TargetLocation = TargetLocation;
 	Source->Duration = Duration;
 	Source->bRestrictSpeedToExpected = false;
 	Source->PathOffsetCurve = CachedLungeConfig->HeightCurve;
 	Source->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::ClampVelocity;
 
-	//재타게팅 시 시간 보존 (TimeOffset > 0이면 source 내부 시간을 진행된 만큼 앞당김)
-	if (TimeOffset > 0.0f)
-	{
-		Source->SetTime(TimeOffset);
-	}
-
-	const uint16 NewID = CMC->ApplyRootMotionSource(Source);
-
-	//역산용 직선 정보 캐싱 (다음 재타게팅 시 OldLerpGround 계산에 사용)
-	LastSourceStartLocation = StartLocation;
-	LastSourceTargetLocation = TargetLocation;
-
-	return NewID;
+	return CMC->ApplyRootMotionSource(Source);
 }
 
 #pragma endregion

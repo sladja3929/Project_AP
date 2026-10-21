@@ -12,6 +12,8 @@ struct FEnemyLungeConfig;
  *
  * 몽타주 내 ANS 배치로 모든 타이밍을 제어:
  * - TrackingTarget ANS: 타겟 추적 (회전 + 목적지 캐싱). 이동 중에도 겹칠 수 있음
+ *   이동 중 수신 시 MoveToDynamicForce 1개를 유지한 채 StartLocation을 역산값으로 대입 + SetTargetLocation
+ *   (새 lerp 직선이 현재 진행 지점을 지나도록 StartLocation 역산 → 위치 도약 없이 완전 추적)
  * - Lunging ANS: 코드 이동 구간. ANS 지속시간 = 이동 시간
  * - HitDetection ANS: 착지 공격 판정
  * - ActionRecovery 커브: 경직 + 콤보 전이 트리거
@@ -46,26 +48,11 @@ protected:
 
 	// ===== 이동 =====
 
-	//TrackingTarget ANS에서 갱신되는 타겟 위치
+	//TrackingTarget ANS에서 갱신되는 목적지
 	FVector CachedDestination = FVector::ZeroVector;
-
-	//lunge 시작 위치 (lerp 출발점 보존용 — 재타게팅 시 source 재생성에 사용)
-	FVector OriginalLungeStartLocation = FVector::ZeroVector;
-
-	//lunge 시작 월드시간 (Elapsed 계산용)
-	float LungeStartWorldTime = 0.0f;
-
-	//lunge 원래 Duration (재타게팅 시 보존)
-	float LungeOriginalDuration = 0.0f;
 
 	//활성 RootMotionSource의 LocalID (0 == ERootMotionSourceID::Invalid)
 	uint16 CurrentLungeSourceID = 0;
-
-	//마지막으로 등록한 source의 StartLocation (재타게팅 시 OldLerpGround 계산용)
-	FVector LastSourceStartLocation = FVector::ZeroVector;
-
-	//마지막으로 등록한 source의 TargetLocation (재타게팅 시 OldLerpGround 계산용)
-	FVector LastSourceTargetLocation = FVector::ZeroVector;
 
 	// ===== 이벤트 태스크 =====
 	UPROPERTY()
@@ -96,12 +83,11 @@ protected:
 	void StopLungeMovement();
 	bool IsLungeActive() const;
 
-	//새 RootMotionSource 인스턴스를 만들어 CMC에 등록. LocalID 반환 (0 == 실패)
+	//MoveToDynamicForce 인스턴스를 만들어 CMC에 등록. LocalID 반환 (0 == 실패)
 	uint16 AddLungeRootMotionSource(UCharacterMovementComponent* CMC,
 		const FVector& StartLocation,
 		const FVector& TargetLocation,
-		float Duration,
-		float TimeOffset);
+		float Duration);
 
 	// ===== 이벤트 핸들러 =====
 	UFUNCTION()

@@ -137,7 +137,14 @@ private:
 -WeaponTrace 채널 기본 응답은 Ignore로 설정하고, 명시적으로 Block 설정된 메시 바디만 판정
 
 #루트 모션 주의사항
--ApplyRootMotionMoveToForce는 CMC에 사본을 등록함. 태스크 멤버만 변경해도 CMC 사본에는 반영 안 됨 — CMC의 CurrentRootMotion.RootMotionSources를 직접 순회해서 갱신해야 함
+-ApplyRootMotionMoveToForce는 CMC에 사본을 등록함. 태스크 멤버만 변경해도 CMC 사본에는 반영 안 됨
+-CMC에 등록된 MoveToForce 소스의 TargetLocation을 직접 수정하지 말 것 — Matches()가 TargetLocation을 비교하므로 dedi 시뮬프록시에서 ConvertRootMotionServerIDsToLocalIDs ensure 발생 (갱신 빈도와 무관)
+-이동 중 목적지 재조정이 필요한 루트 모션은 MoveToDynamicForce 사용 (Matches가 목적지 비교 안 함, SetTargetLocation으로 기존 소스 유지한 채 갱신)
+-MoveToDynamicForce는 GAS 태스크가 아닌 Engine 모듈 struct(RootMotionSource.h) — CMC->ApplyRootMotionSource로 직접 등록. 대응하는 Vector 기반 태스크는 없음
+-목적지를 계속 갱신하는 GAS 태스크는 ApplyRootMotionMoveToActorForce뿐이며 TargetActor 필수 (Actor 없으면 목적지 고정, SetRootMotionTargetLocation은 protected)
+-MoveToDynamicForce도 StartLocation이 고정이라 TargetLocation만 바꾸면 lerp 목표점이 진행률 × 변화량만큼 즉시 튐(움찔거림). 변화율 클램프는 점프를 줄이는 대신 추적 지연을 만듦
+-점프 없는 재타게팅은 같은 소스에서 StartLocation을 역산값으로 직접 대입 + SetTargetLocation을 함께 호출 (Matches가 Start/Target 비교 안 함, UpdateStateFrom이 둘 다 시뮬프록시로 복사 → ensure 없음). 예: EnemyLungeAbility
+-CMC 소스 필드 직접 대입은 해당 struct의 Matches() 비교 대상이 아닌 필드만 허용. 소스 교체(Remove → Apply)로 재타게팅하지 말 것
 
 #애니메이션 주의사항
 -Two-stage chained Layered Blend Per Bone (UpperBody 적용 → 캐시 → arm 레이어 base로 사용)로 구성하면 GetSlotLocalWeight 동적 가중치 없이 레이어 분리 가능
