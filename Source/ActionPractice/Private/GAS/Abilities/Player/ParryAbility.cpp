@@ -40,7 +40,7 @@ void UParryAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, con
 	DEBUG_LOG(TEXT("ParryAbility Activated"));
 
 	if (!ConsumeStamina()) return;
-	StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
+	StartMontageWithFacingWarp();
 }
 
 bool UParryAbility::ConsumeStamina()

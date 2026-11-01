@@ -21,10 +21,7 @@ struct FEnemyComboAttackUnit
     FComboAttackUnit ComboData;
 
     // ===== 적 전용 콤보별 설정 =====
-
-    //타겟 회전 시간 (초)
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
-    float RotateTime = 0.1f;
+    //타겟 회전은 몽타주의 AttackTarget 워프 윈도우(MotionWarping ANS)에서 정의
 
     //콤보 연계 최대 거리
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")

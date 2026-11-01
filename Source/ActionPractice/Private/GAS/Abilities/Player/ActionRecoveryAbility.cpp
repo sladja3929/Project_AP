@@ -2,7 +2,6 @@
 #include "Input/InputBufferComponent.h"
 #include "Characters/ActionPracticeCharacter.h"
 #include "AbilitySystemComponent.h"
-#include "Abilities/Tasks/AbilityTask_WaitDelay.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
@@ -79,31 +78,22 @@ void UActionRecoveryAbility::ActivateInitSettings()
 	bActionRecoveryEnded = false;
 }
 
-bool UActionRecoveryAbility::RotateCharacter()
+bool UActionRecoveryAbility::UpdateFacingWarpTarget()
 {
 	if (AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo())
 	{
-		DEBUG_LOG(TEXT("Rotating Character - bIgnoreLockOn: %s"), bIgnoreLockOn ? TEXT("true") : TEXT("false"));
-		Character->RotateCharacterToInputDirection(RotateTime, bIgnoreLockOn);
-		return true;
+		DEBUG_LOG(TEXT("Update Facing Warp Target - bIgnoreLockOn: %s"), bIgnoreLockOn ? TEXT("true") : TEXT("false"));
+		return Character->UpdateFacingWarpTargetFromInput(bIgnoreLockOn);
 	}
 
 	return false;
 }
 
-void UActionRecoveryAbility::StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask()
+void UActionRecoveryAbility::StartMontageWithFacingWarp()
 {
-	bool bShouldRotate = RotateCharacter();
-
-	//캐릭터가 회전을 마칠 때까지 기다린 후에 몽타주 태스크 실행
-	//회전하지 않으면 즉시 실행
-	float DelayTime = bShouldRotate ? RotateTime : 0.0f;
-	WaitDelayTask = UAbilityTask_WaitDelay::WaitDelay(this, DelayTime);
-	if (WaitDelayTask)
-	{
-		WaitDelayTask->OnFinish.AddDynamic(this, &UActionRecoveryAbility::StartMontageWithEventsTask);
-		WaitDelayTask->ReadyForActivation();
-	}
+	//워프 타깃을 몽타주 시작 전에 갱신해야 첫 워프 윈도우부터 반영됨
+	UpdateFacingWarpTarget();
+	StartMontageWithEventsTask();
 }
 
 void UActionRecoveryAbility::StartMontageWithEventsTask()

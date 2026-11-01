@@ -27,7 +27,8 @@ public class ActionPractice : ModuleRules
 			"NetCore",
 			"Niagara",
 			"PhysicsCore",
-			"NavigationSystem"
+			"NavigationSystem",
+			"MotionWarping"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

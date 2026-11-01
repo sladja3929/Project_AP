@@ -72,6 +72,7 @@ void URestAbility::ActivateAbility(
 	SetWeaponsVisibility(false);
 
 	//Bonfire 방향으로 회전
+	//MOVE_None 상태에선 CMC가 루트 모션을 적용하지 않아 워핑 대신 틱 회전 사용 (ServerInitiated라 서버/클라 각자 계산)
 	if (CachedBonfire.IsValid())
 	{
 		if (AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo())

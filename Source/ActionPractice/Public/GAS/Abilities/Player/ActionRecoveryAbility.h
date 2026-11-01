@@ -6,7 +6,6 @@
 #include "ActionRecoveryAbility.generated.h"
 
 class UAbilityTask_PlayMontageWithEvents;
-class UAbilityTask_WaitDelay;
 class UAbilityTask_PlayMontageAndWait;
 class UAbilityTask_WaitGameplayEvent;
 
@@ -30,21 +29,14 @@ public:
 protected:
 #pragma region "Protected Variables"
 		
-	//회전이 락온을 무시할지 여부
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rotate")
+	//Facing 워프 타깃 계산 시 락온을 무시할지 여부 (회전 시간/곡선은 몽타주의 MotionWarping ANS에서 정의)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Motion Warping")
 	bool bIgnoreLockOn = false;
-
-	//캐릭터 회전 시간
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rotate")
-	float RotateTime = 0.1f;
 
 	// ===== 태스크 =====
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_PlayMontageWithEvents> PlayMontageWithEventsTask;
 
-	UPROPERTY()
-	TObjectPtr<UAbilityTask_WaitDelay> WaitDelayTask;
-	
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitInputByBufferEventTask;
 
@@ -70,12 +62,12 @@ protected:
 	UFUNCTION()
 	virtual bool ConsumeStamina() PURE_VIRTUAL(UActionRecoveryAbility::ConsumeStamina, return false;);
 	
-	UFUNCTION()
-	virtual bool RotateCharacter();
+	//입력/락온 방향으로 Facing 워프 타깃 갱신
+	virtual bool UpdateFacingWarpTarget();
 
-	//몽타주 실행 전 캐릭터 회전이 필요할 경우 StartMontageWithEventsTask 대신 실행하는 함수
-	UFUNCTION()
-	virtual void StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
+	//몽타주 실행 시 캐릭터 회전이 필요할 경우 StartMontageWithEventsTask 대신 실행하는 함수
+	//회전은 몽타주의 Facing 워프 윈도우가 처리하므로 대기 없이 즉시 몽타주 시작
+	virtual void StartMontageWithFacingWarp();
 
 	// ===== 몽타주 인터페이스 함수 =====
 	UFUNCTION()

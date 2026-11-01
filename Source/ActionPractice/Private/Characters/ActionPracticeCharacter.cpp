@@ -1,5 +1,6 @@
 #include "Public/Characters/ActionPracticeCharacter.h"
 #include "Characters/LockOnComponent.h"
+#include "Characters/APMotionWarpingComponent.h"
 #include "Characters/WeaponManagerComponent.h"
 #include "Characters/ItemManagerComponent.h"
 #include "Public/Games/ActionPracticePlayerController.h"
@@ -272,41 +273,45 @@ bool AActionPracticeCharacter::IsBlockInputPressed() const
 	return false;
 }
 
-void AActionPracticeCharacter::RotateCharacterToInputDirection(float RotateTime, bool bIgnoreLockOn)
+bool AActionPracticeCharacter::UpdateFacingWarpTargetFromInput(bool bIgnoreLockOn)
 {
+	//입력/락온 방향은 로컬 컨트롤 측만 신뢰 (원격 클라이언트의 서버 인스턴스는 RPC로 수신)
+	if (!IsLocallyControlled() || !MotionWarpingComponent)
+	{
+		return false;
+	}
+
+	const FName WarpTargetName = UAPMotionWarpingComponent::WarpTargetName_Facing;
 	float DesiredYaw = 0.0f;
+	bool bHasDirection = false;
 
 	//락온 상태면 락온 대상 방향으로
 	if (!bIgnoreLockOn && LockOnComponent->IsLockedOn())
 	{
-		AActor* LockTarget = LockOnComponent->GetLockOnTarget();
-		if (!LockTarget) return;
-		DEBUG_LOG(TEXT("APCharacter - Rotate Character To Lock On Target"));
-
-		//락온 타겟 방향으로 Yaw 계산
-		const FVector DirectionToTarget = (LockTarget->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-		DesiredYaw = DirectionToTarget.Rotation().Yaw;
+		if (const AActor* LockTarget = LockOnComponent->GetLockOnTarget())
+		{
+			const FVector DirectionToTarget = (LockTarget->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+			bHasDirection = !DirectionToTarget.IsNearlyZero();
+			DesiredYaw = DirectionToTarget.Rotation().Yaw;
+			DEBUG_LOG(TEXT("APCharacter - Facing Warp To Lock On Target"));
+		}
 	}
-	
+
 	//아니면 입력 방향으로
 	else
 	{
-		if (!CalculateYawFromMovementInput(DesiredYaw)) return;
-		DEBUG_LOG(TEXT("APCharacter - Rotate Character To Movement Input Direction"));
+		bHasDirection = CalculateYawFromMovementInput(DesiredYaw);
+		DEBUG_LOG(TEXT("APCharacter - Facing Warp To Movement Input Direction: %d"), bHasDirection);
 	}
 
-	const FRotator TargetRotation(0.0f, DesiredYaw, 0.0f);
-
-	//로컬 회전
-	DEBUG_LOG(TEXT("APCharacter - RotateToRotation called. HasAuthority: %s"), HasAuthority() ? TEXT("true") : TEXT("false"));
-	RotateToRotation(TargetRotation, RotateTime);
-	
-	//서버 회전 RPC
-	if (!HasAuthority())
+	if (!bHasDirection)
 	{
-		DEBUG_LOG(TEXT("APCharacter - Server_RequestRotateToYaw RPC called"));
-		Server_RequestRotateToYaw(DesiredYaw, RotateTime);
+		MotionWarpingComponent->RemoveWarpTargetPredicted(WarpTargetName);
+		return false;
 	}
+
+	MotionWarpingComponent->SetWarpTargetYawPredicted(WarpTargetName, DesiredYaw);
+	return true;
 }
 
 void AActionPracticeCharacter::RotateToTargetPosition(const FVector& TargetPosition, float RotationTime)
@@ -314,21 +319,7 @@ void AActionPracticeCharacter::RotateToTargetPosition(const FVector& TargetPosit
 	const FVector Direction = (TargetPosition - GetActorLocation()).GetSafeNormal2D();
 	if (Direction.IsNearlyZero()) return;
 
-	const float DesiredYaw = Direction.Rotation().Yaw;
-	const FRotator TargetRotation(0.0f, DesiredYaw, 0.0f);
-
-	RotateToRotation(TargetRotation, RotationTime);
-
-	if (!HasAuthority())
-	{
-		Server_RequestRotateToYaw(DesiredYaw, RotationTime);
-	}
-}
-
-void AActionPracticeCharacter::Server_RequestRotateToYaw_Implementation(float TargetYaw, float RotateTime)
-{
-	const FRotator TargetRotation(0.0f, TargetYaw, 0.0f);
-	RotateToRotation(TargetRotation, RotateTime);
+	RotateToRotation(FRotator(0.0f, Direction.Rotation().Yaw, 0.0f), RotationTime);
 }
 
 bool AActionPracticeCharacter::CalculateYawFromMovementInput(float& OutYaw) const

@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Characters/EnemyCharacter.h"
+#include "Characters/APMotionWarpingComponent.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
 #include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
@@ -82,14 +83,9 @@ void UEnemyAttackAbility::ActivateInitSettings()
 void UEnemyAttackAbility::CacheGameplayTags()
 {
 	//이벤트 태그
-	EventNotifyRotateToTargetTag = UGameplayTagsSubsystem::GetEventNotifyRotateToTargetTag();
 	EventNotifyCheckConditionTag = UGameplayTagsSubsystem::GetEventNotifyCheckConditionTag();
 
 	//태그 유효성 검사
-	if (!EventNotifyRotateToTargetTag.IsValid())
-	{
-		DEBUG_LOG(TEXT("EventNotifyRotateToTargetTag is not valid"));
-	}
 	if (!EventNotifyCheckConditionTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("EventNotifyCheckConditionTag is not valid"));
@@ -176,9 +172,27 @@ void UEnemyAttackAbility::ExecuteAttack()
 
 	SetHitDetectionConfig();
 
-	START_WAIT_EVENT_TASK(WaitRotateToTargetEventTask, EventNotifyRotateToTargetTag, OnEventRotateToTarget, nullptr, true, true);
+	//몽타주 시작 전에 워프 타깃을 세팅해야 첫 워프 윈도우부터 반영됨
+	UpdateAttackWarpTarget();
+
 	START_WAIT_EVENT_TASK(WaitCheckConditionEventTask, EventNotifyCheckConditionTag, OnEventCheckCondition, nullptr, true, true);
 	StartMontageWithEventsTask();
+}
+
+void UEnemyAttackAbility::UpdateAttackWarpTarget()
+{
+	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	UAPMotionWarpingComponent* MotionWarpingComponent = EnemyCharacter ? EnemyCharacter->GetMotionWarpingComponent() : nullptr;
+
+	if (!MotionWarpingComponent)
+	{
+		DEBUG_LOG(TEXT("UpdateAttackWarpTarget: No MotionWarpingComponent"));
+		return;
+	}
+
+	//타깃이 없으면 내부에서 워프 타깃 제거 → 몽타주 워프 윈도우 비활성 (회전 없음)
+	const AActor* TargetActor = CachedTargetInfo.IsValid() ? CachedTargetInfo.Actor.Get() : nullptr;
+	MotionWarpingComponent->SetWarpTargetFollowActor(UAPMotionWarpingComponent::WarpTargetName_AttackTarget, TargetActor);
 }
 
 #pragma endregion
@@ -338,39 +352,6 @@ void UEnemyAttackAbility::OnTaskMontageInterrupted()
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
-void UEnemyAttackAbility::OnEventRotateToTarget(FGameplayEventData Payload)
-{
-	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
-	if (!EnemyCharacter)
-	{
-		DEBUG_LOG(TEXT("OnEventRotateToTarget: No EnemyCharacter"));
-		return;
-	}
-
-	//캐싱된 Target Actor 가져오기
-	if (!CachedTargetInfo.IsValid())
-	{
-		DEBUG_LOG(TEXT("OnEventRotateToTarget: No Cached Target"));
-		return;
-	}
-
-	AActor* TargetActor = CachedTargetInfo.Actor.Get();
-	if (!TargetActor)
-	{
-		DEBUG_LOG(TEXT("OnEventRotateToTarget: Target Actor is nullptr"));
-		return;
-	}
-
-	//현재 콤보의 RotateTime 사용
-	float CurrentRotateTime = 0.1f;
-	if (EnemyAttackData && ComboCounter < EnemyAttackData->ComboSequence.Num())
-	{
-		CurrentRotateTime = EnemyAttackData->ComboSequence[ComboCounter].RotateTime;
-	}
-	EnemyCharacter->RotateToTarget(TargetActor, CurrentRotateTime);
-	DEBUG_LOG(TEXT("OnEventRotateToTarget: Rotating to %s"), *TargetActor->GetName());
-}
-
 void UEnemyAttackAbility::OnEventCheckCondition(FGameplayEventData Payload)
 {	
 	AEnemyAIController* AIController = GetEnemyAIControllerFromActorInfo();
@@ -461,6 +442,15 @@ void UEnemyAttackAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 	{
 		//HitDetectionSetter 언바인딩
 		HitDetectionSetter.UnBind();
+
+		//추적 워프 타깃 정리 (리셋/타깃 소멸 후 잔존 방지)
+		if (AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo())
+		{
+			if (UAPMotionWarpingComponent* MotionWarpingComponent = EnemyCharacter->GetMotionWarpingComponent())
+			{
+				MotionWarpingComponent->RemoveWarpTarget(UAPMotionWarpingComponent::WarpTargetName_AttackTarget);
+			}
+		}
 
 		if (PlayMontageWithEventsTask)
 		{

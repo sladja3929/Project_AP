@@ -29,9 +29,6 @@ UUseItemAbility::UUseItemAbility()
 	//아이템 사용은 스태미나 소모 없음
 	StaminaCost = -1.0f;
 
-	//회전 불필요 (제자리에서 사용)
-	RotateTime = 0.0f;
-
 	//네트워크: LocalPredicted
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;

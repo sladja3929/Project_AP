@@ -539,15 +539,6 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyHitDetectionEndTag()
 	return FGameplayTag::EmptyTag;
 }
 
-const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyRotateToTargetTag()
-{
-	if (UGameplayTagsSubsystem* Subsystem = Get())
-	{
-		return Subsystem->GetEventNotifyRotateToTargetTagInternal();
-	}
-	return FGameplayTag::EmptyTag;
-}
-
 const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyCheckConditionTag()
 {
 	if (UGameplayTagsSubsystem* Subsystem = Get())
@@ -1240,15 +1231,6 @@ const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyHitDetectionEndTagInte
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->Event_Notify_HitDetectionEnd;
-	}
-	return FGameplayTag::EmptyTag;
-}
-
-const FGameplayTag& UGameplayTagsSubsystem::GetEventNotifyRotateToTargetTagInternal() const
-{
-	if (GameplayTagsDataAsset)
-	{
-		return GameplayTagsDataAsset->Event_Notify_RotateToTarget;
 	}
 	return FGameplayTag::EmptyTag;
 }

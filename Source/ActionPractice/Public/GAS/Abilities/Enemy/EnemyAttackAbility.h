@@ -66,13 +66,9 @@ protected:
 	TObjectPtr<UAbilityTask_PlayMontageWithEvents> PlayMontageWithEventsTask = nullptr;
 
 	UPROPERTY()
-	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitRotateToTargetEventTask = nullptr;
-
-	UPROPERTY()
 	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitCheckConditionEventTask = nullptr;
 
 	// ===== 게임플레이 태그 =====
-	FGameplayTag EventNotifyRotateToTargetTag;
 	FGameplayTag EventNotifyCheckConditionTag;
 
 	// ===== 커브 이름 =====
@@ -90,6 +86,9 @@ protected:
 
 	// ===== 실행 로직 =====
 	void ExecuteAttack();
+
+	//캐싱된 타깃을 추적하는 AttackTarget 워프 타깃 갱신 (서버 설정 → 시뮬 프록시 자동 복제)
+	void UpdateAttackWarpTarget();
 
 	// ===== 히트 디텍션 (IHitDetectionUser) =====
 	virtual void SetHitDetectionConfig() override;
@@ -113,9 +112,6 @@ protected:
 	virtual void OnTaskMontageInterrupted() override;
 
 	//이벤트 핸들러
-	UFUNCTION()
-	virtual void OnEventRotateToTarget(FGameplayEventData Payload);
-
 	UFUNCTION()
 	virtual void OnEventCheckCondition(FGameplayEventData Payload);
 

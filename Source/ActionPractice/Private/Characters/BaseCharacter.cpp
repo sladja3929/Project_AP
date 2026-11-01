@@ -1,4 +1,5 @@
 #include "Characters/BaseCharacter.h"
+#include "Characters/APMotionWarpingComponent.h"
 #include "AbilitySystemComponent.h"
 #include "GAS/AbilitySet/AbilitySetDataAsset.h"
 #include "GAS/CharacterStats/CharacterStatsDataAsset.h"
@@ -25,6 +26,9 @@ ABaseCharacter::ABaseCharacter()
 
 	//데디케이티드 서버에서도 애니메이션 틱 활성화 (몽타주 콜백을 위해 필수)
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+
+	//몽타주 회전 보정용 모션 워핑 (워프 타깃은 서버 → 시뮬 프록시 자동 복제)
+	MotionWarpingComponent = CreateDefaultSubobject<UAPMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 }
 
 void ABaseCharacter::BeginPlay()

@@ -84,11 +84,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Input")
 	FVector2D GetCurrentMovementInput() const;
 
-	UFUNCTION(BlueprintCallable, Category = "Character")
-	void RotateCharacterToInputDirection(float RotationTime, bool bIgnoreLockOn);
+	//락온 대상 또는 입력 방향으로 Facing 워프 타깃 갱신 (로컬 컨트롤 측에서만 계산, 원격 클라이언트는 서버로 전달)
+	//방향이 없으면 워프 타깃 제거 → 몽타주 워프 윈도우 비활성 (이전 액션 타깃 잔존 방지)
+	//반환값: 워프 타깃 설정 여부
+	bool UpdateFacingWarpTargetFromInput(bool bIgnoreLockOn);
 
-	//특정 월드 위치를 향해 캐릭터를 회전 (BaseCharacter::RotateToPosition 래퍼)
-	UFUNCTION(BlueprintCallable, Category = "Character")
+	//특정 월드 위치를 향해 틱 기반으로 회전 (BaseCharacter::RotateToPosition 래퍼)
+	//몽타주 워핑을 쓸 수 없는 이동 비활성 상태 전용. 서버/클라 양쪽에서 각자 호출해야 함 (RPC 없음)
 	void RotateToTargetPosition(const FVector& TargetPosition, float RotationTime);
 
 	TArray<FGameplayAbilitySpec*> FindAbilitySpecsWithInputAction(const UInputAction* InputAction);
@@ -195,10 +197,6 @@ protected:
 
 	// ===== Rotation Helper =====
 	bool CalculateYawFromMovementInput(float& OutYaw) const;
-
-	//서버에 회전 요청(RPC)
-	UFUNCTION(Server, Reliable)
-	void Server_RequestRotateToYaw(float TargetYaw, float RotateTime);
 
 
 #pragma endregion

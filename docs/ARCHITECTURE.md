@@ -58,3 +58,11 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -Parry: IA_SpecialAction 입력, ParryAbility는 ActionRecoveryAbility 상속, ParryWindow 커브로 State.Parrying 태그 제어
 -ActionRecoveryAbility는 버퍼 입력 허용, 리커버리 상태 태그 관리, 버퍼 실행까지 담당함
 -ChargeAttackAbility는 입력 유지/해제와 차지 시작 커브, 최대 차지, 노차지 분기를 포함함
+
+##액션 회전 (Motion Warping) 설계
+-몽타주 액션의 회전은 코드 틱 회전이 아닌 BaseCharacter의 APMotionWarpingComponent(UMotionWarpingComponent 상속)로 처리. 회전 구간/곡선은 몽타주의 MotionWarping ANS가 정의하고, 몽타주가 끊기면 워핑도 함께 종료됨
+-워프 타깃 이름은 UAPMotionWarpingComponent 상수로 관리: Facing(지정 Yaw, Rotation Type=Default) / AttackTarget(타깃 추적, Rotation Type=Facing). 둘 다 Warp Translation off인 회전 전용
+-복제: 엔진이 WarpTargets를 서버 → 시뮬레이티드 프록시로만 복제(COND_SimulatedOnly). 오너 클라이언트 → 서버 방향은 복제되지 않음
+-플레이어(ActionRecoveryAbility 계열): 로컬 컨트롤 측이 락온/입력 방향으로 Facing 타깃 계산 → 로컬 적용 + Server RPC 전달(SetWarpTargetYawPredicted). 방향이 없으면 타깃 제거해 이전 액션 타깃 잔존 방지
+-적(EnemyAttackAbility 계열): 서버가 매 콤보 시작 시 캐싱된 타깃을 bFollowComponent로 AttackTarget에 설정 → 시뮬 프록시 자동 복제. 단 런지(SuperJump)는 비루트모션 몽타주라 워핑 불가 → TrackingTarget ANS의 틱 회전(RotateToTarget) + 목적지 이벤트 발행 유지
+-워핑은 루트 모션을 수정하는 방식이므로 몽타주 애니메이션의 Root Motion이 켜져 있어야 하고, MOVE_None 상태에선 동작하지 않음 (Rest는 이 이유로 틱 회전 유지)
