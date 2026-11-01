@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-`D:\unreal\ActionPractice\plan.txt`의 락온 타겟 탐색/전환 고도화 계획(1~8단계) 전체가 구현되어 2026-09-21에 검수, VERDICT: OK로 통과.
+`D:\unreal\ActionPractice\collab\plan.txt`의 락온 타겟 탐색/전환 고도화 계획(1~8단계) 전체가 구현되어 2026-09-21에 검수, VERDICT: OK로 통과.
 
 **검증 방법:** Editor Development 빌드(공식 빌드 명령) 성공, `UnrealEditor-Cmd.exe ... -ExecCmds="Automation RunTests ActionPractice.LockOn; Quit" -nullrhi` 로 신규 Automation Test 4종(ProjectToCameraPlane/ScoreCandidate/BuildRankedHeap/SelectSwitchTarget) 전부 Success 확인.
 

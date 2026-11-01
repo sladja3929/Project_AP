@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-`D:\unreal\ActionPractice\plan.txt`에 정의된 동기->비동기 로드 리팩토링의 단계별 진행 상황.
+`D:\unreal\ActionPractice\collab\plan.txt`에 정의된 동기->비동기 로드 리팩토링의 단계별 진행 상황.
 
 **완료 (검수 시점 기준, 2026-07-21):**
 - Phase 0: 조사만 (PrimaryAssetTypesToScan 미등록 확인, AbilityTask_PlayNormalAttactMontage 데드코드 의심, BaseAttack/NormalAttack/ChargeAttackAbility 레거시 확정)

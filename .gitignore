@@ -96,4 +96,5 @@ errorlog.txt
 error.txt
 plan.txt
 log.txt
-Ignore/
+# Claude Code 소통용 파일 (계획/결과/로그/스크린샷)
+collab/
