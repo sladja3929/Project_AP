@@ -262,7 +262,7 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 		{
 			for (const FGameplayAbilitySpec& Spec : GetActivatableAbilities())
 			{
-				if (Spec.IsActive() && Spec.Ability && Spec.Ability->AbilityTags.HasTag(AbilityParryTag))
+				if (Spec.IsActive() && Spec.Ability && Spec.Ability->GetAssetTags().HasTag(AbilityParryTag))
 				{
 					bIsParryActive = true;
 					break;

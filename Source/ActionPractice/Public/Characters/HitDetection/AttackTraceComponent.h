@@ -59,7 +59,7 @@ struct FAdaptiveTraceConfig
 
 	//트레이스 실행 주기 (초)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Adaptive Trace")
-	float SecondsPerTrace = 0.16;
+	float SecondsPerTrace = 0.16f;
 
 	//프레임 별 트레이스 보간 횟수 (추가)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Adaptive Trace")

@@ -44,7 +44,7 @@ void UEnemyAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 		const UEnemyDataAsset* EnemyData = EnemyCharacter->GetEnemyData();
 		if (EnemyData)
 		{
-			FGameplayTagContainer AssetTag = AbilityTags;
+			FGameplayTagContainer AssetTag = GetAssetTags();
 			const FEnemyTaggedAttackData* AttackData = EnemyData->GetAttackDataByTags(AssetTag);
 			if (AttackData)
 			{
@@ -109,7 +109,7 @@ void UEnemyAttackAbility::CacheEnemyData()
 	}
 
 	//어빌리티의 Asset Tag로 DA에서 공격 데이터 조회
-	FGameplayTagContainer AssetTag = AbilityTags;
+	FGameplayTagContainer AssetTag = GetAssetTags();
 	EnemyAttackData = EnemyData->GetAttackDataByTags(AssetTag);
 	if (!EnemyAttackData || EnemyAttackData->ComboSequence.Num() == 0)
 	{
@@ -202,7 +202,7 @@ void UEnemyAttackAbility::UpdateAttackWarpTarget()
 void UEnemyAttackAbility::SetHitDetectionConfig()
 {
 	//어빌리티의 Asset Tag로 HitDetection 조회 (기존 FGameplayTagContainer 오버로드 활용)
-	if (!HitDetectionSetter.PrepareHitDetection(AbilityTags, ComboCounter))
+	if (!HitDetectionSetter.PrepareHitDetection(GetAssetTags(), ComboCounter))
 	{
 		DEBUG_LOG(TEXT("Failed to prepare HitDetection"));
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
@@ -271,7 +271,7 @@ UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 	if (!Montage)
 	{
 		DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load montage. Tags=%s, ComboIndex=%d"),
-			*AbilityTags.ToStringSimple(), ComboCounter);
+			*GetAssetTags().ToStringSimple(), ComboCounter);
 		return nullptr;
 	}
 

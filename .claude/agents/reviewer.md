@@ -21,7 +21,7 @@ memory: project
 - 관심사 분리(이벤트 전송은 ASC 레벨 등) 준수
 - CLAUDE.md 주의사항 위반: GAS(BlockAbilitiesWithTag 게이트 범위, Periodic GE magnitude 캐싱, CommitAbility/Cooldown 순서), 네트워크 복제(OnPossess 서버 전용, CMC 회전 플래그 복제), 충돌 채널(Block만 감지), 루트모션 CMC 사본, StateTree 바인딩 제약
 - 메모리/수명주기 (TObjectPtr 사용, 댕글링, GC 안전성)
-- 언리얼 5.7에서 유효하지 않은 API나 구버전 방식 사용 여부
+- 언리얼 5.8에서 유효하지 않은 API나 구버전 방식 사용 여부
 
 출력 형식 (우선순위별):
 

@@ -1,7 +1,7 @@
 #프로젝트 개요
 -언어: 한국어로 소통
--Unreal Engine 5.7 C++ 프로젝트
--클래스 API를 제공할 때 무조건 언리얼 5.7 버전에서 유효한지 확인할 것
+-Unreal Engine 5.8 C++ 프로젝트
+-클래스 API를 제공할 때 무조건 언리얼 5.8 버전에서 유효한지 확인할 것
 -엘든 링, 몬스터 헌터 월드를 레퍼런스로 하는 액션 RPG 게임 개발
 -취업 포트폴리오 용 토이 프로젝트
 -현업에서 자주 사용하는 기술들을 제공할 것
@@ -9,7 +9,7 @@
 
 #빌드
 -빌드는 반드시 아래 명령 한 가지 형태로만 실행할 것 (git bash 기준, 경로/인자 변형 금지 — 권한 프롬프트 난립 방지)
--"C:/Program Files/Epic Games/UE_5.7/Engine/Build/BatchFiles/Build.bat" ActionPracticeEditor Win64 Development "D:/unreal/ActionPractice/ActionPractice.uproject" -waitmutex
+-"D:/Epic Games/UE_5.8/Engine/Build/BatchFiles/Build.bat" ActionPracticeEditor Win64 Development "D:/unreal/ActionPractice/ActionPractice.uproject" -waitmutex
 -데디케이티드 서버 타깃 빌드가 필요하면 타깃명만 ActionPracticeServer로 바꾸고 나머지 형태는 동일하게 유지할 것
 -cmd.exe 래퍼, 백슬래시 경로(C:\...), UnrealBuildTool.exe 직접 호출 등 다른 형태로 조합하지 말 것
 
@@ -168,4 +168,4 @@ private:
 -질문에서 AP 접두사를 사용하면 보통 ActionPractice를 줄여서 부르는 것으로 해석할 것
 -직접 구현 요청이 없으면 설계 의도, 시스템 관계, 리팩터링 포인트, 클래스 책임 분리를 우선 설명할 것
 -새 코드를 제안할 때는 현재 프로젝트의 GAS, StateTree, InputBuffer, GameplayTagsSubsystem 중심 구조를 해치지 않는 방향으로 제안할 것
--언리얼 5.7에서 유효하지 않은 API나 구버전 방식은 사용하지 말 것
+-언리얼 5.8에서 유효하지 않은 API나 구버전 방식은 사용하지 말 것
