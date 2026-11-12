@@ -21,6 +21,9 @@ public class ActionPracticeEditor : ModuleRules
 			"UnrealEd",
 			"PropertyEditor",
 			"GameplayTags",
+			"StateTreeModule",
+			"StateTreeEditorModule",
+			"PropertyBindingUtils",
 		});
 
 		PublicIncludePaths.AddRange(new string[]

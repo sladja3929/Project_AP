@@ -99,3 +99,7 @@ plan.txt
 log.txt
 # Claude Code 소통용 파일 (계획/결과/로그/스크린샷)
 collab/
+
+# Python bytecode
+__pycache__/
+*.pyc
