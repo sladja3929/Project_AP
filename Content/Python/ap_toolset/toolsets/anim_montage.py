@@ -28,15 +28,26 @@ def _mark_dirty(animation: unreal.AnimSequenceBase) -> None:
     animation.modify()
 
 
-def _set_slot_name(montage: unreal.AnimMontage, slot_name: str, slot_track_index: int) -> bool:
-    #SlotAnimTracks는 BlueprintReadOnly라 C++ 라이브러리 경유
+def _editor_lib():
     library = getattr(unreal, 'ActionPracticeEditorScriptLibrary', None)
 
     if library is None:
         raise RuntimeError(
             'ActionPracticeEditorScriptLibrary not found. Build the ActionPracticeEditor module and restart the editor.')
 
-    return bool(library.set_montage_slot_name(montage, slot_track_index, slot_name))
+    return library
+
+
+def _set_slot_name(montage: unreal.AnimMontage, slot_name: str, slot_track_index: int) -> bool:
+    #SlotAnimTracks는 BlueprintReadOnly라 C++ 라이브러리 경유
+    return bool(_editor_lib().set_montage_slot_name(montage, slot_track_index, slot_name))
+
+
+def _get_sections(montage: unreal.AnimMontage) -> list:
+    #CompositeSections는 스크립트에 노출되지 않아 C++ 라이브러리 경유
+    names, start_times, next_names = _editor_lib().get_montage_sections(montage)
+    return [{'name': str(name), 'start_time': start, 'next': '' if str(next_name) == 'None' else str(next_name)}
+            for name, start, next_name in zip(names, start_times, next_names)]
 
 
 @unreal.uclass()
@@ -101,7 +112,8 @@ class AnimMontageTools(unreal.ToolsetDefinition):
             montage: The montage to query.
 
         Returns:
-            A JSON string with length, slot names, segment animations, and blend in/out times.
+            A JSON string with length, slots (segments with start_pos / anim start-end time),
+            blend in/out times, and sections (name, start_time, next).
         """
         slots = []
 
@@ -111,7 +123,12 @@ class AnimMontageTools(unreal.ToolsetDefinition):
 
             for segment in anim_track.get_editor_property('anim_segments'):
                 reference = segment.get_editor_property('anim_reference')
-                segments.append(reference.get_path_name() if reference else None)
+                segments.append({
+                    'animation': reference.get_path_name() if reference else None,
+                    'start_pos': segment.get_editor_property('start_pos'),
+                    'anim_start_time': segment.get_editor_property('anim_start_time'),
+                    'anim_end_time': segment.get_editor_property('anim_end_time'),
+                })
 
             slots.append({'slot_name': str(slot_track.get_editor_property('slot_name')), 'segments': segments})
 
@@ -124,7 +141,39 @@ class AnimMontageTools(unreal.ToolsetDefinition):
             'blend_out_time': blend_out.get_editor_property('blend_time'),
             'blend_out_trigger_time': montage.get_editor_property('blend_out_trigger_time'),
             'enable_auto_blend_out': montage.get_editor_property('enable_auto_blend_out'),
+            'sections': _get_sections(montage),
         })
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def set_montage_sections(montage: unreal.AnimMontage, sections: str) -> str:
+        """Replaces all composite sections of a montage. The asset is not saved.
+
+        Loops are built with next links, e.g. a section whose next is itself loops
+        forever until code changes its next section.
+
+        Args:
+            montage: The montage to modify.
+            sections: JSON array of {"name": str, "start_time": float, "next": str}.
+                One section must start at 0. "next" is the section played after this
+                one ends; empty string means the montage ends after this section.
+                Example: [{"name": "Start", "start_time": 0, "next": "Loop"},
+                {"name": "Loop", "start_time": 2.5, "next": "Loop"},
+                {"name": "End", "start_time": 9.0, "next": ""}]
+
+        Returns:
+            A JSON string of the resulting sections sorted by start time.
+        """
+        entries = json.loads(sections)
+        names = [entry['name'] for entry in entries]
+        start_times = [float(entry['start_time']) for entry in entries]
+        next_names = [entry.get('next') or 'None' for entry in entries]
+        error = _editor_lib().set_montage_sections(montage, names, start_times, next_names)
+
+        if error:
+            raise RuntimeError(error)
+
+        return json.dumps(_get_sections(montage))
 
     @toolset_registry.tool_call
     @staticmethod
@@ -245,3 +294,57 @@ class AnimMontageTools(unreal.ToolsetDefinition):
         """
         _mark_dirty(animation)
         return _anim_lib().remove_animation_notify_events_by_track(animation, track_name)
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def get_root_motion_info(animation: unreal.AnimSequence, sample_count: int = 30) -> str:
+        """Measures how the root bone moves in an animation sequence.
+
+        Motion warping only modifies root motion, so a montage needs root motion enabled
+        on its sequences for warp windows to have any effect. Use this to check whether
+        enabling root motion would move the capsule (non-zero translation) or only lets
+        the warp rotate it (in-place animation).
+
+        Args:
+            animation: The animation sequence to inspect.
+            sample_count: Number of evenly spaced samples between start and end.
+
+        Returns:
+            A JSON string: {"enable_root_motion", "root_lock", "root_bone", "length",
+            "end_translation" [x, y, z], "end_yaw", "max_horizontal_distance"}. Translation and
+            yaw are relative to the first frame in the root bone's local space.
+        """
+        length = _anim_lib().get_sequence_length(animation)
+        options = unreal.AnimPoseEvaluationOptions()
+        extensions = unreal.AnimPoseExtensions
+        root_bone = None
+        start = None
+        end = None
+        max_distance = 0.0
+
+        for index in range(max(2, sample_count)):
+            time = length * index / (max(2, sample_count) - 1)
+            pose = extensions.get_anim_pose_at_time(animation, time, options)
+
+            if root_bone is None:
+                root_bone = extensions.get_bone_names(pose)[0]
+
+            transform = extensions.get_bone_pose(pose, root_bone, unreal.AnimPoseSpaces.LOCAL)
+
+            if start is None:
+                start = transform
+
+            end = transform
+            delta = transform.translation - start.translation
+            max_distance = max(max_distance, (delta.x ** 2 + delta.y ** 2) ** 0.5)
+
+        end_delta = end.translation - start.translation
+        return json.dumps({
+            'enable_root_motion': animation.get_editor_property('enable_root_motion'),
+            'root_lock': str(animation.get_editor_property('root_motion_root_lock')),
+            'root_bone': str(root_bone),
+            'length': length,
+            'end_translation': [round(end_delta.x, 2), round(end_delta.y, 2), round(end_delta.z, 2)],
+            'end_yaw': round(end.rotation.rotator().yaw - start.rotation.rotator().yaw, 2),
+            'max_horizontal_distance': round(max_distance, 2),
+        })

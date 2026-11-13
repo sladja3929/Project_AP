@@ -5,7 +5,7 @@ description: 새 적 NPC(일반몹 또는 보스)를 추가하는 절차. 캐릭
 
 #새 적 NPC 추가 절차
 
-에셋 작업은 unreal-mcp(엔진 내장 MCP)로 수행한다. 프로젝트 전용 툴세트(Content/Python/ap_toolset)가 몽타주와 StateTree 컴파일을 담당한다.
+에셋 작업은 unreal-mcp(엔진 내장 MCP)로 수행한다. 프로젝트 전용 툴세트(Content/Python/ap_toolset)가 몽타주와 StateTree 편집·컴파일을 담당한다.
 시스템 설계 의도는 docs/ARCHITECTURE.md의 캐릭터 계층·Attack 시스템·StateTree AI 섹션을 따른다.
 
 ##0단계: 요청 범위 확정
@@ -85,8 +85,10 @@ CDO(`/Game/.../BP_<Name>.Default__BP_<Name>_C`)와 컴포넌트 템플릿을 Obj
   -parameters(meleeRange, middleRange)도 여기 있다. 캡슐이 커졌으면 meleeRange를 늘린다
 -ST_<Name> 에디터 데이터 수정
   -스키마: `ST_<Name>.ST_<Name>:StateTreeEditorData_0.GASStateTreeAIComponentSchema_0`의 contextActorClass, aIControllerClass
-  -ActivateAbilityTask: StateTreeTools(get_root_states/get_children/get_tasks)로 상태를 찾고, 그 상태의 Tasks 프로퍼티를 get_properties → 문자열 치환(abilityToActivate) → set_properties로 왕복한다. 노드 ID를 유지해야 프로퍼티 바인딩이 보존된다
+  -구조 파악은 StateTreeEditTools.describe_state_tree (스테이트 경로, 태스크/컨디션/트랜지션과 ID 출력)
+  -ActivateAbilityTask: StateTreeEditTools.set_node_property(state_path, node_id, "AbilityToActivate", "/Game/.../BP_X.BP_X_C"). 노드 ID가 유지되어 프로퍼티 바인딩이 보존된다
   -여러 공격을 쓰려면 공격 상태를 늘리는 대신 기존 ST 구조를 먼저 확인하고 사용자에게 구성 방식을 확인한다
+  -구조 변경(스테이트·노드·트랜지션 추가/복사), 프로퍼티 바인딩, 전역 파라미터는 edit-statetree 스킬 절차를 따른다. 새 노드의 바인딩은 사용자에게 넘기지 않고 직접 설정한다
 -**반드시 StateTreeCompileTools.compile_state_tree(save=true) 실행**
   -에디터 데이터만 바꾸면 런타임 컴파일 데이터는 레퍼런스 적 스키마 그대로라 AI가 동작하지 않는다
   -컴파일 후 `ST_<Name>:GASStateTreeAIComponentSchema_0`(컴파일된 스키마)의 contextActorClass가 새 BP인지 확인한다
@@ -112,6 +114,8 @@ AnimMontageTools로 만든다. 모든 몽타주는 slot_name='DefaultSlot'.
 -콤보: comboSequence 항목 추가 + 연계 판정 지점에 AnimNotify_CheckCondition
 -런지: AnimNotifyState_Lunging, AnimNotifyState_TrackingTarget 구간 배치 (WoodGiant SuperJump 몽타주를 list_notifies로 확인 후 따라 구성)
 -레퍼런스 몽타주 구성은 AnimMontageTools.list_notifies로 조회해서 따른다
+-루프 몽타주(대기·경계 등): set_montage_sections로 Start/Loop/End 섹션을 만들고 Loop의 next를 자기 자신으로 둔다. End 섹션은 next가 없어야 한다. get_montage_info의 sections로 결과 확인
+-MotionWarping은 루트 모션에만 적용되므로 원본 시퀀스의 루트 모션이 꺼져 있으면 워프가 동작하지 않는다. get_root_motion_info로 루트 이동량을 확인해 켜도 캡슐이 움직이지 않는 제자리 애니메이션인지(회전 워프만 적용) 판단한다
 
 ###ABP 확인
 -ABP_<Name> AnimGraph에 Slot('DefaultSlot') 노드가 출력 포즈 경로에 있는지 BlueprintTools.get_connected_subgraph(AnimGraphNode_Root_0)로 확인한다. 없으면 몽타주가 재생되지 않으므로 사용자에게 알린다

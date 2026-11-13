@@ -34,6 +34,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ActionPractice|Editor|Animation")
 	static bool SetMontageSlotName(UAnimMontage* Montage, int32 SlotTrackIndex, FName SlotName);
 
+	//몽타주 섹션 조회 (CompositeSections는 스크립트에 노출되지 않음). 시작 시간순
+	UFUNCTION(BlueprintCallable, Category = "ActionPractice|Editor|Animation")
+	static void GetMontageSections(UAnimMontage* Montage, TArray<FName>& OutNames, TArray<float>& OutStartTimes, TArray<FName>& OutNextNames);
+
+	//몽타주 섹션 전체 교체. 세 배열은 같은 인덱스끼리 한 섹션, 0초 섹션 필수, NextName이 None이면 연결 없음
+	//실패 시 에러 메시지 반환, 성공 시 빈 문자열
+	UFUNCTION(BlueprintCallable, Category = "ActionPractice|Editor|Animation")
+	static FString SetMontageSections(UAnimMontage* Montage, const TArray<FName>& Names, const TArray<float>& StartTimes, const TArray<FName>& NextNames);
+
 #pragma endregion
 
 protected:

@@ -24,6 +24,7 @@ public class ActionPracticeEditor : ModuleRules
 			"StateTreeModule",
 			"StateTreeEditorModule",
 			"PropertyBindingUtils",
+			"ApplicationCore",
 		});
 
 		PublicIncludePaths.AddRange(new string[]
