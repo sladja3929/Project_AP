@@ -132,9 +132,10 @@ AnimMontageTools로 만든다. 모든 몽타주는 slot_name='DefaultSlot'.
 
 ##MCP 툴 사용 주의사항
 -ObjectTools.set_properties로 배열 크기와 원소를 동시에 바꾸면 "ArrayRemove: elements changed alongside the size change"로 실패한다. 빈 배열로 한 번 설정한 뒤 새 배열을 설정한다
+-BP CDO·컴포넌트 템플릿을 ObjectTools.set_properties로 바꾸면 열려 있는 레벨에 이미 배치된 인스턴스에는 전파되지 않는다(레벨을 다시 열어야 반영). 바로 PIE로 확인해야 하면 배치 인스턴스(`<Level>:PersistentLevel.<액터>.<컴포넌트>`)에도 같은 값을 설정한다
 -ap_toolset 툴에서 기본값이 빈 문자열('')인 인자는 스키마상 필수다. 생략하지 말고 명시한다
 -여러 툴 호출은 ProgrammaticToolset.execute_tool_script로 묶어 왕복을 줄인다
--ap_toolset Python 수정 후에는 ProjectToolsetAdminTools.reload_project_toolsets로 다시 로드한다
+-ap_toolset Python 수정 후에는 ProjectToolsetAdminTools.reload_project_toolsets로 다시 로드한다. 리로드는 이미 등록된 툴세트 클래스만 다시 등록하므로, 새 툴세트 클래스(파일) 추가는 에디터 재시작이 필요하다 (기존 클래스에 메서드 추가는 리로드로 반영)
 -C++ 함수 본문만 바꿨으면 에디터를 켠 채 LiveCodingToolset.CompileLiveCoding으로 반영한다. UCLASS/UFUNCTION/UPROPERTY 추가·시그니처 변경, Build.cs 변경은 Live Coding으로 반영되지 않으므로 에디터 종료 → 빌드 → 재실행이 필요하다 (Live Coding 활성 중에는 UBT 빌드가 거부됨)
 -에디터 실행은 `"D:/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe" "D:/unreal/ActionPractice/ActionPractice.uproject"`를 백그라운드로 띄우고 http://127.0.0.1:8000/mcp 응답을 기다린다
 -CaptureEditorImage는 결과가 커서 파일로 저장된다. base64를 디코드해 collab/에 png로 저장한 뒤 확인한다

@@ -33,6 +33,9 @@ public class ActionPractice : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
+		//게임플레이 디버거 커스텀 카테고리 (WITH_GAMEPLAY_DEBUGGER 정의 + 모듈 의존성, Shipping 제외)
+		SetupGameplayDebuggerSupport(Target);
+
 		PublicIncludePaths.AddRange(new string[] {
 			"ActionPractice"
 		});

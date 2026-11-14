@@ -51,6 +51,7 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -Evaluator가 런타임 데이터(체력 비율, 타깃 거리/각도)를 갱신하고, Task가 행동(어빌리티 활성화, GE 적용, 이동 등)을 실행함
 -태그 기반 Condition은 노드 선택 시점에만 평가됨 — 글로벌 전환이 필요하면 Root 레벨 On Event Transition을 사용해야 함
 -StateTree 이벤트 전송은 ASC에서 담당 (어빌리티가 아닌 ASC 레벨에서, GAS/ST 관심사 분리)
+-몽타주 재생 경로는 두 가지로 구분: 히트 판정·쿨다운·데미지 등 게임플레이 데이터가 있으면 어빌리티(+EnemyDataAsset), 연출 전용(대기·경계·하울링 등)이면 PlayMontageTask가 어빌리티 없이 ASC::PlayMontage로 재생 (RepAnimMontageInfo로 복제, 데이터는 StateTree 노드에 둠)
 
 ##액션 및 입력 설계 의도
 -Sprint: 홀드 방식

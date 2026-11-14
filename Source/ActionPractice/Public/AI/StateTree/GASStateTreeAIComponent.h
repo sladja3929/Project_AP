@@ -16,4 +16,7 @@ class ACTIONPRACTICE_API UGASStateTreeAIComponent : public UStateTreeAIComponent
 
 public:
 	virtual TSubclassOf<UStateTreeSchema> GetSchema() const override;
+
+	//StateTree 파라미터의 float 값 조회 (디버그 표시용). 파라미터가 없으면 false
+	bool GetStateTreeParameterFloat(FName ParameterName, float& OutValue) const;
 };
