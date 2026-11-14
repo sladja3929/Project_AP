@@ -22,9 +22,13 @@ class ProjectToolsetAdminTools(unreal.ToolsetDefinition):
         ActionPracticeEditor C++ module still require a build and editor restart.
 
         Returns:
-            True when the reload finished.
+            True when the reload finished. False if the toolset registry is unavailable.
         """
         import ap_toolset  # pylint: disable=import-outside-toplevel
 
         toolset_registry.reload_module(ap_toolset)
-        return True
+
+        #reload_module은 기존 등록 툴세트만 재등록하므로 등록 목록에 새로 추가된 툴세트까지 등록
+        from ap_toolset import toolsets  # pylint: disable=import-outside-toplevel
+
+        return toolsets.registration.register()
