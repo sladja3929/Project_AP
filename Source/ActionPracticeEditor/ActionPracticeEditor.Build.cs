@@ -25,6 +25,7 @@ public class ActionPracticeEditor : ModuleRules
 			"StateTreeEditorModule",
 			"PropertyBindingUtils",
 			"ApplicationCore",
+			"Landscape",
 		});
 
 		PublicIncludePaths.AddRange(new string[]

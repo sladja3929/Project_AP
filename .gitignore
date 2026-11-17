@@ -87,6 +87,8 @@ DerivedDataCache/*
 # ThirdParty / temp content folders
 Content/ThirdParty/*
 Content/Mediterranean_Coast
+# KiteDemo 팩: 맵이 참조하는 파일만 git add -f로 추적 (.claude/skills/create-map/scripts/deps.py)
+Content/KiteDemo/
 
 # Other files
 other_helper/*
