@@ -11,6 +11,8 @@
 #include "Items/AttackData.h"
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -193,6 +195,70 @@ void UEnemyAttackAbility::UpdateAttackWarpTarget()
 	//타깃이 없으면 내부에서 워프 타깃 제거 → 몽타주 워프 윈도우 비활성 (회전 없음)
 	const AActor* TargetActor = CachedTargetInfo.IsValid() ? CachedTargetInfo.Actor.Get() : nullptr;
 	MotionWarpingComponent->SetWarpTargetFollowActor(UAPMotionWarpingComponent::WarpTargetName_AttackTarget, TargetActor);
+
+	UpdateAttackApproachTarget(MotionWarpingComponent, TargetActor);
+}
+
+void UEnemyAttackAbility::UpdateAttackApproachTarget(UAPMotionWarpingComponent* MotionWarpingComponent, const AActor* TargetActor)
+{
+	//이전 콤보의 감시 타이머·타깃 정리 후 재설정
+	ClearAttackApproachTarget();
+
+	ApproachStopDistance = 0.0f;
+
+	if (EnemyAttackData && EnemyAttackData->ComboSequence.IsValidIndex(ComboCounter))
+	{
+		ApproachStopDistance = EnemyAttackData->ComboSequence[ComboCounter].WarpStopDistance;
+	}
+
+	//이미 정지 거리 안이면 정지 지점이 오너 뒤에 생기므로 미설정 (몽타주 원래 루트 모션 그대로 재생)
+	const AActor* OwnerActor = MotionWarpingComponent->GetOwner();
+	const bool bCanApproach = TargetActor && OwnerActor && FVector::Dist2D(OwnerActor->GetActorLocation(), TargetActor->GetActorLocation()) > ApproachStopDistance;
+
+	if (!bCanApproach)
+	{
+		return;
+	}
+
+	MotionWarpingComponent->SetWarpTargetFollowActor(UAPMotionWarpingComponent::WarpTargetName_AttackApproach, TargetActor, ApproachStopDistance);
+
+	//워프 도중 타깃 접근 감시 (워프 윈도우 길이가 몽타주마다 달라 어빌리티 종료까지 유지)
+	if (const UWorld* World = GetWorld())
+	{
+		constexpr float GuardInterval = 0.05f;
+		World->GetTimerManager().SetTimer(ApproachGuardTimerHandle, this, &UEnemyAttackAbility::CheckApproachStopDistance, GuardInterval, true);
+	}
+}
+
+void UEnemyAttackAbility::CheckApproachStopDistance()
+{
+	const AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	const AActor* TargetActor = CachedTargetInfo.IsValid() ? CachedTargetInfo.Actor.Get() : nullptr;
+
+	if (EnemyCharacter && TargetActor && FVector::Dist2D(EnemyCharacter->GetActorLocation(), TargetActor->GetActorLocation()) > ApproachStopDistance)
+	{
+		return;
+	}
+
+	//정지 거리 도달 또는 타깃 소멸 → 이동 워프 종료 (해당 윈도우는 Disabled, 남은 구간은 원래 루트 모션)
+	DEBUG_LOG(TEXT("CheckApproachStopDistance: Reached stop distance %.1f, removing AttackApproach"), ApproachStopDistance);
+	ClearAttackApproachTarget();
+}
+
+void UEnemyAttackAbility::ClearAttackApproachTarget()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ApproachGuardTimerHandle);
+	}
+
+	const AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	UAPMotionWarpingComponent* MotionWarpingComponent = EnemyCharacter ? EnemyCharacter->GetMotionWarpingComponent() : nullptr;
+
+	if (MotionWarpingComponent)
+	{
+		MotionWarpingComponent->RemoveWarpTarget(UAPMotionWarpingComponent::WarpTargetName_AttackApproach);
+	}
 }
 
 #pragma endregion
@@ -437,7 +503,10 @@ void UEnemyAttackAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 
 	ComboCounter = 0;
 	bPerformNextCombo = false;
-	
+
+	//감시 타이머가 this를 참조하므로 종료 유효성 검사와 무관하게 정리
+	ClearAttackApproachTarget();
+
 	if (IsEndAbilityValid(Handle, ActorInfo))
 	{
 		//HitDetectionSetter 언바인딩

@@ -27,6 +27,13 @@
 -developer 서브에이전트는 설계가 확정된 기계적 대량 변경(리네이밍, 레거시 삭제, 다수 파일 일괄 수정)이나 메인 컨텍스트 보호가 필요한 작업에만 위임
 -커밋은 사용자가 요청할 때만 하고, 커밋 시 push까지 함께 수행. 커밋 메시지에 Co-Authored-By 줄은 넣지 않음
 
+#MCP 에셋 편집 주의사항
+-BP 기본값(CDO·컴포넌트 템플릿)은 반드시 ap_toolset BlueprintDefaultsTools.set_blueprint_defaults로 수정 (레벨 배치 인스턴스 전파 + BP·액터 패키지 저장)
+-ObjectTools.set_properties로 BP CDO·컴포넌트 템플릿을 직접 바꾸지 말 것. 열린 레벨의 배치 인스턴스에 전파되지 않아 PIE에 반영 안 되고, 이 상태로 레벨을 저장하면 이전 값이 인스턴스 오버라이드로 굳음
+-ObjectTools.reset_properties를 BP 인스턴스·컴포넌트에 쓰지 말 것. BP 값이 아닌 네이티브 클래스 기본값으로 되돌림 (인스턴스를 BP 값으로 맞출 때는 sync_blueprint_instances)
+-BP 값을 바꿨는데 PIE 동작이 그대로면 check_blueprint_instances로 배치 인스턴스 값부터 확인. 결과의 unloaded_map_references(로드 안 된 맵)는 해당 맵을 열었을 때 다시 확인
+-set_blueprint_defaults 결과의 failed_instances·kept_overrides가 비어 있지 않거나 호출이 중간에 실패하면 check_blueprint_instances → sync_blueprint_instances(force=True)로 복구 (재호출은 이전 값이 이미 바뀌어 전파 안 됨)
+
 #코드 컨벤션
 -중괄호는 Allman 스타일
 -주석은 //와 텍스트를 붙일 것 -> "//주석 내용"

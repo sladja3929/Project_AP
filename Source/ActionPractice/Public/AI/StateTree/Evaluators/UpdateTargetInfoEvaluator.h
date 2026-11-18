@@ -31,11 +31,11 @@ struct ACTIONPRACTICE_API FUpdateTargetInfoEvaluatorInstanceData
 	UPROPERTY(EditAnywhere, Category = "Output")
 	TObjectPtr<AActor> DetectedTarget = nullptr;
 
-	//Output: 타겟까지의 거리
+	//Output: 타겟까지의 수평 거리 (액터 중심 간, 높이 차 제외)
 	UPROPERTY(EditAnywhere, Category = "Output")
 	float DistanceToTarget = -1.0f;
 
-	//Output: Enemy의 정면 기준 Target과의 각도 (Yaw)
+	//Output: Enemy의 정면 기준 Target과의 수평 각도 (Yaw, -180~180, 음수 왼쪽 / 양수 오른쪽)
 	UPROPERTY(EditAnywhere, Category = "Output")
 	float AngleToTarget = 0.0f;
 

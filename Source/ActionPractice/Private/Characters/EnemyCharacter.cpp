@@ -52,7 +52,10 @@ AEnemyCharacter::AEnemyCharacter()
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
-	//GetCharacterMovement()->bUseAcc
+
+	//가속 기반 경로 이동. 비활성 시 MoveTo 중단(StateTree 이동 상태 전환 등)마다 속도가 0으로 리셋되어 로코모션이 한 프레임 Idle로 튐
+	GetCharacterMovement()->GetNavMovementProperties()->bUseAccelerationForPaths = true;
+
 	//Actor Tag
 	Tags.Add(FName("Enemy"));
 

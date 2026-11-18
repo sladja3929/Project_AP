@@ -13,6 +13,8 @@
 //워프 타깃 이름 상수 정의
 const FName UAPMotionWarpingComponent::WarpTargetName_Facing = TEXT("Facing");
 const FName UAPMotionWarpingComponent::WarpTargetName_AttackTarget = TEXT("AttackTarget");
+const FName UAPMotionWarpingComponent::WarpTargetName_AttackApproach = TEXT("AttackApproach");
+const FName UAPMotionWarpingComponent::WarpTargetName_TurnTarget = TEXT("TurnTarget");
 
 UAPMotionWarpingComponent::UAPMotionWarpingComponent(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -52,7 +54,7 @@ void UAPMotionWarpingComponent::RemoveWarpTargetPredicted(FName WarpTargetName)
 	}
 }
 
-void UAPMotionWarpingComponent::SetWarpTargetFollowActor(FName WarpTargetName, const AActor* TargetActor)
+void UAPMotionWarpingComponent::SetWarpTargetFollowActor(FName WarpTargetName, const AActor* TargetActor, float StopDistance)
 {
 	const USceneComponent* TargetComponent = TargetActor ? TargetActor->GetRootComponent() : nullptr;
 
@@ -63,11 +65,13 @@ void UAPMotionWarpingComponent::SetWarpTargetFollowActor(FName WarpTargetName, c
 		return;
 	}
 
-	//bFollowComponent=true → 워프 윈도우 동안 매 틱 타깃 위치 재조회 (추적 회전)
+	//bFollowComponent=true → 워프 윈도우 동안 매 틱 타깃 위치 재조회 (추적 회전·이동)
+	//VectorFromTargetToOwner의 X 오프셋은 매 틱 타깃→오너 방향으로 재계산되어 접근 방향과 무관하게 타깃 앞 지점 유지
 	//오프셋 인자 기본값만 쓰면 deprecated 예정 오버로드와 모호하므로 LocationOffsetDirection 명시
-	AddOrUpdateWarpTargetFromComponent(WarpTargetName, TargetComponent, NAME_None, true, EWarpTargetLocationOffsetDirection::TargetsForwardVector);
+	const FVector LocationOffset(FMath::Max(StopDistance, 0.0f), 0.0f, 0.0f);
+	AddOrUpdateWarpTargetFromComponent(WarpTargetName, TargetComponent, NAME_None, true, EWarpTargetLocationOffsetDirection::VectorFromTargetToOwner, LocationOffset);
 
-	DEBUG_LOG(TEXT("SetWarpTargetFollowActor: %s -> %s"), *WarpTargetName.ToString(), *TargetActor->GetName());
+	DEBUG_LOG(TEXT("SetWarpTargetFollowActor: %s -> %s StopDistance=%.1f"), *WarpTargetName.ToString(), *TargetActor->GetName(), LocationOffset.X);
 }
 
 void UAPMotionWarpingComponent::Server_SetWarpTargetYaw_Implementation(FName WarpTargetName, float Yaw)

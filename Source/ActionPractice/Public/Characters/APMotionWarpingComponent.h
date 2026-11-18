@@ -24,6 +24,16 @@ public:
 	//타깃 액터를 바라보며 추적하는 워프 타깃 (ANS 설정: Rotation Type = Facing, Warp Translation off)
 	static const FName WarpTargetName_AttackTarget;
 
+	//타깃 앞 정지 지점까지 이동시키는 워프 타깃 (ANS 설정: Warp Translation on, Warp Rotation off)
+	//회전은 같은 구간의 AttackTarget ANS가 담당 (정지 지점을 바라보면 도착 직전 방향이 불안정)
+	//애니메이션 이동량이 0인 구간은 SkewWarp가 AddTranslationEasingFunc 곡선으로 이동량을 생성
+	static const FName WarpTargetName_AttackApproach;
+
+	//제자리 회전 몽타주가 타깃을 바라볼 때까지 회전하는 워프 타깃 (ANS 설정: Rotation Type = Facing, Rotation Method = Scale, Warp Translation off)
+	//Scale은 애니메이션 자체의 루트 회전량을 실제 필요한 각도에 맞춰 늘리거나 줄임 (회전 모션이 있는 시퀀스 전용)
+	//Scale은 프레임 회전량을 ±WarpMaxRotationRate*DeltaSeconds로 클램프하므로 WarpMaxRotationRate 0이면 회전하지 않음 (충분히 큰 값 필요)
+	static const FName WarpTargetName_TurnTarget;
+
 #pragma endregion
 
 #pragma region "Public Functions"
@@ -41,8 +51,9 @@ public:
 	void RemoveWarpTargetPredicted(FName WarpTargetName);
 
 	//타깃 액터의 루트 컴포넌트를 추적하는 워프 타깃 설정 (서버에서 호출 시 시뮬 프록시에 자동 복제)
+	//StopDistance > 0이면 타깃에서 오너 쪽으로 StopDistance만큼 떨어진 지점을 추적 (이동 워프용)
 	//타깃이 없으면 워프 타깃 제거 → 해당 워프 윈도우 비활성
-	void SetWarpTargetFollowActor(FName WarpTargetName, const AActor* TargetActor);
+	void SetWarpTargetFollowActor(FName WarpTargetName, const AActor* TargetActor, float StopDistance = 0.0f);
 
 #pragma endregion
 

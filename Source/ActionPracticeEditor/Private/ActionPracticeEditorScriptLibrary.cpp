@@ -183,3 +183,136 @@ FString UActionPracticeEditorScriptLibrary::SetMontageSections(UAnimMontage* Mon
 	DEBUG_LOG(TEXT("SetMontageSections: %s -> %d sections"), *GetNameSafe(Montage), Montage->CompositeSections.Num());
 	return FString();
 }
+
+FString UActionPracticeEditorScriptLibrary::SetMontageSegments(UAnimMontage* Montage, int32 SlotTrackIndex, const TArray<UAnimSequenceBase*>& Animations, const TArray<float>& AnimStartTimes, const TArray<float>& AnimEndTimes, const TArray<float>& PlayRates)
+{
+	if (!Montage)
+	{
+		return TEXT("Montage is null");
+	}
+
+	if (!Montage->SlotAnimTracks.IsValidIndex(SlotTrackIndex))
+	{
+		return FString::Printf(TEXT("Slot track index %d is out of range (%d tracks)"), SlotTrackIndex, Montage->SlotAnimTracks.Num());
+	}
+
+	const int32 NumSegments = Animations.Num();
+
+	if (NumSegments == 0 || AnimStartTimes.Num() != NumSegments || AnimEndTimes.Num() != NumSegments || PlayRates.Num() != NumSegments)
+	{
+		return TEXT("Animations, AnimStartTimes, AnimEndTimes and PlayRates must be non-empty and have the same length");
+	}
+
+	//새 트랙을 먼저 구성해 검증 실패 시 몽타주를 건드리지 않음
+	FAnimTrack NewTrack;
+	float NextStartPos = 0.0f;
+
+	for (int32 Index = 0; Index < NumSegments; ++Index)
+	{
+		UAnimSequenceBase* Animation = Animations[Index];
+		FText Reason;
+
+		//몽타주 중첩, 길이 0, 가산 타입 불일치 등 엔진 규칙 검사
+		if (!NewTrack.IsValidToAdd(Animation, &Reason))
+		{
+			return FString::Printf(TEXT("Segment %d: %s"), Index, Reason.IsEmpty() ? TEXT("animation is not valid for a montage") : *Reason.ToString());
+		}
+
+		const USkeleton* Skeleton = Montage->GetSkeleton();
+
+		if (Skeleton && !Skeleton->IsCompatibleForEditor(Animation->GetSkeleton()))
+		{
+			return FString::Printf(TEXT("Segment %d: %s uses a skeleton incompatible with the montage"), Index, *GetNameSafe(Animation));
+		}
+
+		const float AnimLength = Animation->GetPlayLength();
+
+		if (AnimStartTimes[Index] < 0.0f || AnimEndTimes[Index] > AnimLength + UE_KINDA_SMALL_NUMBER || AnimStartTimes[Index] >= AnimEndTimes[Index])
+		{
+			return FString::Printf(TEXT("Segment %d: range %.3f-%.3f is invalid for %s (length %.3f)"), Index, AnimStartTimes[Index], AnimEndTimes[Index], *GetNameSafe(Animation), AnimLength);
+		}
+
+		//역재생은 노티파이·루트 모션 해석이 달라 지원하지 않음
+		if (PlayRates[Index] <= 0.0f)
+		{
+			return FString::Printf(TEXT("Segment %d: play rate must be positive (got %.3f)"), Index, PlayRates[Index]);
+		}
+
+		FAnimSegment Segment;
+		Segment.SetAnimReference(Animation, true);
+		Segment.AnimStartTime = AnimStartTimes[Index];
+		Segment.AnimEndTime = FMath::Min(AnimEndTimes[Index], AnimLength);
+		Segment.AnimPlayRate = PlayRates[Index];
+		Segment.LoopingCount = 1;
+		Segment.StartPos = NextStartPos;
+		NextStartPos += Segment.GetLength();
+		NewTrack.AnimSegments.Add(Segment);
+	}
+
+	//교체 전 이 슬롯에 링크된 섹션·노티파이의 몽타주 절대 시간 저장 (교체 후 같은 시간으로 재링크)
+	TArray<float> SectionTimes;
+	TArray<float> NotifyTimes;
+	TArray<float> NotifyEndTimes;
+	float LatestLinkedTime = 0.0f;
+
+	for (const FCompositeSection& Section : Montage->CompositeSections)
+	{
+		SectionTimes.Add(Section.GetTime());
+
+		if (Section.GetSlotIndex() == SlotTrackIndex)
+		{
+			LatestLinkedTime = FMath::Max(LatestLinkedTime, Section.GetTime());
+		}
+	}
+
+	for (const FAnimNotifyEvent& Notify : Montage->Notifies)
+	{
+		NotifyTimes.Add(Notify.GetTime());
+		NotifyEndTimes.Add(Notify.GetTime() + Notify.GetDuration());
+
+		if (Notify.GetSlotIndex() == SlotTrackIndex)
+		{
+			LatestLinkedTime = FMath::Max(LatestLinkedTime, Notify.GetTime() + Notify.GetDuration());
+		}
+	}
+
+	//몽타주 에디터의 ClampToEndTime처럼 이벤트를 몰래 당기지 않고 거부
+	if (NextStartPos + UE_KINDA_SMALL_NUMBER < LatestLinkedTime)
+	{
+		return FString::Printf(TEXT("New track length %.3f is shorter than linked sections/notifies (latest %.3f)"), NextStartPos, LatestLinkedTime);
+	}
+
+	Montage->Modify();
+	Montage->SlotAnimTracks[SlotTrackIndex].AnimTrack = NewTrack;
+
+	for (int32 Index = 0; Index < Montage->CompositeSections.Num(); ++Index)
+	{
+		FCompositeSection& Section = Montage->CompositeSections[Index];
+
+		if (Section.GetSlotIndex() == SlotTrackIndex)
+		{
+			Section.Link(Montage, SectionTimes[Index], SlotTrackIndex);
+		}
+	}
+
+	for (int32 Index = 0; Index < Montage->Notifies.Num(); ++Index)
+	{
+		FAnimNotifyEvent& Notify = Montage->Notifies[Index];
+
+		if (Notify.GetSlotIndex() == SlotTrackIndex)
+		{
+			Notify.Link(Montage, NotifyTimes[Index], SlotTrackIndex);
+			Notify.EndLink.Link(Montage, NotifyEndTimes[Index], SlotTrackIndex);
+		}
+	}
+
+	//몽타주 에디터 RecalculateSequenceLength와 같은 순서 (재귀 참조 검사 → 길이 → 링크·트리거 오프셋)
+	Montage->InvalidateRecursiveAsset();
+	Montage->SetCompositeLength(Montage->CalculateSequenceLength());
+	Montage->UpdateLinkableElements();
+	Montage->PostEditChange();
+	Montage->MarkPackageDirty();
+
+	DEBUG_LOG(TEXT("SetMontageSegments: %s[%d] -> %d segments, length %.3f"), *GetNameSafe(Montage), SlotTrackIndex, NumSegments, Montage->GetPlayLength());
+	return FString();
+}

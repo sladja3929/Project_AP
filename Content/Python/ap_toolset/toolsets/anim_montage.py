@@ -51,6 +51,39 @@ def _get_sections(montage: unreal.AnimMontage) -> list:
             for name, start, next_name in zip(names, start_times, next_names)]
 
 
+def _montage_info(montage: unreal.AnimMontage) -> str:
+    slots = []
+
+    for slot_track in montage.get_editor_property('slot_anim_tracks'):
+        anim_track = slot_track.get_editor_property('anim_track')
+        segments = []
+
+        for segment in anim_track.get_editor_property('anim_segments'):
+            reference = segment.get_editor_property('anim_reference')
+            segments.append({
+                'animation': reference.get_path_name() if reference else None,
+                'start_pos': segment.get_editor_property('start_pos'),
+                'anim_start_time': segment.get_editor_property('anim_start_time'),
+                'anim_end_time': segment.get_editor_property('anim_end_time'),
+                'play_rate': segment.get_editor_property('anim_play_rate'),
+                'looping_count': segment.get_editor_property('looping_count'),
+            })
+
+        slots.append({'slot_name': str(slot_track.get_editor_property('slot_name')), 'segments': segments})
+
+    blend_in = montage.get_editor_property('blend_in')
+    blend_out = montage.get_editor_property('blend_out')
+    return json.dumps({
+        'length': _anim_lib().get_sequence_length(montage),
+        'slots': slots,
+        'blend_in_time': blend_in.get_editor_property('blend_time'),
+        'blend_out_time': blend_out.get_editor_property('blend_time'),
+        'blend_out_trigger_time': montage.get_editor_property('blend_out_trigger_time'),
+        'enable_auto_blend_out': montage.get_editor_property('enable_auto_blend_out'),
+        'sections': _get_sections(montage),
+    })
+
+
 def _quat_delta(reference: unreal.Quat, rotation: unreal.Quat) -> unreal.Quat:
     #inverse(reference) * rotation (Hamilton 곱, 단위 쿼터니언이므로 역원 = 켤레)
     ax, ay, az, aw = -reference.x, -reference.y, -reference.z, reference.w
@@ -281,37 +314,10 @@ class AnimMontageTools(unreal.ToolsetDefinition):
             montage: The montage to query.
 
         Returns:
-            A JSON string with length, slots (segments with start_pos / anim start-end time),
-            blend in/out times, and sections (name, start_time, next).
+            A JSON string with length, slots (segments with start_pos / anim start-end time /
+            play_rate / looping_count), blend in/out times, and sections (name, start_time, next).
         """
-        slots = []
-
-        for slot_track in montage.get_editor_property('slot_anim_tracks'):
-            anim_track = slot_track.get_editor_property('anim_track')
-            segments = []
-
-            for segment in anim_track.get_editor_property('anim_segments'):
-                reference = segment.get_editor_property('anim_reference')
-                segments.append({
-                    'animation': reference.get_path_name() if reference else None,
-                    'start_pos': segment.get_editor_property('start_pos'),
-                    'anim_start_time': segment.get_editor_property('anim_start_time'),
-                    'anim_end_time': segment.get_editor_property('anim_end_time'),
-                })
-
-            slots.append({'slot_name': str(slot_track.get_editor_property('slot_name')), 'segments': segments})
-
-        blend_in = montage.get_editor_property('blend_in')
-        blend_out = montage.get_editor_property('blend_out')
-        return json.dumps({
-            'length': _anim_lib().get_sequence_length(montage),
-            'slots': slots,
-            'blend_in_time': blend_in.get_editor_property('blend_time'),
-            'blend_out_time': blend_out.get_editor_property('blend_time'),
-            'blend_out_trigger_time': montage.get_editor_property('blend_out_trigger_time'),
-            'enable_auto_blend_out': montage.get_editor_property('enable_auto_blend_out'),
-            'sections': _get_sections(montage),
-        })
+        return _montage_info(montage)
 
     @toolset_registry.tool_call
     @staticmethod
@@ -343,6 +349,59 @@ class AnimMontageTools(unreal.ToolsetDefinition):
             raise RuntimeError(error)
 
         return json.dumps(_get_sections(montage))
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def set_montage_segments(montage: unreal.AnimMontage, segments: str, slot_track_index: int = 0) -> str:
+        """Replaces all animation segments of one montage slot track. The asset is not saved.
+
+        Segments are placed back to back in the given order; each segment's montage
+        length is (anim_end_time - anim_start_time) / play_rate. Use it to slow down only
+        part of an animation, e.g. stretch an attack's recovery tail by splitting the same
+        sequence into [0, t] at 1.0 and [t, end] at 0.7. Sections and notifies keep their
+        montage times and are re-linked to the new segments, so content after a slowed
+        segment does not move with the animation; fails if the new track would be shorter
+        than any section or notify on it.
+
+        Args:
+            montage: The montage to modify.
+            segments: JSON array of {"animation": str (asset path), "anim_start_time": float,
+                "anim_end_time": float, "play_rate": float (> 0, default 1.0)}. A negative
+                anim_end_time means the end of the animation.
+            slot_track_index: The slot track whose segments are replaced.
+
+        Returns:
+            The resulting montage info JSON (same as get_montage_info).
+        """
+        entries = json.loads(segments)
+        animations = []
+        start_times = []
+        end_times = []
+        play_rates = []
+
+        for index, entry in enumerate(entries):
+            animation = unreal.EditorAssetLibrary.load_asset(entry['animation'])
+
+            if not isinstance(animation, unreal.AnimSequenceBase):
+                raise RuntimeError(f'Segment {index}: {entry["animation"]} is not an animation sequence')
+
+            end_time = float(entry.get('anim_end_time', -1.0))
+
+            if end_time < 0.0:
+                end_time = _anim_lib().get_sequence_length(animation)
+
+            animations.append(animation)
+            start_times.append(float(entry.get('anim_start_time', 0.0)))
+            end_times.append(end_time)
+            play_rates.append(float(entry.get('play_rate', 1.0)))
+
+        error = _editor_lib().set_montage_segments(
+            montage, slot_track_index, animations, start_times, end_times, play_rates)
+
+        if error:
+            raise RuntimeError(error)
+
+        return _montage_info(montage)
 
     @toolset_registry.tool_call
     @staticmethod

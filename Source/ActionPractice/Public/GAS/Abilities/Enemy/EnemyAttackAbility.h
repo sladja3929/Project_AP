@@ -8,6 +8,7 @@
 #include "EnemyAttackAbility.generated.h"
 
 class UAbilityTask_PlayMontageWithEvents;
+class UAPMotionWarpingComponent;
 struct FFinalAttackData;
 struct FEnemyTaggedAttackData;
 
@@ -54,6 +55,13 @@ protected:
 	//Ability 시작 시 캐싱된 Target 정보
 	FCurrentTarget CachedTargetInfo;
 
+	// ===== 이동 워프 =====
+	//AttackApproach 설정 중 타깃이 정지 거리 안으로 들어오는지 감시하는 타이머
+	FTimerHandle ApproachGuardTimerHandle;
+
+	//현재 콤보의 AttackApproach 정지 거리 (타깃 중심 기준)
+	float ApproachStopDistance = 0.0f;
+
 	// ===== 히트 디텍션 =====
 	UPROPERTY()
 	FHitDetectionSetter HitDetectionSetter;
@@ -87,8 +95,18 @@ protected:
 	// ===== 실행 로직 =====
 	void ExecuteAttack();
 
-	//캐싱된 타깃을 추적하는 AttackTarget 워프 타깃 갱신 (서버 설정 → 시뮬 프록시 자동 복제)
+	//캐싱된 타깃을 추적하는 AttackTarget(회전)·AttackApproach(이동) 워프 타깃 갱신 (서버 설정 → 시뮬 프록시 자동 복제)
 	void UpdateAttackWarpTarget();
+
+	//AttackApproach 설정. 이미 정지 거리 안이면 미설정, 설정 시 감시 타이머 시작
+	void UpdateAttackApproachTarget(UAPMotionWarpingComponent* MotionWarpingComponent, const AActor* TargetActor);
+
+	//워프 도중 타깃이 정지 거리 안으로 들어오면 AttackApproach 제거
+	//정지 지점은 매 틱 타깃→오너 방향으로 재계산되므로 정지 거리 안에서는 오너 뒤에 생겨 뒤로 물러나는 것 방지
+	void CheckApproachStopDistance();
+
+	//AttackApproach 제거 + 감시 타이머 정리
+	void ClearAttackApproachTarget();
 
 	// ===== 히트 디텍션 (IHitDetectionUser) =====
 	virtual void SetHitDetectionConfig() override;

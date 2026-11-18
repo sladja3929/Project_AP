@@ -23,13 +23,19 @@ struct FEnemyComboAttackUnit
     // ===== 적 전용 콤보별 설정 =====
     //타겟 회전은 몽타주의 AttackTarget 워프 윈도우(MotionWarping ANS)에서 정의
 
-    //콤보 연계 최대 거리
+    //콤보 연계 전용: 이 유닛에서 다음 유닛으로 이어갈 수 있는 최대 거리 (마지막 유닛·1단 콤보에서는 미사용)
+    //공격 시작 거리·각도는 StateTree(행동 그룹 진입 조건)가 판정
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
     float MaxTargetDistance = 150.0f;
 
-    //콤보 연계 최대 각도
+    //콤보 연계 전용: 이 유닛에서 다음 유닛으로 이어갈 수 있는 최대 각도 (마지막 유닛·1단 콤보에서는 미사용)
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
     float MaxTargetAngle = 60.0f;
+
+    //AttackApproach 워프(이동) 정지 거리. 타깃과 오너의 액터 중심 간 수평 거리 (캡슐 반경 미포함)
+    //몽타주에 AttackApproach MotionWarping ANS가 있을 때만 사용. 이보다 가까우면(시작 시 또는 워프 도중) 이동 워프 비활성
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config", meta = (ClampMin = "0.0"))
+    float WarpStopDistance = 120.0f;
 };
 
 //적 돌진 공격 설정 (타겟 위치 기반 이동)

@@ -6,6 +6,7 @@
 
 class UStateTree;
 class UAnimMontage;
+class UAnimSequenceBase;
 
 //에디터 Python/MCP 툴세트에서 호출하기 위한 스크립트 노출 함수 모음
 //엔진이 C++로만 제공하는 에디터 기능을 BlueprintCallable로 감싸 unreal.ActionPracticeEditorScriptLibrary로 노출
@@ -42,6 +43,12 @@ public:
 	//실패 시 에러 메시지 반환, 성공 시 빈 문자열
 	UFUNCTION(BlueprintCallable, Category = "ActionPractice|Editor|Animation")
 	static FString SetMontageSections(UAnimMontage* Montage, const TArray<FName>& Names, const TArray<float>& StartTimes, const TArray<FName>& NextNames);
+
+	//몽타주 슬롯 트랙의 세그먼트 전체 교체 (FAnimSegment 필드는 BlueprintReadOnly라 스크립트에서 직접 수정 불가)
+	//네 배열은 같은 인덱스끼리 한 세그먼트, 몽타주 상 시작 위치(StartPos)는 앞 세그먼트 길이로 이어 붙여 자동 계산
+	//몽타주 길이·섹션·노티파이 링크를 몽타주 에디터와 같은 방식으로 갱신. 실패 시 에러 메시지 반환, 성공 시 빈 문자열
+	UFUNCTION(BlueprintCallable, Category = "ActionPractice|Editor|Animation")
+	static FString SetMontageSegments(UAnimMontage* Montage, int32 SlotTrackIndex, const TArray<UAnimSequenceBase*>& Animations, const TArray<float>& AnimStartTimes, const TArray<float>& AnimEndTimes, const TArray<float>& PlayRates);
 
 #pragma endregion
 
