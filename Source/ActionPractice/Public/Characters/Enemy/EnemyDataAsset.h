@@ -79,6 +79,29 @@ struct FEnemyTaggedAttackData
     FEnemyLungeConfig LungeConfig;
 };
 
+//무리 전투 설정 (UEnemyPack이 소집·공격권 분배에 사용)
+USTRUCT(BlueprintType)
+struct FEnemyPackSettings
+{
+    GENERATED_BODY()
+
+    //무리 전투 사용 여부. 켜면 전투 진입 시 같은 배회 구역(구역이 없으면 RallyRadius 안 같은 종류) 적을 함께 전투로 끌어들임
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pack")
+    bool bEnablePack = false;
+
+    //동시에 공격권을 가질 수 있는 최대 구성원 수 (타깃에 가까운 순)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pack", meta = (EditCondition = "bEnablePack", ClampMin = "1"))
+    int32 MaxAttackers = 2;
+
+    //공격자 교체 여유 거리. 비공격자가 가장 먼 공격자보다 이만큼 이상 가까울 때만 교체 (거리가 비슷할 때 공격권이 오가는 떨림 방지)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pack", meta = (EditCondition = "bEnablePack", ClampMin = "0.0"))
+    float AttackerSwapMargin = 100.0f;
+
+    //배회 구역이 없는 적의 소집 반경 (전투 진입한 적 기준 수평 거리)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pack", meta = (EditCondition = "bEnablePack", ClampMin = "0.0"))
+    float RallyRadius = 2000.0f;
+};
+
 UCLASS(BlueprintType)
 class UEnemyDataAsset : public UPrimaryDataAsset
 {
@@ -127,6 +150,12 @@ public:
     //그로기 루프 지속 시간 (초)
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Groggy")
     float GroggyLoopDuration = 3.0f;
+
+    // ===== Pack =====
+
+    //무리 전투 설정 (늑대 등 무리 단위로 싸우는 적만 사용)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pack")
+    FEnemyPackSettings PackSettings;
 
     //AttackTags와 일치하는 공격 데이터를 반환
     const FEnemyTaggedAttackData* GetAttackDataByTags(const FGameplayTagContainer& AttackTags) const

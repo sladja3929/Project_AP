@@ -43,7 +43,7 @@ EStateTreeRunStatus FPlayMontageTask::EnterState(FStateTreeExecutionContext& Con
 
     if (!ASC || !InstanceData.Montage)
     {
-        DEBUG_LOG(TEXT("EnterState: ASC(%p) or Montage(%s) is null"), ASC, *GetNameSafe(InstanceData.Montage));
+        DEBUG_LOG(TEXT("[%s] EnterState: ASC(%p) or Montage(%s) is null"), *GetNameSafe(ASC ? ASC->GetAvatarActor() : nullptr), ASC, *GetNameSafe(InstanceData.Montage));
         return EStateTreeRunStatus::Failed;
     }
 
@@ -53,14 +53,14 @@ EStateTreeRunStatus FPlayMontageTask::EnterState(FStateTreeExecutionContext& Con
 
         if (EndSectionIndex == INDEX_NONE)
         {
-            DEBUG_LOG(TEXT("EnterState: EndSection %s not found in %s"), *InstanceData.EndSection.ToString(), *GetNameSafe(InstanceData.Montage));
+            DEBUG_LOG(TEXT("[%s] EnterState: EndSection %s not found in %s"), *GetNameSafe(ASC ? ASC->GetAvatarActor() : nullptr), *InstanceData.EndSection.ToString(), *GetNameSafe(InstanceData.Montage));
             return EStateTreeRunStatus::Failed;
         }
 
         //EndSection이 다른 섹션으로 이어지면(루프 포함) 몽타주가 끝나지 않음
         if (!InstanceData.Montage->CompositeSections[EndSectionIndex].NextSectionName.IsNone())
         {
-            DEBUG_LOG(TEXT("EnterState: EndSection %s of %s must have no next section"), *InstanceData.EndSection.ToString(), *GetNameSafe(InstanceData.Montage));
+            DEBUG_LOG(TEXT("[%s] EnterState: EndSection %s of %s must have no next section"), *GetNameSafe(ASC ? ASC->GetAvatarActor() : nullptr), *InstanceData.EndSection.ToString(), *GetNameSafe(InstanceData.Montage));
             return EStateTreeRunStatus::Failed;
         }
     }
@@ -88,11 +88,11 @@ EStateTreeRunStatus FPlayMontageTask::EnterState(FStateTreeExecutionContext& Con
 
     if (PlayLength <= 0.0f)
     {
-        DEBUG_LOG(TEXT("EnterState: PlayMontage failed. Montage=%s"), *GetNameSafe(InstanceData.Montage));
+        DEBUG_LOG(TEXT("[%s] EnterState: PlayMontage failed. Montage=%s"), *GetNameSafe(ASC ? ASC->GetAvatarActor() : nullptr), *GetNameSafe(InstanceData.Montage));
         return EStateTreeRunStatus::Failed;
     }
 
-    DEBUG_LOG(TEXT("EnterState: Playing %s, Duration=%.2f"), *GetNameSafe(InstanceData.Montage), InstanceData.ComputedDuration);
+    DEBUG_LOG(TEXT("[%s] EnterState: Playing %s, Duration=%.2f"), *GetNameSafe(ASC ? ASC->GetAvatarActor() : nullptr), *GetNameSafe(InstanceData.Montage), InstanceData.ComputedDuration);
     return EStateTreeRunStatus::Running;
 }
 
@@ -109,7 +109,7 @@ EStateTreeRunStatus FPlayMontageTask::Tick(FStateTreeExecutionContext& Context, 
     //몽타주 종료 또는 다른 몽타주(피격 어빌리티 등)로 대체
     if (ASC->GetCurrentMontage() != InstanceData.Montage)
     {
-        DEBUG_LOG(TEXT("Tick: %s is no longer playing - Task SUCCEEDED"), *GetNameSafe(InstanceData.Montage));
+        DEBUG_LOG(TEXT("[%s] Tick: %s is no longer playing - Task SUCCEEDED"), *GetNameSafe(ASC ? ASC->GetAvatarActor() : nullptr), *GetNameSafe(InstanceData.Montage));
         return EStateTreeRunStatus::Succeeded;
     }
 
@@ -130,7 +130,7 @@ EStateTreeRunStatus FPlayMontageTask::Tick(FStateTreeExecutionContext& Context, 
     if (InstanceData.EndSection.IsNone())
     {
         ASC->CurrentMontageStop();
-        DEBUG_LOG(TEXT("Tick: Duration elapsed, stopped %s - Task SUCCEEDED"), *GetNameSafe(InstanceData.Montage));
+        DEBUG_LOG(TEXT("[%s] Tick: Duration elapsed, stopped %s - Task SUCCEEDED"), *GetNameSafe(ASC ? ASC->GetAvatarActor() : nullptr), *GetNameSafe(InstanceData.Montage));
         return EStateTreeRunStatus::Succeeded;
     }
 
@@ -142,7 +142,7 @@ EStateTreeRunStatus FPlayMontageTask::Tick(FStateTreeExecutionContext& Context, 
         ASC->CurrentMontageSetNextSectionName(CurrentSection, InstanceData.EndSection);
     }
 
-    DEBUG_LOG(TEXT("Tick: Duration elapsed, %s -> %s"), *CurrentSection.ToString(), *InstanceData.EndSection.ToString());
+    DEBUG_LOG(TEXT("[%s] Tick: Duration elapsed, %s -> %s"), *GetNameSafe(ASC ? ASC->GetAvatarActor() : nullptr), *CurrentSection.ToString(), *InstanceData.EndSection.ToString());
     return EStateTreeRunStatus::Running;
 }
 
@@ -155,7 +155,12 @@ void FPlayMontageTask::ExitState(FStateTreeExecutionContext& Context, const FSta
     if (ASC && InstanceData.Montage && ASC->GetCurrentMontage() == InstanceData.Montage)
     {
         ASC->CurrentMontageStop();
-        DEBUG_LOG(TEXT("ExitState: Stopped %s"), *GetNameSafe(InstanceData.Montage));
+        DEBUG_LOG(TEXT("[%s] ExitState: Stopped %s"), *GetNameSafe(ASC ? ASC->GetAvatarActor() : nullptr), *GetNameSafe(InstanceData.Montage));
+    }
+    else
+    {
+        //정지하지 않고 나감 (이미 끝났거나 다른 몽타주로 대체됨). ASC 기록과 실제 재생이 어긋나면 몽타주가 남을 수 있어 추적용으로 기록
+        DEBUG_LOG(TEXT("[%s] ExitState: %s not current (Current=%s)"), *GetNameSafe(ASC ? ASC->GetAvatarActor() : nullptr), *GetNameSafe(InstanceData.Montage), *GetNameSafe(ASC ? ASC->GetCurrentMontage() : nullptr));
     }
 
     //직접 세팅한 워프 타깃만 정리 (검증 실패로 세팅 전 종료된 경우 다른 소유자의 타깃을 지우지 않음)

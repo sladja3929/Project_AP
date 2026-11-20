@@ -12,7 +12,7 @@ class AEnemyCharacter;
 /**
  * 게임플레이 디버거(') "EnemyAI" 카테고리
  * - 디버그 대상 적의 시야(Sight/LoseSight 부채꼴)와 StateTree 거리 파라미터(Melee/Middle/Long/Alert) 링을 바닥에 표시
- * - 활성 StateTree 상태, 현재 타깃과 거리를 텍스트로 표시
+ * - 활성 StateTree 상태, 현재 타깃과 거리, 무리 역할(공격자/견제)을 텍스트로 표시
  * - 배회 구역(AEnemyWanderArea) 박스와 구성원별 배회 목적지 표시
  * - AI는 서버에서만 동작하므로 서버 CollectData에서 수집한 텍스트/셰이프를 디버거가 클라이언트로 복제 (데디 서버에서도 확인 가능)
  */

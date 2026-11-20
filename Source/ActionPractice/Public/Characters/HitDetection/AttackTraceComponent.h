@@ -195,6 +195,9 @@ protected:
 	void ProcessHit(AActor* HitActor, const FHitResult& HitResult);
 	virtual void AddIgnoredActors(FCollisionQueryParams& Params) const;
 
+	//아군 판정 (true면 히트에서 제외). 기본은 아군 없음, 소유자 종류별로 override
+	virtual bool IsFriendlyActor(const AActor* HitActor) const { return false; }
+
 	// ===== Event Functions =====
 	void BindEventCallbacks();
 	void UnbindEventCallbacks();

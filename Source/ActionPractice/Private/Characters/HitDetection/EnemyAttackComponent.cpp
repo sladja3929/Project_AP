@@ -149,7 +149,11 @@ void UEnemyAttackComponent::AddIgnoredActors(FCollisionQueryParams& Params) cons
 	if (OwnerEnemy)
 	{
 		Params.AddIgnoredActor(OwnerEnemy);
-		// TODO: 필요시 아군 Enemy 제외 로직 추가
 	}
+}
+
+bool UEnemyAttackComponent::IsFriendlyActor(const AActor* HitActor) const
+{
+	return HitActor && HitActor->IsA<AEnemyCharacter>();
 }
 #pragma endregion

@@ -41,6 +41,7 @@ void FUpdateTargetInfoEvaluator::TreeStop(FStateTreeExecutionContext& Context) c
 	InstanceData.AngleToTarget = 0.0f;
 	InstanceData.bTargetDetected = false;
 	InstanceData.bInCombat = false;
+	InstanceData.bIsPackAttacker = true;
 
 	DEBUG_LOG(TEXT("UpdateTargetInfoEvaluator TreeStop"));
 }
@@ -55,6 +56,7 @@ void FUpdateTargetInfoEvaluator::UpdateTargetInfo(FStateTreeExecutionContext& Co
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
 	InstanceData.bInCombat = InstanceData.EnemyAIController && InstanceData.EnemyAIController->IsInCombat();
+	InstanceData.bIsPackAttacker = !InstanceData.EnemyAIController || InstanceData.EnemyAIController->IsPackAttacker();
 
 	if (!InstanceData.EnemyAIController || !InstanceData.EnemyAIController->CurrentTarget.IsValid() || !InstanceData.EnemyCharacter)
 	{

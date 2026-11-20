@@ -8,6 +8,7 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "AI/EnemyWanderArea.h"
+#include "AI/EnemyPack.h"
 #include "Components/BoxComponent.h"
 #include "Math/ColorList.h"
 
@@ -104,6 +105,14 @@ void FGameplayDebuggerCategory_EnemyAI::CollectStateAndTarget(const AEnemyCharac
 	}
 
 	AddTextLine(AIController->IsInCombat() ? TEXT("Awareness: {red}Combat") : TEXT("Awareness: {yellow}Perceived"));
+
+	//무리 역할 (공격자 / 견제)
+	if (const UEnemyPack* Pack = AIController->GetPack())
+	{
+		AddTextLine(FString::Printf(TEXT("Pack: %s  {grey}Members: {white}%d  {grey}Attackers: {white}%d/%d"),
+			AIController->IsPackAttacker() ? TEXT("{red}Attacker") : TEXT("{cyan}Support"),
+			Pack->GetMemberCount(), Pack->GetAttackerCount(), Pack->GetSettings().MaxAttackers));
+	}
 
 	//UpdateTargetInfoEvaluator와 같은 기준 (액터 중심 간 수평 거리)
 	const float Distance = FVector::Dist2D(Enemy->GetActorLocation(), TargetActor->GetActorLocation());

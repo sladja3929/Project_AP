@@ -458,7 +458,8 @@ bool UAttackTraceComponent::ValidateHit(AActor* HitActor, const FHitResult& HitR
 	AActor* Owner = GetOwnerActor();
 	if (HitActor == Owner) return false;
 
-	//필요 시 아군 제외 구현해야 함
+	//아군 제외 (적끼리 등, 판정 기준은 소유자 종류별 IsFriendlyActor)
+	if (IsFriendlyActor(HitActor)) return false;
 
 	//중복 체크
 	float CurrentTime = GetWorld()->GetTimeSeconds();

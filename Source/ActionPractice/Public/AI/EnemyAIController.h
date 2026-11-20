@@ -10,6 +10,7 @@ class UGASStateTreeAIComponent;
 class AEnemyCharacter;
 class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
+class UEnemyPack;
 
 /**
  * Enemy AI가 추적하는 Target 정보
@@ -46,6 +47,7 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(FOnEnemyCombatStateChanged, bool /*bInComba
  * 타깃 인지 상태와 전투 상태를 StateTree와 별개로 소유
  * - 인지: AIPerception 시야(시야각·SightRadius·가림)로 획득, 시야를 벗어나면 해제
  * - 전투: StateTree(Enter Combat 태스크) 또는 피격으로 진입. 시야와 무관하게 타깃을 유지하고, 타깃 사망·LoseSightRadius 초과 거리·자신의 사망/리셋으로만 해제
+ * - 무리: 무리 전투를 쓰는 적은 전투 진입 시 UEnemyPackSubsystem으로 무리를 소집. 무리 소속이면 거리 해제는 구성원 전원이 해제 거리 밖일 때만
  */
 UCLASS()
 class ACTIONPRACTICE_API AEnemyAIController : public AAIController
@@ -71,6 +73,13 @@ public:
 	FORCEINLINE AActor* GetCurrentTargetActor() const { return CurrentTarget.Actor.Get(); }
 	FORCEINLINE const FCurrentTarget& GetCurrentTarget() const { return CurrentTarget; }
 	FORCEINLINE bool IsInCombat() const { return bInCombat; }
+	FORCEINLINE UEnemyPack* GetPack() const { return Pack.Get(); }
+
+	//공격권 보유 여부. 무리에 속하지 않으면 항상 true (혼자 싸우는 적은 늘 공격자)
+	bool IsPackAttacker() const;
+
+	//무리 소속 설정 (UEnemyPackSubsystem 전용)
+	void SetPack(UEnemyPack* InPack);
 
 	//전투 진입. 살아 있는 플레이어만 대상이며, 이미 전투 중이면 기존 대상 유지
 	void EnterCombat(AActor* Target);
@@ -121,12 +130,18 @@ private:
 
 	FTimerHandle CombatReleaseCheckTimer;
 
+	//소속 무리 (UEnemyPackSubsystem 소유, 전투 중에만 존재)
+	TWeakObjectPtr<UEnemyPack> Pack;
+
 #pragma endregion
 
 #pragma region "Private Functions"
 
 	//전투 해제 조건 검사 (타이머 콜백)
 	void CheckCombatRelease();
+
+	//소속 무리 탈퇴
+	void LeavePack();
 
 	//현재 시야에 들어와 있는 살아 있는 플레이어 (없으면 nullptr)
 	AActor* FindPerceivedPlayer() const;

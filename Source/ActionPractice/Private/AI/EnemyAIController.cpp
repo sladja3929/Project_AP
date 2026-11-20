@@ -1,5 +1,7 @@
 ﻿#include "AI/EnemyAIController.h"
 #include "AI/StateTree/GASStateTreeAIComponent.h"
+#include "AI/EnemyPack.h"
+#include "AI/EnemyPackSubsystem.h"
 #include "Characters/ActionPracticeCharacter.h"
 #include "Characters/EnemyCharacter.h"
 #include "Perception/AIPerceptionComponent.h"
@@ -91,6 +93,7 @@ void AEnemyAIController::OnUnPossess()
 	GetWorldTimerManager().ClearTimer(CombatReleaseCheckTimer);
 	bInCombat = false;
 	CurrentTarget.Reset();
+	LeavePack();
 
 	EnemyCharacter.Reset();
 
@@ -171,6 +174,12 @@ void AEnemyAIController::EnterCombat(AActor* Target)
 
 	DEBUG_LOG(TEXT("EnterCombat: %s"), *GetNameSafe(Target));
 	OnCombatStateChanged.Broadcast(true, Target);
+
+	//무리 소집 (진입 경로와 무관: Howl·근거리 진입·피격 모두. 무리 미사용 적이거나 이미 소속이면 무시)
+	if (UEnemyPackSubsystem* PackSubsystem = UWorld::GetSubsystem<UEnemyPackSubsystem>(GetWorld()))
+	{
+		PackSubsystem->RallyPack(this, Target);
+	}
 }
 
 void AEnemyAIController::ExitCombat()
@@ -182,6 +191,7 @@ void AEnemyAIController::ExitCombat()
 
 	bInCombat = false;
 	GetWorldTimerManager().ClearTimer(CombatReleaseCheckTimer);
+	LeavePack();
 
 	AActor* PreviousTarget = CurrentTarget.Actor.Get();
 	AActor* PerceivedPlayer = FindPerceivedPlayer();
@@ -208,6 +218,7 @@ void AEnemyAIController::ResetAwareness()
 	bInCombat = false;
 	GetWorldTimerManager().ClearTimer(CombatReleaseCheckTimer);
 	CurrentTarget.Reset();
+	LeavePack();
 
 	//이미 감지된 대상은 감지 이벤트가 다시 오지 않으므로 인지 기록 삭제 (다음 시야 판정에서 새로 감지)
 	if (UAIPerceptionComponent* PerceptionComp = GetPerceptionComponent())
@@ -226,6 +237,7 @@ void AEnemyAIController::ClearAwarenessOnDeath()
 	bInCombat = false;
 	GetWorldTimerManager().ClearTimer(CombatReleaseCheckTimer);
 	CurrentTarget.Reset();
+	LeavePack();
 }
 
 void AEnemyAIController::CheckCombatRelease()
@@ -244,10 +256,48 @@ void AEnemyAIController::CheckCombatRelease()
 	const UAISenseConfig_Sight* SightConfig = PerceptionComp ? PerceptionComp->GetSenseConfig<UAISenseConfig_Sight>() : nullptr;
 	const float ReleaseDistance = SightConfig ? SightConfig->LoseSightRadius : 0.0f;
 
-	if (ReleaseDistance > 0.0f && FVector::Dist2D(ControlledPawn->GetActorLocation(), Target->GetActorLocation()) > ReleaseDistance)
+	if (ReleaseDistance <= 0.0f)
+	{
+		return;
+	}
+
+	//무리 소속이면 구성원 전원이 해제 거리 밖일 때만 해제 (혼자 멀어진 구성원은 무리 타깃을 유지해 다시 따라옴)
+	const UEnemyPack* CurrentPack = Pack.Get();
+	const bool bBeyondReleaseDistance = CurrentPack
+		? CurrentPack->AreAllMembersBeyond(ReleaseDistance)
+		: FVector::Dist2D(ControlledPawn->GetActorLocation(), Target->GetActorLocation()) > ReleaseDistance;
+
+	if (bBeyondReleaseDistance)
 	{
 		ExitCombat();
 	}
+}
+
+bool AEnemyAIController::IsPackAttacker() const
+{
+	const UEnemyPack* CurrentPack = Pack.Get();
+	return !CurrentPack || CurrentPack->IsAttacker(this);
+}
+
+void AEnemyAIController::SetPack(UEnemyPack* InPack)
+{
+	Pack = InPack;
+}
+
+void AEnemyAIController::LeavePack()
+{
+	if (!Pack.IsValid())
+	{
+		Pack.Reset();
+		return;
+	}
+
+	if (UEnemyPackSubsystem* PackSubsystem = UWorld::GetSubsystem<UEnemyPackSubsystem>(GetWorld()))
+	{
+		PackSubsystem->LeavePack(this);
+	}
+
+	Pack.Reset();
 }
 
 AActor* AEnemyAIController::FindPerceivedPlayer() const

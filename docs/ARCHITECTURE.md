@@ -21,6 +21,8 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 
 -EDefenseResult(None/Blocked/GuardBroken/Parried)는 HandleOnDamagedResolved에서 결정되어 GE 컨텍스트와 GameplayCue로 전달됨
 -ActionPracticeGameplayEffectContext는 DamageType, PoiseDamage, DefenseResult, bUnparriable을 담는 커스텀 GE 컨텍스트
+-아군 피격 제외는 데미지 파이프라인 이전의 히트 판정 단계에서 처리: UAttackTraceComponent::ValidateHit가 소유자별 IsFriendlyActor로 거르며, 적 공격(EnemyAttackComponent)은 다른 적 전체를 아군으로 봄. 플레이어 무기의 CapsuleOverlapComponent는 별도 구현이라 이 필터를 거치지 않음 (적이 이 방식을 쓰게 되면 아군 필터를 따로 추가해야 함)
+-데미지·회복은 메타 어트리뷰트(IncomingDamage/IncomingHealing)로 들어와 파이프라인이 SetHealth로 직접 바꾸므로, Health 변화에 반응하는 로직(적 머리 위 HP바 등)은 GE가 바꾼 어트리뷰트가 아니라 PostGameplayEffectExecute 전후 값이나 OnRep으로 판단해야 함
 
 ##Attack 시스템 설계
 -Attack는 단일 어빌리티가 아니라 AttackSequenceAbility 중심 구조로 동작함
@@ -57,6 +59,11 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -Idle 배회는 레벨 배치 액터 AEnemyWanderArea(박스 구역)를 적 인스턴스가 참조하는 방식(AEnemyCharacter::WanderArea, 없으면 스폰 위치 반경). 무리는 구역 하나를 공유해 한 영역에 묶이되 함께 움직이지는 않음. 순찰 루트 공유 대신 구역을 쓰는 이유는 같은 선 위를 오가는 구성원끼리 마주치기 때문. 겹침은 두 단계로 막음: 구역이 구성원별 목적지를 예약해 가까운 지점을 피하고(MinSeparation), 이동 중에는 CMC RVO 회피. Wander 태스크는 진행 방향 기준 각도·거리 범위에서 다음 지점을 골라 지그재그를 줄이고, 시작 대기를 랜덤화해 무리 출발을 분산
 -전투 중 견제: 옆걸음 모션이 없는 사족 보행(Wolf)은 Circle Target 태스크로 타깃 둘레를 호를 따라 걷거나(몸은 이동 방향) Combat Idle 몽타주로 제자리 대기. 어느 쪽이든 몸 전체를 워프로 돌리지 않고 시선만 ABP 머리 바라보기가 타깃을 따라감. 실제 동물이 상대를 견제할 때의 움직임이라 strafe 모션을 만들지 않음. 선회 반경은 상위 상태 거리 범위 안쪽 여유(EdgeMargin)로 보정해, 완료 순간 경계를 넘어 다른 거리 상태(접근 등)가 잠깐 선택되는 끊김을 막음
 -머리 바라보기: 적 ABP 공통 부모 UEnemyAnimInstance가 전투 대상(AEnemyCharacter::CombatTarget, 서버 전투 상태를 복제해 클라이언트에서도 사용) 쪽 수평 Yaw를 계산해 목·머리 본에 나눠 주고, ABP의 Transform (Modify) Bone 노드(Additive, Component Space)가 적용. 피치는 건드리지 않음(사족 보행 목 본 축이 위로 들려 있어 Look At으로 축을 맞추면 목이 꺾임). 몽타주 재생 중에는 Look At Target ANS(로직 없는 구간 표시) 구간에서만 허용하고, 그 밖의 몽타주 재생 중이거나 대상이 뒤쪽이면 정면으로 보간 복귀. ANS 활성 여부는 Begin/End 카운터 대신 AnimInstance의 활성 ANS 목록에서 조회해 몽타주 중단으로 End가 누락돼도 어긋나지 않음
+-무리 전투: 조정자는 UEnemyPackSubsystem(서버 전용 WorldSubsystem), 무리 단위 상태는 UEnemyPack. 구성원 개별 전투 상태의 소유자는 여전히 EnemyAIController이고 무리는 소집·공격권·해제 판단만 담당. 사용 여부와 튜닝 값은 EnemyDataAsset::PackSettings(MaxAttackers, AttackerSwapMargin, RallyRadius)
+  -소집: 무리 전투를 쓰는 적이 어떤 경로로든(Howl·근거리 진입·피격) EnterCombat하면 같은 배회 구역 구성원(구역이 없으면 RallyRadius 안 같은 EnemyName의 구역 없는 적)을 같은 타깃으로 EnterCombat시킴. 같은 타깃과 싸우는 무리가 있으면 합류. 소집된 구성원은 인지 단계(늑대 Alert·Howl)를 건너뛰고, 잠자던 구성원은 Rest 트랜지션의 In Combat 조건으로 Wake Up을 거쳐 합류. Howl 진입 조건이 비전투라 동시에 발견해도 먼저 전투에 들어간 한 마리만 Howl
+  -공격권: 타깃에 가까운 순으로 MaxAttackers명. 빈 자리는 즉시 채우고, 기존 공격자는 비공격자가 AttackerSwapMargin 이상 더 가까울 때만 교체(거리가 비슷할 때 떨림 방지). 0.2초 주기와 구성원 변화 시 갱신. Update Target Info Evaluator의 bIsPackAttacker로 ST에 노출(무리 미소속이면 항상 true라 혼자 싸우는 적은 늘 공격자)
+  -ST 분기: 공격 노드(Jump Attack, Melee, Turn To Target)와 중거리 Approach는 공격자 전용, 견제 노드(Circle, Combat Idle)와 Give Way는 비공격자 전용. 공격권은 진행 중인 공격 노드를 끊지 않고 끝난 뒤 재선택에만 반영되며, 이동·견제 노드에만 역할 변경 OnTick 트랜지션을 둠. 비공격자가 너무 가까우면 Circle(반경 범위 보정으로 바깥쪽 호), 근접 거리 안이면 Combat 마지막 자식 Give Way(같은 선회)로 물러나 공격자에게 자리를 내줌
+  -해제: 무리 소속이면 거리 해제는 살아 있는 구성원 전원이 해제 거리 밖일 때만(한 마리만 멀어지면 무리 타깃을 유지해 다시 따라옴). 타깃 사망은 개별 판정. 전투 해제·사망·리셋·빙의 해제 시 컨트롤러가 무리에서 탈퇴하고 빈 무리는 제거
 -몽타주 행동의 시작 각도는 StateTree가 판정: 정면이 필요한 행동 그룹·노드(Melee, Jump Attack) 진입 조건에 Target Angle 컨디션을 걸고(선회·제자리 대기처럼 정면이 필요 없는 견제 행동에는 걸지 않음. 선회 직후 몸이 옆을 향해 회전 몽타주가 끼어들기 때문), 각도를 벗어나 그룹이 선택되지 않으면 Combat 마지막 자식 Turn To Target이 선택되어 회전 후 Combat 재선택. 행동 노드 안에서 회전하고 이어 재생하지 않는 이유는 회전 사이 거리·각도가 바뀌어도 ST가 처음부터 다시 고르게 하기 위함. 예외로 Alert는 실패 시 Long Ranged로 넘어가므로 그룹 안 첫 자식에 Turn을 둠
 -시작 판정(ST)과 콤보 연계 판정(EnemyAttackAbility, FEnemyComboAttackUnit::MaxTargetAngle·MaxTargetDistance)은 서로 다른 판단이라 값이 중복되지 않음. 연계 값은 콤보 단계별 데이터라 단계를 모르는 ST에 둘 수 없음
 -Turn To Target은 회전 몽타주가 있으면 TurnTarget 워프(Rotation Method = Scale)로 애니메이션의 회전량을 실제 각도에 맞추고, 없으면 이동 입력으로 걸으며 회전 (ABP는 속도로 Idle/Walk를 고르므로 제자리 회전은 Idle 재생 → 미끄러짐)

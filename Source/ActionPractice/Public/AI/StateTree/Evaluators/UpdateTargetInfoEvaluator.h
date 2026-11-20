@@ -46,6 +46,10 @@ struct ACTIONPRACTICE_API FUpdateTargetInfoEvaluatorInstanceData
 	//Output: 전투 상태 여부 (EnemyAIController 소유. 전투 중에는 시야를 벗어나도 타깃 유지)
 	UPROPERTY(EditAnywhere, Category = "Output")
 	bool bInCombat = false;
+
+	//Output: 공격권 보유 여부 (무리 전투에서 타깃에 가까운 구성원만 true, 무리 미소속이면 항상 true)
+	UPROPERTY(EditAnywhere, Category = "Output")
+	bool bIsPackAttacker = true;
 };
 
 /**
