@@ -96,13 +96,28 @@ def _is_child_of(cls: unreal.Class, base: unreal.Class) -> bool:
     return unreal.MathLibrary.class_is_child_of(cls, base)
 
 
+def _find_instance_target(actor: unreal.Actor, template: unreal.Object):
+    #템플릿에 대응하는 인스턴스 쪽 오브젝트. 없으면 None
+    if _is_default_subobject(template):
+        #인스턴스의 같은 이름 서브오브젝트 (CDO 서브오브젝트를 아키타입으로 생성됨)
+        return unreal.find_object(None, f'{actor.get_path_name()}:{template.get_name()}')
+
+    if not isinstance(template, unreal.ActorComponent):
+        return actor
+
+    component_name = _instance_component_name(template)
+
+    for component in actor.get_components_by_class(unreal.ActorComponent):
+        if component.get_name() == component_name:
+            return component
+
+    return None
+
+
 def _placed_instances(blueprint: unreal.Blueprint, template: unreal.Object) -> tuple:
     #반환: (액터, 대상 오브젝트) 목록, 같은 이름 컴포넌트를 못 찾은 액터 경로 목록
     _editor_world()
     generated_class = blueprint.generated_class()
-    is_component = isinstance(template, unreal.ActorComponent)
-    is_subobject = _is_default_subobject(template)
-    component_name = _instance_component_name(template) if is_component else ''
     result = []
     skipped = []
 
@@ -110,27 +125,7 @@ def _placed_instances(blueprint: unreal.Blueprint, template: unreal.Object) -> t
         if not _is_child_of(actor.get_class(), generated_class):
             continue
 
-        if is_subobject:
-            #인스턴스의 같은 이름 서브오브젝트 (CDO 서브오브젝트를 아키타입으로 생성됨)
-            match = unreal.find_object(None, f'{actor.get_path_name()}:{template.get_name()}')
-
-            if match is None:
-                skipped.append(actor.get_path_name())
-            else:
-                result.append((actor, match))
-
-            continue
-
-        if not is_component:
-            result.append((actor, actor))
-            continue
-
-        match = None
-
-        for component in actor.get_components_by_class(unreal.ActorComponent):
-            if component.get_name() == component_name:
-                match = component
-                break
+        match = _find_instance_target(actor, template)
 
         if match is None:
             skipped.append(actor.get_path_name())
@@ -161,18 +156,41 @@ def _same(a, b) -> bool:
     return a == b
 
 
-def _apply_to_instance(actor: unreal.Actor, target: unreal.Object, values: dict) -> list:
-    #적용 후 다시 읽어 검증. 반환: 적용되지 않은 프로퍼티 이름 목록 (빈 목록이면 성공)
-    target.modify()
+def _native_property_name(key: str) -> str:
+    #툴 JSON 키(camelCase, 예: relativeLocation)를 리플렉션 이름(RelativeLocation)으로 변환. bXxx는 그대로
+    if len(key) > 1 and key[0] == 'b' and key[1].isupper():
+        return key
 
-    try:
-        unreal.ToolsetLibrary.set_object_properties(target, json.dumps(values))
-    except Exception:  # pylint: disable=broad-except
-        return list(values.keys())
+    return key[0].upper() + key[1:]
 
-    after = _read(target, list(values.keys()))
 
-    return [key for key in values if not _same(after.get(key), values[key])]
+def _apply_to_instance(actor: unreal.Actor, template: unreal.Object, values: dict) -> list:
+    #템플릿 값을 프로퍼티 단위로 통째 복사한 뒤 다시 읽어 검증. 반환: 적용되지 않은 프로퍼티 이름 목록
+    #SCS 컴포넌트는 값 변경마다 컨스트럭션 스크립트가 재실행되어 새 컴포넌트로 교체되므로
+    #JSON 리프 단위 쓰기 대신 set_editor_property로 한 번에 쓰고, 매 쓰기 전후 대상을 이름으로 다시 찾음
+    not_applied = []
+
+    for key in values:
+        target = _find_instance_target(actor, template)
+
+        if target is None:
+            not_applied.append(key)
+            continue
+
+        name = _native_property_name(key)
+
+        try:
+            value = template.get_editor_property(name)
+            target.modify()
+            target.set_editor_property(name, value)
+        except Exception:  # pylint: disable=broad-except
+            not_applied.append(key)
+
+    target = _find_instance_target(actor, template)
+    remaining = [key for key in values if key not in not_applied]
+    after = _read(target, remaining) if target is not None and remaining else {}
+
+    return not_applied + [key for key in remaining if not _same(after.get(key), values[key])]
 
 
 def _loaded_world_packages() -> set:
@@ -309,7 +327,7 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
             diverged = {key: instance_values.get(key) for key in properties if key not in to_apply}
 
             if to_apply:
-                not_applied = _apply_to_instance(actor, target, to_apply)
+                not_applied = _apply_to_instance(actor, template, to_apply)
                 applied = [key for key in to_apply if key not in not_applied]
 
                 if applied:
@@ -417,7 +435,7 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
             if not to_apply:
                 continue
 
-            not_applied = _apply_to_instance(actor, target, to_apply)
+            not_applied = _apply_to_instance(actor, template, to_apply)
             applied = [key for key in to_apply if key not in not_applied]
 
             if applied:
@@ -439,3 +457,37 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
             result['save'] = _save(blueprint, updated_actors)
 
         return json.dumps(result)
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def describe_instance_components(actor: unreal.Actor) -> str:
+        """Lists the scene components of a placed actor with their runtime attachment and transforms.
+
+        Use when a placed Blueprint instance renders a component in the wrong place, e.g. after
+        reparenting components in the Blueprint, to see which parent each component is actually
+        attached to (ActorTools.get_parent_component reads the Blueprint hierarchy, not the instance).
+
+        Args:
+            actor: The placed actor.
+
+        Returns:
+            JSON list of components with name, class, attach parent,
+            relative location/scale and world location.
+        """
+        components = []
+
+        for component in actor.get_components_by_class(unreal.SceneComponent):
+            parent = component.get_attach_parent()
+            relative_location = component.get_editor_property('relative_location')
+            relative_scale = component.get_editor_property('relative_scale3d')
+            world_location = component.get_world_location()
+            components.append({
+                'name': component.get_name(),
+                'class': component.get_class().get_name(),
+                'attach_parent': parent.get_name() if parent is not None else None,
+                'relative_location': [round(relative_location.x, 2), round(relative_location.y, 2), round(relative_location.z, 2)],
+                'relative_scale': [round(relative_scale.x, 3), round(relative_scale.y, 3), round(relative_scale.z, 3)],
+                'world_location': [round(world_location.x, 2), round(world_location.y, 2), round(world_location.z, 2)],
+            })
+
+        return json.dumps({'actor': actor.get_path_name(), 'components': components})
