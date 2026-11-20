@@ -24,6 +24,8 @@
 namespace EnemyAIDebug
 {
 	//StateTree 파라미터 이름 → 표시 색 (안쪽 링부터)
+	//적마다 쓰는 파라미터가 달라 없는 항목은 생략됨
+	//색 구분: 빨강 근접 공격, 주황 원거리 공격 사용 거리, 초록 위치 유지 거리, 노랑 추격·전투 진입, 자홍 인지
 	struct FRangeEntry
 	{
 		const TCHAR* ParameterName;
@@ -34,8 +36,14 @@ namespace EnemyAIDebug
 	static const FRangeEntry RangeEntries[] =
 	{
 		{ TEXT("MeleeRange"), FColor::Red, TEXT("red") },
-		{ TEXT("MiddleRange"), FColor::Orange, TEXT("orange") },
-		{ TEXT("LongRange"), FColor::Yellow, TEXT("yellow") },
+		{ TEXT("JumpAttackMinRange"), FColor::Orange, TEXT("orange") },
+		{ TEXT("JumpAttackMaxRange"), FColor::Orange, TEXT("orange") },
+		{ TEXT("SuperJumpMinRange"), FColor::Orange, TEXT("orange") },
+		{ TEXT("StrafeMinRange"), FColor::Green, TEXT("green") },
+		{ TEXT("HoldRingMin"), FColor::Green, TEXT("green") },
+		{ TEXT("HoldRingMax"), FColor::Green, TEXT("green") },
+		{ TEXT("ChaseRange"), FColor::Yellow, TEXT("yellow") },
+		{ TEXT("CombatEntryRange"), FColor::Yellow, TEXT("yellow") },
 		{ TEXT("AlertRange"), FColor::Magenta, TEXT("magenta") },
 	};
 

@@ -96,7 +96,8 @@ CDO와 컴포넌트 템플릿은 BlueprintDefaultsTools.set_blueprint_defaults(b
 
 ##5단계: AI 컨트롤러와 StateTree
 -BP_<Name>AIController CDO의 `:GASStateTreeAIComponent`.stateTreeRef를 읽어 stateTree 경로만 ST_<Name>으로 바꿔 다시 설정한다
-  -parameters(meleeRange, middleRange)도 여기 있다. 캡슐이 커졌으면 meleeRange를 늘린다
+  -parameters 값은 propertyOverrides에 이름이 있을 때만 ST 기본값보다 우선한다. 거리 조정은 보통 ST_<Name> 전역 파라미터에서 한다 (캡슐이 커졌으면 MeleeRange를 늘림)
+  -Combat 하위 분기(Chase / Engage / Melee / Turn To Target)와 거리 파라미터는 docs/STATETREE_COMBAT_LAYOUT.md 규칙을 따른다 (용도별 이름, Middle/Long 같은 공유 구간 금지, 새 거리 파라미터는 디버거 RangeEntries에도 등록)
 -시야(SightConfig)는 컨트롤러 BP마다 둔다. BlueprintDefaultsTools.set_blueprint_defaults(component_name="SightConfig")로 SightRadius·LoseSightRadius·PeripheralVisionAngleDegrees(정면 기준 한쪽 각도, 기본 60 = 총 120°) 설정
   -시야각은 인지 단계에만 적용되고, 전투 중에는 무시된다. LoseSightRadius는 전투 이탈 거리도 겸한다 (docs/ARCHITECTURE.md StateTree AI 설계)
 -ST_<Name> 에디터 데이터 수정

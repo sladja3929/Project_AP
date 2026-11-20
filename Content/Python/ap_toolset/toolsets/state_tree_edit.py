@@ -125,7 +125,7 @@ class StateTreeEditTools(unreal.ToolsetDefinition):
             state_tree: The StateTree asset.
             state_path: Path of the state to move.
             target_path: Path of the reference state.
-            placement: Before, After or Into (becomes last child of the target).
+            placement: Before, After or Into (becomes the FIRST child of the target; reorder with Before/After).
 
         Returns:
             New path of the moved state.

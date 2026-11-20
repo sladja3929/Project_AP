@@ -12,7 +12,7 @@ StateTree AI 설계(스키마, ASC 컨텍스트, 이벤트 전송)는 docs/ARCHI
 
 ##1단계: 구조 파악
 -describe_state_tree로 스테이트 계층, 태스크·컨디션·트랜지션과 노드 ID를 본다
--스테이트는 이름 경로("Root/Combat/Long Ranged/Sprint")로 지정한다. 글로벌 노드(이밸류에이터·글로벌 태스크)는 state_path를 빈 문자열로 둔다
+-스테이트는 이름 경로("Root/Combat/Chase/Run Attack/Sprint")로 지정한다. 글로벌 노드(이밸류에이터·글로벌 태스크)는 state_path를 빈 문자열로 둔다
 -describe_bindings(state_path)로 현재 바인딩을 본다 (빈 문자열이면 전체)
 -노드 프로퍼티 값은 describe 출력에 없으므로, 필요하면 ObjectTools.get_properties로 에디터 데이터를 읽는다
 
