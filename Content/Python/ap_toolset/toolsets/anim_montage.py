@@ -291,6 +291,55 @@ class AnimMontageTools(unreal.ToolsetDefinition):
 
     @toolset_registry.tool_call
     @staticmethod
+    def resample_blend_space(blend_space: unreal.BlendSpace) -> int:
+        """Validates a blend space's samples and rebuilds its runtime blend data. The asset is not saved.
+
+        Call this after changing SampleData with ObjectTools.set_properties (adding, moving or
+        removing samples). Property edits do not rebuild the segments / triangulation the
+        runtime blends with, so added samples are ignored until this runs. RateScale-only
+        edits are read directly at runtime and do not need it, but it is harmless.
+        ObjectTools.set_properties rejects resizing SampleData while also changing existing
+        elements; read the current array, append the new sample unchanged-elements-first,
+        then call this.
+
+        Args:
+            blend_space: The BlendSpace or BlendSpace1D to rebuild.
+
+        Returns:
+            The number of samples after validation.
+        """
+        return int(_editor_lib().resample_blend_space(blend_space))
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def add_virtual_bone(
+            skeleton: unreal.Skeleton, source_bone: str, target_bone: str, virtual_bone_name: str) -> bool:
+        """Adds a named virtual bone to a skeleton. The asset is not saved.
+
+        A virtual bone follows the target bone's transform expressed in the source bone's
+        space, and can then be moved by skeletal control nodes. Use it as the IK target bone
+        (e.g. Stride Warping / Leg IK foot bones) on skeletons without dedicated IK bones,
+        typically with the root bone as source and a foot bone as target.
+        Re-running with the same name, source and target succeeds without changes.
+
+        Args:
+            skeleton: The skeleton to modify.
+            source_bone: The parent space of the virtual bone (e.g. the root bone).
+            target_bone: The bone the virtual bone copies (e.g. a foot bone).
+            virtual_bone_name: Name with the required 'VB ' prefix (e.g. 'VB ik_foot_l').
+
+        Returns:
+            True on success. Raises with the reason on failure.
+        """
+        error = _editor_lib().add_named_virtual_bone(skeleton, source_bone, target_bone, virtual_bone_name)
+
+        if error:
+            raise RuntimeError(error)
+
+        return True
+
+    @toolset_registry.tool_call
+    @staticmethod
     def set_slot_name(montage: unreal.AnimMontage, slot_name: str, slot_track_index: int = 0) -> bool:
         """Sets the slot name of one of a montage's slot tracks.
 

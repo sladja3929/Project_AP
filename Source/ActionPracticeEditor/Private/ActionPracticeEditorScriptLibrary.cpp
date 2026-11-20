@@ -5,6 +5,8 @@
 #include "StateTreeEditingSubsystem.h"
 #include "Logging/TokenizedMessage.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/Skeleton.h"
 
 #define ENABLE_DEBUG_LOG 1
 
@@ -314,5 +316,62 @@ FString UActionPracticeEditorScriptLibrary::SetMontageSegments(UAnimMontage* Mon
 	Montage->MarkPackageDirty();
 
 	DEBUG_LOG(TEXT("SetMontageSegments: %s[%d] -> %d segments, length %.3f"), *GetNameSafe(Montage), SlotTrackIndex, NumSegments, Montage->GetPlayLength());
+	return FString();
+}
+
+int32 UActionPracticeEditorScriptLibrary::ResampleBlendSpace(UBlendSpace* BlendSpace)
+{
+	if (!BlendSpace)
+	{
+		DEBUG_LOG(TEXT("ResampleBlendSpace: BlendSpace is null"));
+		return 0;
+	}
+
+	//블렌드스페이스 에디터가 샘플 추가·이동 후 호출하는 순서 (검증 → 세그먼트·삼각분할 재계산)
+	BlendSpace->Modify();
+	BlendSpace->ValidateSampleData();
+	BlendSpace->ResampleData();
+	BlendSpace->MarkPackageDirty();
+
+	const int32 NumSamples = BlendSpace->GetNumberOfBlendSamples();
+	DEBUG_LOG(TEXT("ResampleBlendSpace: %s -> %d samples"), *GetNameSafe(BlendSpace), NumSamples);
+	return NumSamples;
+}
+
+FString UActionPracticeEditorScriptLibrary::AddNamedVirtualBone(USkeleton* Skeleton, FName SourceBoneName, FName TargetBoneName, FName VirtualBoneName)
+{
+	if (!Skeleton)
+	{
+		return TEXT("Skeleton is null");
+	}
+
+	const FReferenceSkeleton& RefSkeleton = Skeleton->GetReferenceSkeleton();
+
+	if (RefSkeleton.FindBoneIndex(SourceBoneName) == INDEX_NONE || RefSkeleton.FindBoneIndex(TargetBoneName) == INDEX_NONE)
+	{
+		return FString::Printf(TEXT("Bone not found: %s or %s"), *SourceBoneName.ToString(), *TargetBoneName.ToString());
+	}
+
+	//재실행 시 중복 추가 방지 (같은 구성이면 성공, 이름만 같고 구성이 다르면 실패)
+	for (const FVirtualBone& VirtualBone : Skeleton->GetVirtualBones())
+	{
+		if (VirtualBone.VirtualBoneName == VirtualBoneName)
+		{
+			if (VirtualBone.SourceBoneName == SourceBoneName && VirtualBone.TargetBoneName == TargetBoneName)
+			{
+				return FString();
+			}
+
+			return FString::Printf(TEXT("%s already exists with a different source/target"), *VirtualBoneName.ToString());
+		}
+	}
+
+	if (!Skeleton->AddNewNamedVirtualBone(SourceBoneName, TargetBoneName, VirtualBoneName))
+	{
+		return FString::Printf(TEXT("AddNewNamedVirtualBone failed (name needs 'VB ' prefix, or the same source/target pair already exists): %s"), *VirtualBoneName.ToString());
+	}
+
+	Skeleton->MarkPackageDirty();
+	DEBUG_LOG(TEXT("AddNamedVirtualBone: %s (%s -> %s)"), *VirtualBoneName.ToString(), *SourceBoneName.ToString(), *TargetBoneName.ToString());
 	return FString();
 }

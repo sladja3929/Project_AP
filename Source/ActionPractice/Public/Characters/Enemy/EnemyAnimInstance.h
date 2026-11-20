@@ -12,6 +12,7 @@ class AEnemyCharacter;
  *   목·머리 본에 나눠 줄 컴포넌트 공간 Yaw 회전(NeckLookRotation, HeadLookRotation)을 ABP의 Transform (Modify) Bone 노드가 읽음
  *   (피치는 건드리지 않음. 사족 보행은 목 본 축이 위로 들려 있어 Look At으로 축을 맞추면 목이 꺾임)
  * - 몽타주 재생 중(Look At Target ANS 구간 제외)이거나 대상이 MaxLookAngle 밖이면 0으로 보간 복귀
+ * - 저속 보폭 보정: 걷기 재생 배율 하한 아래 속도에서 남는 이동량을 StrideScale로 계산해 ABP Stride Warping 노드가 보폭을 줄임
  */
 UCLASS()
 class ACTIONPRACTICE_API UEnemyAnimInstance : public UAnimInstance
@@ -28,6 +29,10 @@ public:
 	//머리 본에 더할 컴포넌트 공간 회전
 	UPROPERTY(BlueprintReadOnly, Category = "Look At")
 	FRotator HeadLookRotation = FRotator::ZeroRotator;
+
+	//ABP Stride Warping 노드의 Stride Scale (1이면 보폭 그대로)
+	UPROPERTY(BlueprintReadOnly, Category = "Stride Warping")
+	float StrideScale = 1.0f;
 
 #pragma endregion
 
@@ -61,6 +66,27 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Look At", meta = (ClampMin = "0.0"))
 	float LookInterpSpeed = 6.0f;
 
+	//저속 보폭 보정 사용 여부 (ABP에 Stride Warping 노드를 구성한 적만 켬)
+	UPROPERTY(EditDefaultsOnly, Category = "Stride Warping")
+	bool bEnableStrideWarping = false;
+
+	//걷기 애니메이션 기준 속도 (재생 배율 1에서 디딤발이 지면을 미는 속도). 블렌드스페이스 걷기 샘플 RateScale = 속도 / 이 값
+	UPROPERTY(EditDefaultsOnly, Category = "Stride Warping", meta = (ClampMin = "1.0", EditCondition = "bEnableStrideWarping"))
+	float StrideReferenceSpeed = 355.0f;
+
+	//걷기 재생 배율 하한. 블렌드스페이스 저속 샘플 RateScale 하한과 같은 값이어야 함
+	//이보다 느린 속도는 재생을 더 늦추지 않고 보폭을 줄여 맞춤 (재생만 늦추면 슬로모션처럼 보임)
+	UPROPERTY(EditDefaultsOnly, Category = "Stride Warping", meta = (ClampMin = "0.05", ClampMax = "1.0", EditCondition = "bEnableStrideWarping"))
+	float MinLocomotionPlayRate = 0.5f;
+
+	//보폭 배율 하한 (과도한 다리 굽힘 방지)
+	UPROPERTY(EditDefaultsOnly, Category = "Stride Warping", meta = (ClampMin = "0.1", ClampMax = "1.0", EditCondition = "bEnableStrideWarping"))
+	float MinStrideScale = 0.4f;
+
+	//이 속도까지는 보정량을 0에서 서서히 올림 (정지·출발 순간 보폭이 튀지 않도록)
+	UPROPERTY(EditDefaultsOnly, Category = "Stride Warping", meta = (ClampMin = "1.0", EditCondition = "bEnableStrideWarping"))
+	float StrideBlendInSpeed = 50.0f;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -87,6 +113,9 @@ private:
 
 	//Look At Target ANS 구간이 활성인지 (직전 노티파이 처리 결과 기준)
 	bool IsLookAtNotifyActive() const;
+
+	//현재 수평 속도로 StrideScale 계산
+	void UpdateStrideScale();
 
 #pragma endregion
 };
