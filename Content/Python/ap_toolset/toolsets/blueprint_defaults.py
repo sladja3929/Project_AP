@@ -96,9 +96,12 @@ def _is_child_of(cls: unreal.Class, base: unreal.Class) -> bool:
     return unreal.MathLibrary.class_is_child_of(cls, base)
 
 
-def _find_instance_target(actor: unreal.Actor, template: unreal.Object):
-    #템플릿에 대응하는 인스턴스 쪽 오브젝트. 없으면 None
-    if _is_default_subobject(template):
+def _find_instance_target(actor: unreal.Actor, template: unreal.Object, is_default_subobject: bool = None):
+    #템플릿에 대응하는 인스턴스 쪽 오브젝트. 없으면 None. is_default_subobject는 반복 호출 시 미리 계산한 값 전달용
+    if is_default_subobject is None:
+        is_default_subobject = _is_default_subobject(template)
+
+    if is_default_subobject:
         #인스턴스의 같은 이름 서브오브젝트 (CDO 서브오브젝트를 아키타입으로 생성됨)
         return unreal.find_object(None, f'{actor.get_path_name()}:{template.get_name()}')
 
@@ -156,41 +159,89 @@ def _same(a, b) -> bool:
     return a == b
 
 
-def _native_property_name(key: str) -> str:
-    #툴 JSON 키(camelCase, 예: relativeLocation)를 리플렉션 이름(RelativeLocation)으로 변환. bXxx는 그대로
-    if len(key) > 1 and key[0] == 'b' and key[1].isupper():
-        return key
+def _property_name_candidates(key: str) -> list:
+    #툴 JSON 키(camelCase 예: relativeLocation, bXxx, snake_case)에서 get/set_editor_property에 넘길 이름 후보
+    if not key:
+        return []
 
-    return key[0].upper() + key[1:]
+    candidates = [key]
+
+    if not (len(key) > 1 and key[0] == 'b' and key[1].isupper()):
+        candidates.insert(0, key[0].upper() + key[1:])
+
+    return candidates
 
 
-def _apply_to_instance(actor: unreal.Actor, template: unreal.Object, values: dict) -> list:
-    #템플릿 값을 프로퍼티 단위로 통째 복사한 뒤 다시 읽어 검증. 반환: 적용되지 않은 프로퍼티 이름 목록
+def _template_owned_object(value, template: unreal.Object):
+    #값(또는 배열 원소)이 템플릿과 같은 BP 패키지 소유 오브젝트(Instanced 서브오브젝트 등)면 그 오브젝트 반환
+    #그대로 대입하면 레벨 인스턴스가 BP 패키지 오브젝트를 참조하게 되어 저장 시 외부 참조 문제 발생
+    items = value if isinstance(value, (list, tuple, unreal.Array)) else [value]
+    package = template.get_outermost()
+
+    for item in items:
+        if isinstance(item, unreal.Object) and item.get_outermost() == package:
+            return item
+
+    return None
+
+
+def _apply_to_instance(actor: unreal.Actor, template: unreal.Object, values: dict) -> tuple:
+    #템플릿 값을 프로퍼티 단위로 통째 복사한 뒤 다시 읽어 검증
+    #반환: (적용되지 않은 프로퍼티 이름 목록, 프로퍼티별 실패 원인)
     #SCS 컴포넌트는 값 변경마다 컨스트럭션 스크립트가 재실행되어 새 컴포넌트로 교체되므로
     #JSON 리프 단위 쓰기 대신 set_editor_property로 한 번에 쓰고, 매 쓰기 전후 대상을 이름으로 다시 찾음
+    is_default_subobject = _is_default_subobject(template)
     not_applied = []
+    errors = {}
 
     for key in values:
-        target = _find_instance_target(actor, template)
+        target = _find_instance_target(actor, template, is_default_subobject)
 
         if target is None:
             not_applied.append(key)
+            errors[key] = 'instance object not found'
             continue
 
-        name = _native_property_name(key)
+        candidates = _property_name_candidates(key)
+        last_error = 'empty property name'
+        applied = False
 
-        try:
-            value = template.get_editor_property(name)
-            target.modify()
-            target.set_editor_property(name, value)
-        except Exception:  # pylint: disable=broad-except
+        for name in candidates:
+            try:
+                value = template.get_editor_property(name)
+            except Exception as error:  # pylint: disable=broad-except
+                last_error = str(error)
+                continue
+
+            owned = _template_owned_object(value, template)
+
+            if owned is not None:
+                last_error = f'value references Blueprint-owned object {owned.get_path_name()}; set it on the instance manually'
+                break
+
+            try:
+                target.modify()
+                target.set_editor_property(name, value)
+                applied = True
+            except Exception as error:  # pylint: disable=broad-except
+                last_error = str(error)
+
+            break
+
+        if not applied:
             not_applied.append(key)
+            errors[key] = last_error
 
-    target = _find_instance_target(actor, template)
+    target = _find_instance_target(actor, template, is_default_subobject)
     remaining = [key for key in values if key not in not_applied]
     after = _read(target, remaining) if target is not None and remaining else {}
 
-    return not_applied + [key for key in remaining if not _same(after.get(key), values[key])]
+    for key in remaining:
+        if not _same(after.get(key), values[key]):
+            not_applied.append(key)
+            errors[key] = f'read back {after.get(key)!r} after write'
+
+    return not_applied, errors
 
 
 def _loaded_world_packages() -> set:
@@ -287,7 +338,11 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
         value. Instances with a different value are treated as intentional per-instance
         overrides, left unchanged and reported in "kept_overrides" (use sync_blueprint_instances
         with force=True to overwrite them). Values are compared per top-level property.
-        Each update is read back and verified; mismatches are reported in "failed_instances".
+        Instance values are copied from the updated template one property at a time with
+        set_editor_property; each write may re-run the actor construction script and replace
+        Blueprint-created components, so the component is looked up by name again before each write.
+        Each update is read back and verified; mismatches are reported in "failed_instances" with
+        a per-property error message.
         If this call fails midway the defaults may already hold the new value, so a retry no longer
         sees the old value; recover with check_blueprint_instances + sync_blueprint_instances(force=True).
 
@@ -327,7 +382,7 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
             diverged = {key: instance_values.get(key) for key in properties if key not in to_apply}
 
             if to_apply:
-                not_applied = _apply_to_instance(actor, template, to_apply)
+                not_applied, errors = _apply_to_instance(actor, template, to_apply)
                 applied = [key for key in to_apply if key not in not_applied]
 
                 if applied:
@@ -335,7 +390,7 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
                     updated_actors.append(actor)
 
                 if not_applied:
-                    failed.append({'actor': actor.get_path_name(), 'properties': not_applied})
+                    failed.append({'actor': actor.get_path_name(), 'properties': not_applied, 'errors': errors})
 
             if diverged:
                 kept.append({'actor': actor.get_path_name(), 'values': diverged})
@@ -407,6 +462,8 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
         Overwrites every instance value of the given properties that differs from the default,
         discarding per-instance overrides (e.g. stale values left by an earlier CDO edit made
         without propagation). Inspect them first with check_blueprint_instances; force must be True.
+        Values are copied one property at a time with set_editor_property (see set_blueprint_defaults);
+        failures are reported in "failed_instances" with a per-property error message.
 
         Args:
             blueprint: The Blueprint asset.
@@ -435,7 +492,7 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
             if not to_apply:
                 continue
 
-            not_applied = _apply_to_instance(actor, template, to_apply)
+            not_applied, errors = _apply_to_instance(actor, template, to_apply)
             applied = [key for key in to_apply if key not in not_applied]
 
             if applied:
@@ -443,7 +500,7 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
                 updated_actors.append(actor)
 
             if not_applied:
-                failed.append({'actor': actor.get_path_name(), 'properties': not_applied})
+                failed.append({'actor': actor.get_path_name(), 'properties': not_applied, 'errors': errors})
 
         result = {
             'template': template.get_path_name(),
@@ -467,25 +524,30 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
         reparenting components in the Blueprint, to see which parent each component is actually
         attached to (ActorTools.get_parent_component reads the Blueprint hierarchy, not the instance).
 
+        Pass an actor of the editor world; actors of a running Play-In-Editor world are a separate copy.
+
         Args:
             actor: The placed actor.
 
         Returns:
-            JSON list of components with name, class, attach parent,
-            relative location/scale and world location.
+            JSON list of components with name, class, attach parent and socket, relative location,
+            rotation and scale, and world location.
         """
         components = []
 
         for component in actor.get_components_by_class(unreal.SceneComponent):
             parent = component.get_attach_parent()
             relative_location = component.get_editor_property('relative_location')
+            relative_rotation = component.get_editor_property('relative_rotation')
             relative_scale = component.get_editor_property('relative_scale3d')
             world_location = component.get_world_location()
             components.append({
                 'name': component.get_name(),
                 'class': component.get_class().get_name(),
                 'attach_parent': parent.get_name() if parent is not None else None,
+                'attach_socket': str(component.get_attach_socket_name()),
                 'relative_location': [round(relative_location.x, 2), round(relative_location.y, 2), round(relative_location.z, 2)],
+                'relative_rotation': [round(relative_rotation.pitch, 2), round(relative_rotation.yaw, 2), round(relative_rotation.roll, 2)],
                 'relative_scale': [round(relative_scale.x, 3), round(relative_scale.y, 3), round(relative_scale.z, 3)],
                 'world_location': [round(world_location.x, 2), round(world_location.y, 2), round(world_location.z, 2)],
             })
