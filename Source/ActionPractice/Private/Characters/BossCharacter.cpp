@@ -3,7 +3,6 @@
 #include "Characters/ActionPracticeCharacter.h"
 #include "Components/WidgetComponent.h"
 #include "Games/ActionPracticePlayerController.h"
-#include "Perception/AISense_Sight.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "GAS/AbilitySystemComponent/BaseAbilitySystemComponent.h"
@@ -25,7 +24,7 @@ ABossCharacter::ABossCharacter()
 
 void ABossCharacter::BeginPlay()
 {
-	//EnemyCharacter::BeginPlay에서 EnemyData 프리로드, Perception 바인딩, CacheInitialEnemyState 모두 처리
+	//EnemyCharacter::BeginPlay에서 EnemyData 프리로드, 전투 상태 바인딩, CacheInitialEnemyState 모두 처리
 	Super::BeginPlay();
 
 	//보스는 머리 위 HP바를 사용하지 않음
@@ -66,44 +65,33 @@ void ABossCharacter::ResetEnemy()
 	DEBUG_LOG(TEXT("BossCharacter::ResetEnemy: Boss-specific reset complete"));
 }
 
-void ABossCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
+void ABossCharacter::OnCombatStateChanged(bool bInCombat, AActor* Target)
 {
-	if (!Actor) return;
+	Super::OnCombatStateChanged(bInCombat, Target);
 
-	//시각 감지 케이스 — 보스 전용 조우 연출
-	if (Stimulus.Type == UAISense::GetSenseID<UAISense_Sight>())
+	if (bInCombat)
 	{
-		AActionPracticeCharacter* Player = Cast<AActionPracticeCharacter>(Actor);
-		if (!Player) return;
+		//보스가 이미 사망한 경우 조우 연출 재실행 방지
+		UBaseAbilitySystemComponent* BaseASC = Cast<UBaseAbilitySystemComponent>(AbilitySystemComponent);
+		if (BaseASC && BaseASC->IsDeathHandled()) return;
 
-		if (Stimulus.WasSuccessfullySensed())
+		if (!bBossEncountered)
 		{
-			DEBUG_LOG(TEXT("Player detected by Boss: %s"), *Actor->GetName());
+			bBossEncountered = true;
 
-			//보스가 이미 사망한 경우 조우 연출 재실행 방지
-			UBaseAbilitySystemComponent* BaseASC = Cast<UBaseAbilitySystemComponent>(AbilitySystemComponent);
-			if (BaseASC && BaseASC->IsDeathHandled()) return;
-
-			if (!bBossEncountered)
-			{
-				bBossEncountered = true;
-
-				//서버에서 모든 클라이언트에 조우 연출 전파
-				Multicast_OnBossEncounter();
-			}
+			//서버에서 모든 클라이언트에 조우 연출 전파
+			Multicast_OnBossEncounter();
 		}
-		else
-		{
-			DEBUG_LOG(TEXT("Player lost by Boss: %s"), *Actor->GetName());
 
-			if (bBossEncountered)
-			{
-				bBossEncountered = false;
+		return;
+	}
 
-				//서버에서 모든 클라이언트에 이탈 연출 전파
-				Multicast_OnBossDisengage();
-			}
-		}
+	if (bBossEncountered)
+	{
+		bBossEncountered = false;
+
+		//서버에서 모든 클라이언트에 이탈 연출 전파
+		Multicast_OnBossDisengage();
 	}
 }
 

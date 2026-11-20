@@ -12,6 +12,7 @@
 #include "StateTreeViewModel.h"
 #include "StateTreeTaskBase.h"
 #include "StateTreeConditionBase.h"
+#include "StateTreeConsiderationBase.h"
 #include "Blueprint/StateTreeTaskBlueprintBase.h"
 #include "Blueprint/StateTreeConditionBlueprintBase.h"
 #include "StateTreePropertyBindings.h"
@@ -352,6 +353,11 @@ namespace APStateTreeEdit
 		for (const FStateTreeEditorNode& Node : State->EnterConditions)
 		{
 			OutLines.Add(FString::Printf(TEXT("%s    EnterCondition: %s"), *Indent, *DescribeNode(Node)));
+		}
+
+		for (const FStateTreeEditorNode& Node : State->Considerations)
+		{
+			OutLines.Add(FString::Printf(TEXT("%s    Consideration: %s"), *Indent, *DescribeNode(Node)));
 		}
 
 		for (const FStateTreeEditorNode& Node : State->Tasks)
@@ -931,10 +937,11 @@ FGuid UActionPracticeStateTreeEditLibrary::AddNode(UStateTree* StateTree, UState
 	const bool bIsTask = NodeKind.Equals(TEXT("Task"), ESearchCase::IgnoreCase);
 	const bool bIsEnterCondition = NodeKind.Equals(TEXT("EnterCondition"), ESearchCase::IgnoreCase);
 	const bool bIsTransitionCondition = NodeKind.Equals(TEXT("TransitionCondition"), ESearchCase::IgnoreCase);
+	const bool bIsConsideration = NodeKind.Equals(TEXT("Consideration"), ESearchCase::IgnoreCase);
 
-	if (!bIsTask && !bIsEnterCondition && !bIsTransitionCondition)
+	if (!bIsTask && !bIsEnterCondition && !bIsTransitionCondition && !bIsConsideration)
 	{
-		OutError = FString::Printf(TEXT("Unknown NodeKind '%s' (valid: Task, EnterCondition, TransitionCondition)"), *NodeKind);
+		OutError = FString::Printf(TEXT("Unknown NodeKind '%s' (valid: Task, EnterCondition, TransitionCondition, Consideration)"), *NodeKind);
 		return FGuid();
 	}
 
@@ -956,19 +963,33 @@ FGuid UActionPracticeStateTreeEditLibrary::AddNode(UStateTree* StateTree, UState
 	const UScriptStruct* NodeStruct = Cast<UScriptStruct>(TypeObject);
 	UClass* NodeClass = Cast<UClass>(TypeObject);
 
-	const UScriptStruct* RequiredStruct = bIsTask ? FStateTreeTaskBase::StaticStruct() : FStateTreeConditionBase::StaticStruct();
-	const UClass* RequiredClass = bIsTask ? UStateTreeTaskBlueprintBase::StaticClass() : UStateTreeConditionBlueprintBase::StaticClass();
-
-	if (!(NodeStruct && NodeStruct->IsChildOf(RequiredStruct)) && !(NodeClass && NodeClass->IsChildOf(RequiredClass)))
+	//유틸리티 고려 노드는 C++ 구조체만 지원 (BP 고려 노드 래퍼는 미지원)
+	if (bIsConsideration)
 	{
-		OutError = FString::Printf(TEXT("NodeType '%s' is not a %s struct or %s class"), *NodeType, *RequiredStruct->GetName(), *RequiredClass->GetName());
-		return FGuid();
+		if (!(NodeStruct && NodeStruct->IsChildOf(FStateTreeConsiderationBase::StaticStruct())))
+		{
+			OutError = FString::Printf(TEXT("NodeType '%s' is not a %s struct"), *NodeType, *FStateTreeConsiderationBase::StaticStruct()->GetName());
+			return FGuid();
+		}
+	}
+	else
+	{
+		const UScriptStruct* RequiredStruct = bIsTask ? FStateTreeTaskBase::StaticStruct() : FStateTreeConditionBase::StaticStruct();
+		const UClass* RequiredClass = bIsTask ? UStateTreeTaskBlueprintBase::StaticClass() : UStateTreeConditionBlueprintBase::StaticClass();
+
+		if (!(NodeStruct && NodeStruct->IsChildOf(RequiredStruct)) && !(NodeClass && NodeClass->IsChildOf(RequiredClass)))
+		{
+			OutError = FString::Printf(TEXT("NodeType '%s' is not a %s struct or %s class"), *NodeType, *RequiredStruct->GetName(), *RequiredClass->GetName());
+			return FGuid();
+		}
 	}
 
 	const FScopedTransaction ScopedTransaction(LOCTEXT("AddNodeTransaction", "Add StateTree Node"));
 	State->Modify();
 
-	TArray<FStateTreeEditorNode>& Nodes = bIsTask ? State->Tasks : (bIsEnterCondition ? State->EnterConditions : Transition->Conditions);
+	TArray<FStateTreeEditorNode>& Nodes = bIsTask ? State->Tasks
+		: (bIsEnterCondition ? State->EnterConditions
+		: (bIsConsideration ? State->Considerations : Transition->Conditions));
 	FStateTreeEditorNode& NewNode = Nodes.AddDefaulted_GetRef();
 
 	if (NodeStruct)

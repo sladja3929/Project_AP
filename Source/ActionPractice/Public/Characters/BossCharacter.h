@@ -56,8 +56,9 @@ protected:
 
 #pragma region "Protected Functions"
 
-	// ===== Perception (보스 전용 override) =====
-	virtual void OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus) override;
+	// ===== Combat State (보스 전용 override) =====
+	//전투 진입 시 조우 연출, 해제 시 이탈 연출 (시야를 잠깐 벗어나도 유지)
+	virtual void OnCombatStateChanged(bool bInCombat, AActor* Target) override;
 
 	// ===== Audio =====
 	void PlayBossBGM();

@@ -8,8 +8,6 @@
 #include "GAS/GameplayTagsSubsystem.h"
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
-#include "Perception/AIPerceptionComponent.h"
-#include "Perception/AISense_Sight.h"
 #include "Characters/HitDetection/EnemyAttackComponent.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
 #include "Net/UnrealNetwork.h"
@@ -101,8 +99,7 @@ void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	//플레이어와 달리 적은 possess 콜백 흐름에 묶이지 않으므로 BeginPlay 시점에 직접 GAS 초기화
-	//(BaseCharacter::BeginPlay에서 호출하던 안전망을 자식 클래스로 이동)
+	//서버 AI는 PossessedBy에서 이미 초기화됨 (중복 호출은 무시). 클라이언트·빙의되지 않은 적을 위한 안전망
 	InitializeAbilitySystem();
 
 	DEBUG_LOG(TEXT("EnemyCharacter::BeginPlay: This=%p, ASC=%p, AttributeSet=%p"),
@@ -125,22 +122,6 @@ void AEnemyCharacter::BeginPlay()
 		EnemyData->PreloadAllMontages();
 	}
 
-	//AI 관련 설정은 서버에서만 (싱글플레이어에서는 항상 true)
-	if (HasAuthority())
-	{
-		//AIController의 Perception 델리게이트 바인딩
-		AEnemyAIController* EnemyController = GetEnemyAIController();
-		if (EnemyController)
-		{
-			UAIPerceptionComponent* PerceptionComponent = EnemyController->GetPerceptionComponent();
-			if (PerceptionComponent)
-			{
-				PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AEnemyCharacter::OnPlayerDetected);
-				DEBUG_LOG(TEXT("Perception delegate bound to EnemyCharacter"));
-			}
-		}
-	}
-
 	//초기 스폰 상태 캐시 (Super::BeginPlay 이후, ASC 초기화 완료 후 시점)
 	CacheInitialEnemyState();
 
@@ -154,14 +135,53 @@ void AEnemyCharacter::BeginPlay()
 	}
 }
 
+void AEnemyCharacter::PossessedBy(AController* NewController)
+{
+	//Controller·Owner 설정 후 초기화
+	Super::PossessedBy(NewController);
+
+	//배치된 적은 BeginPlay보다 빙의가 먼저 일어나고, 컨트롤러 OnPossess가 이 함수 직후 StateTree를 시작함
+	//BeginPlay에서 처음 InitAbilityActorInfo를 부르면 그 사이 StateTree가 재생한 몽타주 정보(LocalAnimMontageInfo)가 초기화되어
+	//ASC는 재생 중이 아니라고 판단하고 몽타주는 정지되지 않은 채 남음 (첫 Rest 몽타주가 배회 중에도 계속 재생되던 원인)
+	InitializeAbilitySystem();
+
+	//전투 상태 델리게이트 바인딩 (런타임 스폰·재빙의 포함, 중복 방지)
+	if (AEnemyAIController* EnemyController = Cast<AEnemyAIController>(NewController))
+	{
+		EnemyController->OnCombatStateChanged.RemoveAll(this);
+		EnemyController->OnCombatStateChanged.AddUObject(this, &AEnemyCharacter::OnCombatStateChanged);
+		DEBUG_LOG(TEXT("Combat state delegate bound to EnemyCharacter"));
+	}
+}
+
+void AEnemyCharacter::UnPossessed()
+{
+	if (AEnemyAIController* EnemyController = GetEnemyAIController())
+	{
+		EnemyController->OnCombatStateChanged.RemoveAll(this);
+	}
+
+	CombatTarget = nullptr;
+
+	Super::UnPossessed();
+}
+
 void AEnemyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AEnemyCharacter, CombatTarget);
 }
 
 void AEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearTimer(HealthBarVisibilityTimer);
+
+	if (AEnemyAIController* EnemyController = GetEnemyAIController())
+	{
+		EnemyController->OnCombatStateChanged.RemoveAll(this);
+	}
+
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -327,6 +347,9 @@ void AEnemyCharacter::ResetEnemy()
 	//AI 재시작
 	RestartEnemyAI();
 
+	//사망 경로는 전투 해제 알림이 없으므로 리셋 시 연출용 전투 대상도 직접 정리
+	CombatTarget = nullptr;
+
 	DEBUG_LOG(TEXT("ResetEnemy: Complete"));
 }
 
@@ -353,8 +376,8 @@ void AEnemyCharacter::RestartEnemyAI()
 	AEnemyAIController* AIController = GetEnemyAIController();
 	if (!AIController) return;
 
-	//타깃 캐시 초기화
-	AIController->CurrentTarget.Reset();
+	//전투·인지 상태 초기화
+	AIController->ResetAwareness();
 
 	//StateTree 재시작
 	if (UBrainComponent* Brain = AIController->GetBrainComponent())
@@ -366,30 +389,12 @@ void AEnemyCharacter::RestartEnemyAI()
 
 #pragma endregion
 
-void AEnemyCharacter::OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus)
+void AEnemyCharacter::OnCombatStateChanged(bool bInCombat, AActor* Target)
 {
-	if (!Actor) return;
+	//연출용 전투 대상 복제 (보스는 조우 연출을 추가로 override)
+	CombatTarget = bInCombat ? Target : nullptr;
 
-	//시각 감지 케이스 — 기본 구현은 DetectedPlayer 캐시만 수행
-	if (Stimulus.Type == UAISense::GetSenseID<UAISense_Sight>())
-	{
-		AActionPracticeCharacter* Player = Cast<AActionPracticeCharacter>(Actor);
-		if (!Player) return;
-
-		if (Stimulus.WasSuccessfullySensed())
-		{
-			DetectedPlayer = Player;
-			DEBUG_LOG(TEXT("Player detected by Enemy: %s"), *Actor->GetName());
-		}
-		else
-		{
-			if (Actor == DetectedPlayer.Get())
-			{
-				DetectedPlayer.Reset();
-				DEBUG_LOG(TEXT("Player lost by Enemy: %s"), *Actor->GetName());
-			}
-		}
-	}
+	DEBUG_LOG(TEXT("OnCombatStateChanged: %s, Target=%s"), bInCombat ? TEXT("Enter") : TEXT("Exit"), *GetNameSafe(Target));
 }
 
 void AEnemyCharacter::Tick(float DeltaTime)

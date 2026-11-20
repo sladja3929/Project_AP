@@ -100,6 +100,15 @@ void UEnemyAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, 
 		return;
 	}
 
+	//피격 시 공격자와 전투 진입 (시야 밖에서 맞아도 전투로 전환, 이미 전투 중이면 무시)
+	if (CachedEnemyCharacter.IsValid())
+	{
+		if (AEnemyAIController* AIC = CachedEnemyCharacter->GetEnemyAIController())
+		{
+			AIC->EnterCombat(SourceActor);
+		}
+	}
+
 	//2. 그로기 체크 (HitReaction보다 우선)
 	if (ShouldActivateGroggy())
 	{

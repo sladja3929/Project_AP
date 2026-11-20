@@ -495,6 +495,44 @@ class AnimMontageTools(unreal.ToolsetDefinition):
 
     @toolset_registry.tool_call
     @staticmethod
+    def set_root_motion_modifier(
+            notify_state: unreal.AnimNotifyState, modifier_class: unreal.Class, values: str = '{}') -> unreal.Object:
+        """Replaces the root motion modifier of a MotionWarping notify state with a new instance.
+
+        A MotionWarping notify state is created with a Skew Warp modifier. Use this to switch it to
+        another modifier class (e.g. /Script/MotionWarping.RootMotionModifier_Scale to scale the
+        animation's root translation inside the window, no warp target needed) and set its
+        properties in one call. The owning asset is marked dirty but not saved.
+
+        Args:
+            notify_state: The AnimNotifyState_MotionWarping instance (the "object" of list_notifies).
+            modifier_class: A RootMotionModifier subclass.
+            values: JSON object of modifier properties, same format as ObjectTools.set_properties
+                (e.g. '{"Scale": {"X": 1.4, "Y": 1.4, "Z": 1.0}}'). Empty object keeps defaults.
+
+        Returns:
+            The new modifier instance.
+        """
+        if not isinstance(notify_state, unreal.AnimNotifyState_MotionWarping):
+            raise RuntimeError(f'{notify_state.get_name()} is not an AnimNotifyState_MotionWarping')
+
+        if not unreal.MathLibrary.class_is_child_of(modifier_class, unreal.RootMotionModifier.static_class()):
+            raise RuntimeError(f'{modifier_class.get_name()} is not a RootMotionModifier class')
+
+        #notify state의 outer가 소유 애셋 (modify로 패키지 dirty 표시)
+        notify_state.get_outer().modify()
+        notify_state.modify()
+        modifier = unreal.new_object(modifier_class, outer=notify_state)
+        notify_state.set_editor_property('root_motion_modifier', modifier)
+
+        if values and values.strip() not in ('', '{}'):
+            if not unreal.ToolsetLibrary.set_object_properties(modifier, values):
+                raise RuntimeError(f'Failed to set {values} on {modifier.get_path_name()}')
+
+        return modifier
+
+    @toolset_registry.tool_call
+    @staticmethod
     def remove_notifies_by_name(animation: unreal.AnimSequenceBase, notify_name: str) -> int:
         """Removes all notify events with the given name (as shown by list_notifies).
 
@@ -631,6 +669,45 @@ class AnimMontageTools(unreal.ToolsetDefinition):
             'max_angle': max(sample[1] for sample in samples),
             'samples': samples,
         })
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def get_bone_axes(animation: unreal.AnimSequence, bone_names: list[str], time: float = 0.0) -> str:
+        """Returns where each local axis of the given bones points in component space at a time.
+
+        Use to pick bone axes for skeletal control nodes (e.g. Look At "LookAt Axis" / "Look Up
+        Axis", Modify Bone rotation axis): find the local axis whose component-space direction
+        matches the mesh's forward or up. Mesh forward is component +X rotated by the mesh
+        component's relative rotation on the character (check the Blueprint's mesh yaw).
+
+        Args:
+            animation: An animation sequence of the skeleton (its pose at `time` is evaluated).
+            bone_names: Bones to inspect.
+            time: Evaluation time in seconds.
+
+        Returns:
+            A JSON string: {bone: {"location": [x, y, z], "x": [..], "y": [..], "z": [..]}} where
+            x / y / z are the component-space unit directions of the bone's local axes.
+        """
+        options = unreal.AnimPoseEvaluationOptions()
+        extensions = unreal.AnimPoseExtensions
+        pose = extensions.get_anim_pose_at_time(animation, time, options)
+        result = {}
+
+        def _round(vector: unreal.Vector) -> list:
+            return [round(vector.x, 3), round(vector.y, 3), round(vector.z, 3)]
+
+        for bone_name in bone_names:
+            transform = extensions.get_bone_pose(pose, bone_name, unreal.AnimPoseSpaces.WORLD)
+            rotation = transform.rotation
+            result[bone_name] = {
+                'location': _round(transform.translation),
+                'x': _round(rotation.get_axis_x()),
+                'y': _round(rotation.get_axis_y()),
+                'z': _round(rotation.get_axis_z()),
+            }
+
+        return json.dumps(result)
 
     @toolset_registry.tool_call
     @staticmethod

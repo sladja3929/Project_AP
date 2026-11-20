@@ -56,7 +56,7 @@ public:
 	static UStateTreeState* CopyStateFrom(UStateTree* SourceTree, UStateTreeState* SourceState, UStateTree* TargetTree, UStateTreeState* TargetParentState, FString& OutError);
 
 	//태스크/컨디션 노드 추가 후 새 노드 ID 반환
-	//NodeKind: Task, EnterCondition, TransitionCondition(TransitionID 필요)
+	//NodeKind: Task, EnterCondition, TransitionCondition(TransitionID 필요), Consideration(유틸리티 고려 노드, C++ 구조체만)
 	//NodeType: C++ 노드 구조체 경로(/Script/Module.Struct) 또는 BP 태스크/컨디션 클래스 경로(/Game/.../BP_X.BP_X_C)
 	UFUNCTION(BlueprintCallable, Category = "ActionPractice|Editor|StateTree")
 	static FGuid AddNode(UStateTree* StateTree, UStateTreeState* State, const FString& NodeKind, const FString& NodeType, FGuid TransitionID, FString& OutError);

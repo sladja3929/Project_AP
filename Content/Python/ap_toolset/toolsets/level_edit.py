@@ -101,6 +101,38 @@ class LevelEditTools(unreal.ToolsetDefinition):
 
     @toolset_registry.tool_call
     @staticmethod
+    def save_actors(actors: list[unreal.Actor]) -> str:
+        """Saves the packages of placed actors, including One File Per Actor (World Partition) maps.
+
+        SceneTools.save_actor fails for external actor packages (/Game/__ExternalActors__/...).
+        This saves each actor's own package (its external package in OFPA maps, otherwise the
+        level package), like BlueprintDefaultsTools does after propagating defaults.
+
+        Args:
+            actors: Placed actors whose changes should be saved (new or edited).
+
+        Returns:
+            JSON with the saved package names and whether saving succeeded.
+        """
+        _editor_world()
+        packages = []
+
+        for actor in actors:
+            get_package = getattr(actor, 'get_package', None)
+            package = get_package() if get_package is not None else actor.get_outermost()
+
+            if package is not None and package not in packages:
+                packages.append(package)
+
+        saved = unreal.EditorLoadingAndSavingUtils.save_packages(packages, True) if packages else True
+
+        return json.dumps({
+            'saved': bool(saved),
+            'packages': [package.get_name() for package in packages],
+        })
+
+    @toolset_registry.tool_call
+    @staticmethod
     def create_level(asset_path: str) -> str:
         """Creates a new empty (non World Partition) level asset and opens it in the editor.
 

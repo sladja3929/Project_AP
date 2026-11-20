@@ -71,7 +71,24 @@ def _find_template(blueprint: unreal.Blueprint, component_name: str) -> unreal.O
         if component_name in names:
             return template
 
-    raise RuntimeError(f'Component "{component_name}" not found on {blueprint.get_name()}. Candidates: {candidates}')
+    #컴포넌트가 아닌 CDO 기본 서브오브젝트 (예: AIController의 SightConfig 같은 AISenseConfig)
+    subobject = unreal.find_object(None, f'{cdo.get_path_name()}:{component_name}')
+
+    if subobject is not None:
+        return subobject
+
+    raise RuntimeError(f'Component or default subobject "{component_name}" not found on {blueprint.get_name()}. Components: {candidates}')
+
+
+def _is_default_subobject(template: unreal.Object) -> bool:
+    #CDO 자체도, 컴포넌트 템플릿도 아닌 CDO 하위 서브오브젝트 (outer가 자기 클래스의 CDO)
+    #레벨에 배치되지 않고 런타임에 스폰되는 클래스(AIController 등)는 전파 대상 인스턴스가 없어 CDO 저장만 유효
+    if isinstance(template, unreal.ActorComponent):
+        return False
+
+    outer = template.get_outer()
+
+    return outer is not None and outer == unreal.get_default_object(outer.get_class())
 
 
 def _is_child_of(cls: unreal.Class, base: unreal.Class) -> bool:
@@ -84,12 +101,24 @@ def _placed_instances(blueprint: unreal.Blueprint, template: unreal.Object) -> t
     _editor_world()
     generated_class = blueprint.generated_class()
     is_component = isinstance(template, unreal.ActorComponent)
+    is_subobject = _is_default_subobject(template)
     component_name = _instance_component_name(template) if is_component else ''
     result = []
     skipped = []
 
     for actor in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors():
         if not _is_child_of(actor.get_class(), generated_class):
+            continue
+
+        if is_subobject:
+            #인스턴스의 같은 이름 서브오브젝트 (CDO 서브오브젝트를 아키타입으로 생성됨)
+            match = unreal.find_object(None, f'{actor.get_path_name()}:{template.get_name()}')
+
+            if match is None:
+                skipped.append(actor.get_path_name())
+            else:
+                result.append((actor, match))
+
             continue
 
         if not is_component:
@@ -247,8 +276,9 @@ class BlueprintDefaultsTools(unreal.ToolsetDefinition):
         Args:
             blueprint: The Blueprint asset.
             component_name: Component variable name or template object name (e.g. "CharacterMovement"
-                or "CharMoveComp" for inherited native components). Empty string edits the class
-                defaults (CDO) itself.
+                or "CharMoveComp" for inherited native components), or the name of a non-component
+                default subobject of the CDO (e.g. "SightConfig" on an AIController). Empty string
+                edits the class defaults (CDO) itself.
             values: JSON object of top-level properties to set, same format as ObjectTools.set_properties.
             save: When True, compiles and saves the Blueprint and saves the packages of updated actors.
 

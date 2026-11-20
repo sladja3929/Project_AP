@@ -12,7 +12,7 @@ class UEnemyDataAsset;
 class UGameplayEffect;
 class UWidgetComponent;
 class UEnemyHealthBarWidget;
-struct FAIStimulus;
+class AEnemyWanderArea;
 
 UCLASS()
 class ACTIONPRACTICE_API AEnemyCharacter : public ABaseCharacter
@@ -33,6 +33,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
 	FVector SpawnLocation = FVector::ZeroVector;
 
+	//Idle 배회 구역 (레벨 배치 인스턴스별 지정). 무리는 같은 구역을 공유, 없으면 스폰 위치 반경 배회
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "AI")
+	TObjectPtr<AEnemyWanderArea> WanderArea;
+
 #pragma endregion
 
 #pragma region "Public Functions"
@@ -41,6 +45,12 @@ public:
 
 	virtual void Tick(float DeltaTime) override;
 	virtual void BeginPlay() override;
+
+	//AI 빙의 시 GAS 초기화 (컨트롤러 OnPossess가 StateTree를 시작하기 전에 ASC를 준비)와 전투 상태 델리게이트 바인딩
+	virtual void PossessedBy(AController* NewController) override;
+
+	//빙의 해제 시 전투 상태 델리게이트 해제
+	virtual void UnPossessed() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	// ===== Hit Detection Interface =====
@@ -50,6 +60,10 @@ public:
 	FORCEINLINE AEnemyAIController* GetEnemyAIController() const { return Cast<AEnemyAIController>(GetController()); }
 
 	const UEnemyDataAsset* GetEnemyData() const { return EnemyData.Get(); }
+	FORCEINLINE AEnemyWanderArea* GetWanderArea() const { return WanderArea; }
+
+	//전투 중인 대상 (서버 EnemyAIController 전투 상태를 복제, 머리 바라보기 등 연출용)
+	FORCEINLINE AActor* GetCombatTarget() const { return CombatTarget; }
 
 	void RotateToTarget(const AActor* TargetActor, float RotateTime);
 
@@ -97,6 +111,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UWidgetComponent> EnemyHealthBarWidgetComponent;
 
+	//전투 대상 (서버 OnCombatStateChanged에서 설정, 시뮬레이티드 프록시에도 복제)
+	UPROPERTY(Replicated, Transient)
+	TObjectPtr<AActor> CombatTarget;
+
 #pragma endregion
 
 #pragma region "Protected Functions"
@@ -109,16 +127,14 @@ protected:
 	void ApplyEnemyResetEffect();
 	void RestartEnemyAI();
 
-	// ===== Perception =====
-	UFUNCTION()
-	virtual void OnPlayerDetected(AActor* Actor, FAIStimulus Stimulus);
+	// ===== Combat State =====
+	//EnemyAIController의 전투 진입·해제 알림 (서버). 인지(시야) 변화가 아닌 전투 상태 기준
+	virtual void OnCombatStateChanged(bool bInCombat, AActor* Target);
 
 #pragma endregion
 
 private:
 #pragma region "Private Variables"
-
-	TWeakObjectPtr<AActionPracticeCharacter> DetectedPlayer;
 
 	//초기 스폰 Transform 캐시
 	FTransform InitialTransform;

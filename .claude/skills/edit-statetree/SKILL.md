@@ -18,14 +18,24 @@ StateTree AI 설계(스키마, ASC 컨텍스트, 이벤트 전송)는 docs/ARCHI
 
 ##2단계: 구조 변경
 -스테이트: add_state(State/Group/Linked/LinkedAsset/Subtree), remove_state, move_state(Before/After/Into), set_state_property(Name, Tag, SelectionBehavior, bEnabled 등)
--노드: add_node(Task/EnterCondition/TransitionCondition, C++ 구조체 경로 또는 BP 클래스 경로), remove_node
+-노드: add_node(Task/EnterCondition/TransitionCondition/Consideration, C++ 구조체 경로 또는 BP 클래스 경로), remove_node
+  -Consideration(유틸리티 고려 노드)은 C++ 구조체만 (예: /Script/StateTreeModule.StateTreeConstantConsideration, Constant는 0~1)
 -트랜지션: add_transition(Trigger, EventTag, TransitionType, Target, Priority), set_transition_target
 -복사: copy_state_from(하위 포함), copy_node_from(노드·트랜지션). 다른 트리에서도 가능
   -노드 ID는 새로 발급되고, 복사 범위 내부의 트랜지션·바인딩은 새 ID로 다시 연결된다
   -복사 범위 밖을 가리키는 GotoState 트랜지션은 set_transition_target으로 재지정한다
   -같은 설정의 노드가 이미 있으면 새로 add_node 하기보다 copy_node_from이 값까지 가져와 빠르다
 -SelectionBehavior는 자식 선택 방식이다. 무작위 선택이면 TrySelectChildrenAtRandom, 조건 기반이면 각 자식의 EnterCondition으로 거른다
+  -...WeightedByUtility / HighestUtility에서 점수는 상태 Weight × 고려 노드 값. 고려 노드가 없는 자식은 점수 0이라 선택되지 않으므로 모든 자식에 고려 노드를 둔다 (고정 비중이면 Constant 1.0)
+  -선택된 자식이 진입에 실패하면 남은 자식 중에서 다시 고른다. 진입 조건이 거짓인 자식은 후보에서 빠진다
+-선택 방식은 현재 조건만 본다. "직전 행동이 X였을 때만" 같은 이력 조건은 전역 파라미터를 Set Float Parameter로 기록하고 진입 조건·고려 노드에서 읽는다 (예: ST_Wolf backJumpWeight)
 -태그 기반 Condition은 선택 시점에만 평가된다. 실행 중 전환이 필요하면 상위 스테이트의 OnEvent/OnTick 트랜지션을 쓴다
+-태스크와 상태 완료
+  -상태는 완료 판정 대상 태스크가 끝나면 완료된다. 즉시 Succeeded를 반환하는 태스크(Set Float Parameter 기본)를 다른 태스크와 같은 상태에 두면 bConsideredForCompletion=False로 완료 판정에서 뺀다
+  -태스크가 있는데 완료 판정 대상이 하나도 없는 상태는 진입 즉시 완료 처리된다. 부모 상태에 이런 태스크만 두면 자식 행동이 매 틱 재선택되어 움찔거린다
+  -부모 상태에 두는 태스크는 Running을 유지하는 완료 판정 대상이어야 한다 (Enter Combat, Set Float Parameter의 bKeepRunning=True)
+  -태스크는 목록 순서대로 EnterState되고, 완료 판정 대상 태스크가 진입에 실패하면 뒤 태스크는 실행되지 않는다 (어빌리티 실패 시 기록 생략 등에 활용)
+-완료 트랜지션의 대상 상태가 선택에 실패(진입 조건 거짓)하면 그 트랜지션은 건너뛰고 다음 트랜지션을 본다. 모두 실패하면 Root부터 재선택
 
 ##3단계: 노드 프로퍼티
 -set_node_property(state_path, node_id, property_path, value_text)

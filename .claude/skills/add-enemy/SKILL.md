@@ -52,7 +52,9 @@ CDO와 컴포넌트 템플릿은 BlueprintDefaultsTools.set_blueprint_defaults(b
   -SkeletalMeshTools.get_bounds로 메시 크기를 확인해 정한다. origin.z ≈ boxExtent.z이면 피벗이 발밑이므로 메시 Z = -CapsuleHalfHeight
   -CapsuleHalfHeight ≥ CapsuleRadius 제약. 사족 보행처럼 긴 체형은 반경을 키우고 높이를 낮춘다
   -전방 축(Yaw)은 메시마다 다르므로 값은 넣되 뷰포트 확인 필요 항목으로 보고한다
+-`:CharMoveComp` 회피: bUseRVOAvoidance=true, AvoidanceWeight=0.5, AvoidanceConsiderationRadius=300 (배회 무리끼리 비켜 가기, Wolf·StickMan 기준값)
 -BlueprintTools.compile_blueprint 후 저장
+-레벨에 상주시킬 때 Idle 배회 구역: AEnemyWanderArea를 SceneTools.add_to_scene_from_class로 배치(기본 반경 800, 액터 스케일로 크기 조절)하고 적 인스턴스의 WanderArea에 지정. 무리는 구역 하나를 공유. 배치 액터 저장은 LevelEditTools.save_actors (OFPA 맵의 외부 액터 포함, SceneTools.save_actor는 외부 액터에서 실패)
 
 ##3단계: 히트 소켓과 락온 소켓
 -EnemyDataAsset.hitSocketInfo의 {hitSocketName, hitSocketCount}는 메시 소켓 `<hitSocketName>_0 ~ _(N-1)`로 확장된다. 소켓은 끝단에서 몸쪽 순서로 배치 (예: Stickman HitS_HandR_0=middle_01_r, _1=hand_r, _2=lowerarm_r)
@@ -72,6 +74,18 @@ CDO와 컴포넌트 템플릿은 BlueprintDefaultsTools.set_blueprint_defaults(b
 -선택 몽타주를 만들지 않은 슬롯은 None으로 둔다. 레퍼런스 적 몽타주가 남지 않게 할 것
   -그로기 몽타주가 None이면 EnemyGroggyAbility가 각 Phase를 건너뛴다(루프 타이머는 유지). 크래시 없음
 
+###Poise 밸런스 기준
+-리액션 판정: 유효 잔량 = 현재 Poise − 받은 PoiseDamage. 0 이하일 때 HitReaction. 잔량 0~−20 약(Light), −20~−50 중(Middle), −50 미만 강(Heavy) (FHitReactionProcessor 기본 임계값 Light −20 / Heavy −50). 브레이크 후 Poise는 최대치로 복원
+-플레이어 기준값: MaxPoise 100. 약공격 PoiseDamage는 Knight Sword 7 (콤보 3타 10), Bastard Sword 10, 차지 10~15
+-적 MaxPoise(DA_Stats): 일반몹은 약공격 1타에 무너지게 7 미만(Wolf 5). 버티는 적은 약공격 n타에 맞춰 7×n 근처로 정하고 근거를 보고
+-적 공격 PoiseDamage(DA_<Name> attackData.poiseDamage), 플레이어 Poise 가득 찬 상태 기준
+  -무너뜨리지 않음(견제·연타용): 100 미만 (Wolf Bite2 55)
+  -약한 리액션: 100~120 (Wolf Bite1·RunAttack 110)
+  -중간 리액션: 120~150 (Wolf JumpAttack 135)
+  -강한 리액션: 150 초과
+-연속 피격 시 잔량이 이미 줄어 있으므로 같은 공격도 한 단계 강한 리액션이 날 수 있음 (예: Bite2 후 Bite1은 −65로 Heavy)
+-적이 받는 PoiseDamage의 일부(GroggyDamageRate)는 Stance(그로기 게이지)에도 들어가므로 MaxStance는 그로기까지 원하는 타수로 따로 정한다
+
 ###DA_AbilitySet_<Name>
 -grantedAbilities에 BP_<Name>_Attack (추가 공격 어빌리티도 여기에 등록)
 
@@ -83,7 +97,10 @@ CDO와 컴포넌트 템플릿은 BlueprintDefaultsTools.set_blueprint_defaults(b
 ##5단계: AI 컨트롤러와 StateTree
 -BP_<Name>AIController CDO의 `:GASStateTreeAIComponent`.stateTreeRef를 읽어 stateTree 경로만 ST_<Name>으로 바꿔 다시 설정한다
   -parameters(meleeRange, middleRange)도 여기 있다. 캡슐이 커졌으면 meleeRange를 늘린다
+-시야(SightConfig)는 컨트롤러 BP마다 둔다. BlueprintDefaultsTools.set_blueprint_defaults(component_name="SightConfig")로 SightRadius·LoseSightRadius·PeripheralVisionAngleDegrees(정면 기준 한쪽 각도, 기본 60 = 총 120°) 설정
+  -시야각은 인지 단계에만 적용되고, 전투 중에는 무시된다. LoseSightRadius는 전투 이탈 거리도 겸한다 (docs/ARCHITECTURE.md StateTree AI 설계)
 -ST_<Name> 에디터 데이터 수정
+  -전투 행동 그룹(레퍼런스의 Combat)에 Enter Combat 태스크가 있어야 컨트롤러가 전투 상태가 된다. 레퍼런스를 복제했으면 유지되는지 확인
   -스키마: `ST_<Name>.ST_<Name>:StateTreeEditorData_0.GASStateTreeAIComponentSchema_0`의 contextActorClass, aIControllerClass
   -구조 파악은 StateTreeEditTools.describe_state_tree (스테이트 경로, 태스크/컨디션/트랜지션과 ID 출력)
   -ActivateAbilityTask: StateTreeEditTools.set_node_property(state_path, node_id, "AbilityToActivate", "/Game/.../BP_X.BP_X_C"). 노드 ID가 유지되어 프로퍼티 바인딩이 보존된다
@@ -116,6 +133,15 @@ AnimMontageTools로 만든다. 모든 몽타주는 slot_name='DefaultSlot'.
 -레퍼런스 몽타주 구성은 AnimMontageTools.list_notifies로 조회해서 따른다
 -루프 몽타주(대기·경계 등): set_montage_sections로 Start/Loop/End 섹션을 만들고 Loop의 next를 자기 자신으로 둔다. End 섹션은 next가 없어야 한다. get_montage_info의 sections로 결과 확인
 -MotionWarping은 루트 모션에만 적용되므로 원본 시퀀스의 루트 모션이 꺼져 있으면 워프가 동작하지 않는다. get_root_motion_info로 루트 이동량을 확인해 켜도 캡슐이 움직이지 않는 제자리 애니메이션인지(회전 워프만 적용) 판단한다
+-이동 거리만 늘리거나 줄일 때(회피·백점프 등)는 시퀀스를 다시 굽지 않고 이동 구간에 MotionWarping ANS를 추가한 뒤 AnimMontageTools.set_root_motion_modifier로 `/Script/MotionWarping.RootMotionModifier_Scale`, Scale=(X,Y 배율, Z 1)을 지정한다. 워프 타깃 불필요 (예: AM_Wolf_BackJump track '2', ×1.4)
+  -이동량이 바뀌면 그 행동의 낙하 방지 검사 거리(Retreat Path Clear의 RetreatDistance 등)도 함께 맞춘다
+
+###머리 바라보기 (선택, 요청 시)
+-ABP 부모를 EnemyAnimInstance로 (BlueprintTools.set_parent 후 compile)
+-AnimGraph: Slot → 로컬을컴포넌트로 → 본트랜스폼(변경) 목 → 본트랜스폼(변경) 머리 → 컴포넌트에서로컬로 → 출력. 변환 노드는 connect_pins가 자동으로 넣지 않으므로 직접 생성(type_id '애니메이션|스페이스변환|...')
+  -본트랜스폼(변경): BoneToModify, RotationMode BMM_Additive, RotationSpace BCS_ComponentSpace. Rotation 핀에 NeckLookRotation / HeadLookRotation 변수 노드 연결
+  -본 선택과 축 확인은 AnimMontageTools.get_bone_axes (Wolf: b_neck_1 / b_head)
+-몽타주 재생 중에는 기본적으로 바라보기가 꺼짐. 제자리 대기 몽타주(Combat Idle 등)에서 시선만 따라가게 하려면 몽타주에 Look At Target ANS(/Script/ActionPractice.AnimNotifyState_LookAtTarget)를 AnimMontageTools.add_notify_state로 전 구간에 추가하고, 같은 구간의 회전 MotionWarping ANS와 ST 몽타주 태스크의 WarpTargetName은 제거
 
 ###ABP 확인
 -ABP_<Name> AnimGraph에 Slot('DefaultSlot') 노드가 출력 포즈 경로에 있는지 BlueprintTools.get_connected_subgraph(AnimGraphNode_Root_0)로 확인한다. 없으면 몽타주가 재생되지 않으므로 사용자에게 알린다

@@ -39,9 +39,13 @@ struct ACTIONPRACTICE_API FUpdateTargetInfoEvaluatorInstanceData
 	UPROPERTY(EditAnywhere, Category = "Output")
 	float AngleToTarget = 0.0f;
 
-	//Output: 인지 여부
+	//Output: 타깃 보유 여부 (인지 또는 전투)
 	UPROPERTY(EditAnywhere, Category = "Output")
 	bool bTargetDetected  = false;
+
+	//Output: 전투 상태 여부 (EnemyAIController 소유. 전투 중에는 시야를 벗어나도 타깃 유지)
+	UPROPERTY(EditAnywhere, Category = "Output")
+	bool bInCombat = false;
 };
 
 /**

@@ -236,6 +236,9 @@ void UEnemyDeathAbility::StopEnemyAI()
 		Brain->StopLogic(TEXT("Death"));
 		DEBUG_LOG(TEXT("StopEnemyAI: StateTree stopped"));
 	}
+
+	//사망으로 전투 해제 (알림 없음, 보스 HP바·BGM 정리는 BossDeathAbility 담당)
+	AIController->ClearAwarenessOnDeath();
 }
 
 void UEnemyDeathAbility::FreezeAnimPose()

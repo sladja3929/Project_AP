@@ -40,6 +40,7 @@ void FUpdateTargetInfoEvaluator::TreeStop(FStateTreeExecutionContext& Context) c
 	InstanceData.DistanceToTarget = -1.0f;
 	InstanceData.AngleToTarget = 0.0f;
 	InstanceData.bTargetDetected = false;
+	InstanceData.bInCombat = false;
 
 	DEBUG_LOG(TEXT("UpdateTargetInfoEvaluator TreeStop"));
 }
@@ -52,6 +53,8 @@ void FUpdateTargetInfoEvaluator::Tick(FStateTreeExecutionContext& Context, const
 void FUpdateTargetInfoEvaluator::UpdateTargetInfo(FStateTreeExecutionContext& Context) const
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+
+	InstanceData.bInCombat = InstanceData.EnemyAIController && InstanceData.EnemyAIController->IsInCombat();
 
 	if (!InstanceData.EnemyAIController || !InstanceData.EnemyAIController->CurrentTarget.IsValid() || !InstanceData.EnemyCharacter)
 	{

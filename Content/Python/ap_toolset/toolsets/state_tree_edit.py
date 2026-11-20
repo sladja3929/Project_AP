@@ -190,14 +190,16 @@ class StateTreeEditTools(unreal.ToolsetDefinition):
     @toolset_registry.tool_call
     @staticmethod
     def add_node(state_tree: unreal.StateTree, state_path: str, node_kind: str, node_type: str, transition_id: str = '') -> str:
-        """Adds a task or condition node with default values.
+        """Adds a task, condition or utility consideration node with default values.
 
         Args:
             state_tree: The StateTree asset.
             state_path: Path of the owning state.
-            node_kind: Task, EnterCondition or TransitionCondition.
-            node_type: C++ node struct path (e.g. /Script/StateTreeModule.StateTreeDelayTask) or a
-                Blueprint task/condition class path (e.g. /Game/AI/BP_MyTask.BP_MyTask_C).
+            node_kind: Task, EnterCondition, TransitionCondition or Consideration (utility
+                consideration used by the parent's ...WeightedByUtility / HighestUtility selection).
+            node_type: C++ node struct path (e.g. /Script/StateTreeModule.StateTreeDelayTask,
+                /Script/StateTreeModule.StateTreeConstantConsideration) or a Blueprint task/condition
+                class path (e.g. /Game/AI/BP_MyTask.BP_MyTask_C). Considerations accept C++ structs only.
             transition_id: Transition GUID, required only for TransitionCondition. Pass an empty string otherwise.
 
         Returns:

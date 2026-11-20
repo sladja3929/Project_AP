@@ -7,6 +7,8 @@
 #include "Components/CapsuleComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "AI/EnemyWanderArea.h"
+#include "Components/BoxComponent.h"
 #include "Math/ColorList.h"
 
 #define ENABLE_DEBUG_LOG 1
@@ -70,6 +72,7 @@ void FGameplayDebuggerCategory_EnemyAI::CollectData(APlayerController* OwnerPC, 
 	CollectStateAndTarget(Enemy);
 	CollectStateTreeRanges(Enemy, Center);
 	CollectPerception(Enemy, Center);
+	CollectWanderArea(Enemy, Center);
 }
 
 #pragma region "Collect"
@@ -96,12 +99,14 @@ void FGameplayDebuggerCategory_EnemyAI::CollectStateAndTarget(const AEnemyCharac
 
 	if (!TargetActor)
 	{
-		AddTextLine(TEXT("Target: {grey}none"));
+		AddTextLine(TEXT("Awareness: {grey}None  {white}Target: {grey}none"));
 		return;
 	}
 
-	//UpdateTargetInfoEvaluator와 같은 기준 (액터 중심 간 3D 거리)
-	const float Distance = FVector::Dist(Enemy->GetActorLocation(), TargetActor->GetActorLocation());
+	AddTextLine(AIController->IsInCombat() ? TEXT("Awareness: {red}Combat") : TEXT("Awareness: {yellow}Perceived"));
+
+	//UpdateTargetInfoEvaluator와 같은 기준 (액터 중심 간 수평 거리)
+	const float Distance = FVector::Dist2D(Enemy->GetActorLocation(), TargetActor->GetActorLocation());
 	AddTextLine(FString::Printf(TEXT("Target: {white}%s  {grey}Distance: {white}%.0f"), *TargetActor->GetName(), Distance));
 	AddShape(FGameplayDebuggerShape::MakeSegment(Enemy->GetActorLocation(), TargetActor->GetActorLocation(), 2.0f, FColor::White, FString::Printf(TEXT("%.0f"), Distance)));
 }
@@ -146,8 +151,49 @@ void FGameplayDebuggerCategory_EnemyAI::CollectPerception(const AEnemyCharacter*
 	const float HalfAngle = SightConfig->PeripheralVisionAngleDegrees;
 
 	AddSightArc(Center, Forward, SightConfig->SightRadius, HalfAngle, EnemyAIDebug::SightColor, FString::Printf(TEXT("Sight %.0f"), SightConfig->SightRadius));
-	AddSightArc(Center, Forward, SightConfig->LoseSightRadius, HalfAngle, FColor(128, 128, 128), FString::Printf(TEXT("LoseSight %.0f"), SightConfig->LoseSightRadius));
+	//전투 중에는 시야각과 무관하게 LoseSightRadius 거리로만 해제되므로 전방위로 표시
+	const float LoseSightHalfAngle = AIController->IsInCombat() ? 180.0f : HalfAngle;
+	AddSightArc(Center, Forward, SightConfig->LoseSightRadius, LoseSightHalfAngle, FColor(128, 128, 128), FString::Printf(TEXT("LoseSight %.0f"), SightConfig->LoseSightRadius));
 	AddTextLine(FString::Printf(TEXT("{skyblue}Sight: {white}%.0f  {grey}LoseSight: {white}%.0f  {grey}Peripheral: {white}%.0f"), SightConfig->SightRadius, SightConfig->LoseSightRadius, HalfAngle));
+}
+
+void FGameplayDebuggerCategory_EnemyAI::CollectWanderArea(const AEnemyCharacter* Enemy, const FVector& Center)
+{
+	const AEnemyWanderArea* Area = Enemy->GetWanderArea();
+
+	if (!Area || !Area->GetAreaBox())
+	{
+		AddTextLine(TEXT("{green}Wander: {grey}spawn radius"));
+		return;
+	}
+
+	//구역 박스를 디버그 대상 바닥 높이에 납작하게 표시
+	const UBoxComponent* Box = Area->GetAreaBox();
+	const FVector Extent = Box->GetScaledBoxExtent();
+	const FVector BoxCenter(Box->GetComponentLocation().X, Box->GetComponentLocation().Y, Center.Z);
+
+	AddShape(FGameplayDebuggerShape::MakeBox(BoxCenter, Box->GetComponentRotation(), FVector(Extent.X, Extent.Y, 5.0f), EnemyAIDebug::RingThickness, FColorList::LimeGreen, Area->GetActorNameOrLabel()));
+
+	//구성원별 목적지 (디버그 대상은 강조)
+	for (const TPair<TWeakObjectPtr<const APawn>, FVector>& Pair : Area->GetReservedPoints())
+	{
+		const APawn* Member = Pair.Key.Get();
+
+		if (!Member)
+		{
+			continue;
+		}
+
+		const bool bIsDebugActor = Member == Enemy;
+		AddShape(FGameplayDebuggerShape::MakePoint(Pair.Value, bIsDebugActor ? 20.0f : 12.0f, bIsDebugActor ? FColor::White : FColorList::LimeGreen, bIsDebugActor ? TEXT("Wander Target") : FString()));
+
+		if (bIsDebugActor)
+		{
+			AddShape(FGameplayDebuggerShape::MakeSegment(Enemy->GetActorLocation(), Pair.Value, 1.5f, FColorList::LimeGreen));
+		}
+	}
+
+	AddTextLine(FString::Printf(TEXT("{green}Wander: {white}%s  {grey}Members: {white}%d"), *Area->GetActorNameOrLabel(), Area->GetReservedPoints().Num()));
 }
 
 #pragma endregion
