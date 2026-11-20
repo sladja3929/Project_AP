@@ -28,6 +28,7 @@
 -커밋은 사용자가 요청할 때만 하고, 커밋 시 push까지 함께 수행. 커밋 메시지에 Co-Authored-By 줄은 넣지 않음
 
 #MCP 에셋 편집 주의사항
+-unreal-mcp 툴로 에셋·BP·레벨을 편집하거나 에디터·PIE를 다루기 전에 unreal-mcp 스킬(공통 규칙과 함정 원본)을 읽을 것. 아래는 그중 반드시 지킬 BP 기본값 규칙
 -BP 기본값(CDO·컴포넌트 템플릿)은 반드시 ap_toolset BlueprintDefaultsTools.set_blueprint_defaults로 수정 (레벨 배치 인스턴스 전파 + BP·액터 패키지 저장)
 -ObjectTools.set_properties로 BP CDO·컴포넌트 템플릿을 직접 바꾸지 말 것. 열린 레벨의 배치 인스턴스에 전파되지 않아 PIE에 반영 안 되고, 이 상태로 레벨을 저장하면 이전 값이 인스턴스 오버라이드로 굳음
 -ObjectTools.reset_properties를 BP 인스턴스·컴포넌트에 쓰지 말 것. BP 값이 아닌 네이티브 클래스 기본값으로 되돌림 (인스턴스를 BP 값으로 맞출 때는 sync_blueprint_instances)

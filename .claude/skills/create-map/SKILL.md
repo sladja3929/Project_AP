@@ -72,11 +72,9 @@ description: 환경 에셋 팩(KiteDemo 등)으로 플레이용 맵을 unreal-mc
 -PIE는 StartPIE(warmup 8초) → 로그 확인 → StopPIE. 실제 플레이 확인(전투 공간, 경계 이탈, 프레임)은 사용자에게 요청
 
 ##주의사항
--ActorTools.set_actor_transform에 일부 필드만 넘기면 나머지가 0으로 초기화된다. 항상 get_actor_transform 값 전체를 넘긴다
--find_actors는 name, tag, collision_channels를 모두 넘겨야 한다
--샌드박스 스크립트(execute_tool_script)의 dict는 .get(k, default)를 못 쓴다
 -폴리지 인스턴스는 액터가 아니므로 위치 문제는 JSON 원본에서 찾는다 (ScreenCoordsToWorld로 좌표를 구해 대조)
--C++ 함수 본문 수정은 Live Coding으로 반영 가능하나 다음 에디터 종료 시 정식 빌드
+-처음 여는 환경 팩은 메시 빌드가 길다. 규격 조사는 실제로 쓸 메시 몇 개만 소량씩 한다
+-MCP 공통 규칙과 함정(set_actor_transform 전체 지정, find_actors 필수 인자, execute_tool_script 제약, 대량 에셋 로드, Live Coding, 캡처)은 unreal-mcp 스킬을 따른다
 
 ##커밋 범위
 -서드파티 팩은 전체가 아니라 맵이 참조하는 파일만 커밋한다: python scripts/deps.py <맵> <맵 에셋 폴더> <팩 폴더> <목록 파일>

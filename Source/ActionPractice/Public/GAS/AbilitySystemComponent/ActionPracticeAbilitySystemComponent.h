@@ -79,10 +79,17 @@ protected:
 #pragma region "Protected Variables"
 
 	TObjectPtr<AActionPracticeCharacter> OwnerCharacter;
-	FGameplayTag EffectStaminaRegenBlockDurationTag;
 	FGameplayTag StateAbilityBlockingTag;
 	FGameplayTag StateGuardBrokenTag;
 	FGameplayTag StateParryingTag;
+
+	//가드로 스태미나를 소모했을 때 적용할 리젠 차단 GE (State.StaminaRegenBlocked 부여, HasDuration)
+	UPROPERTY(EditDefaultsOnly, Category = "Defense|Stamina")
+	TSubclassOf<UGameplayEffect> GuardStaminaRegenBlockEffect;
+
+	//가드 스태미나 소모 후 리젠 차단 시간(초). 0 이하면 GE에 설정된 지속시간 사용
+	UPROPERTY(EditDefaultsOnly, Category = "Defense|Stamina", meta = (ClampMin = "0.0", Units = "s"))
+	float GuardStaminaRegenBlockDuration = 0.5f;
 
 #pragma endregion
 
@@ -101,8 +108,6 @@ protected:
 private:
 #pragma region "Private Variables"
 
-	FActiveGameplayEffectHandle StaminaRegenBlockHandle;
-
 	//내부 방어 판정 상태
 	EPlayerDefenseState LastDefenseState = EPlayerDefenseState::None;
 
@@ -119,6 +124,9 @@ private:
 
 	//패리 성공 시 적 강제 그로기 발동
 	void ForceEnemyGroggy(AActor* EnemyActor);
+
+	//가드 스태미나 소모 후 일정 시간 리젠 차단
+	void ApplyGuardStaminaRegenBlock();
 
 #pragma endregion
 };
