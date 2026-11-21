@@ -189,6 +189,14 @@ protected:
 	// ===== Pause Menu =====
 	void OnPauseInput();
 
+	// ===== Debug =====
+	//"6" 키: 보스룸(ABossArena)에 가장 가까운 Bonfire로 이동 (Shipping 빌드에서는 바인딩·동작 안 함)
+	void OnDebugTeleportToBossBonfire();
+
+	//이동은 서버 권한으로 처리 (CMC 위치 보정 방지)
+	UFUNCTION(Server, Reliable)
+	void Server_DebugTeleportToBossBonfire();
+
 #pragma endregion
 
 private:

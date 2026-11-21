@@ -315,9 +315,32 @@ bool ULockOnComponent::IsTargetVisible(const FLockOnView& View, const FVector& A
 
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(LockOnVisibility), true, Owner);
 
-	const bool bBlocked = World->LineTraceTestByObjectType(View.Location, AimPoint, ObjectParams, QueryParams);
+	//오브젝트 타입 쿼리는 채널 응답과 무관하게 해당 타입을 모두 맞히므로, 오버랩 전용 트리거(보스룸 범위·상호작용 범위 등 WorldDynamic)도 걸림
+	//어떤 채널도 막지 않는 순수 트리거만 제외하고, 하나라도 막는 컴포넌트(지형·구조물·투명 벽)는 기존처럼 가림으로 판정
+	TArray<FHitResult> Hits;
+	World->LineTraceMultiByObjectType(Hits, View.Location, AimPoint, ObjectParams, QueryParams);
 
-	return !bBlocked;
+	for (const FHitResult& Hit : Hits)
+	{
+		const UPrimitiveComponent* HitComponent = Hit.GetComponent();
+
+		if (!HitComponent)
+		{
+			continue;
+		}
+
+		const FCollisionResponseContainer& Responses = HitComponent->GetCollisionResponseToChannels();
+
+		for (int32 Channel = 0; Channel < UE_ARRAY_COUNT(Responses.EnumArray); ++Channel)
+		{
+			if (Responses.EnumArray[Channel] == ECR_Block)
+			{
+				return false;
+			}
+		}
+	}
+
+	return true;
 }
 
 AActor* ULockOnComponent::FindBestTarget(const AActor* ExcludedActor)

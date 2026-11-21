@@ -20,6 +20,7 @@
 #include "GAS/GameplayTagsSubsystem.h"
 #include "Input/InputBufferComponent.h"
 #include "Characters/InteractionComponent.h"
+#include "Characters/PlayerNoiseComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "Input/InputActionDataAsset.h"
@@ -90,6 +91,9 @@ AActionPracticeCharacter::AActionPracticeCharacter()
 
 	//InteractionComponent Settings
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
+
+	//PlayerNoise Component Settings
+	PlayerNoiseComponent = CreateDefaultSubobject<UPlayerNoiseComponent>(TEXT("PlayerNoiseComponent"));
 
 	//GAS Settings
 	CreateAbilitySystemComponent();

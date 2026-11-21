@@ -1,6 +1,8 @@
 #include "Characters/BossCharacter.h"
 
 #include "Characters/ActionPracticeCharacter.h"
+#include "AI/BossArena.h"
+#include "AI/EnemyAIController.h"
 #include "Components/WidgetComponent.h"
 #include "Games/ActionPracticePlayerController.h"
 #include "Components/AudioComponent.h"
@@ -33,10 +35,52 @@ void ABossCharacter::BeginPlay()
 		EnemyHealthBarWidgetComponent->SetVisibility(false);
 		EnemyHealthBarWidgetComponent->SetHiddenInGame(true);
 	}
+
+	//보스룸 진입 인지 (AI는 서버 전용)
+	if (HasAuthority() && BossArena)
+	{
+		BossArena->OnPlayerEntered.AddUObject(this, &ABossCharacter::OnPlayerEnteredArena);
+		PerceivePlayersInArena();
+	}
+}
+
+void ABossCharacter::OnPlayerEnteredArena(AActor* Player)
+{
+	if (AEnemyAIController* AIController = GetEnemyAIController())
+	{
+		AIController->PerceiveTarget(Player);
+	}
+}
+
+bool ABossCharacter::IsTargetInCombatArea(const AActor* Target) const
+{
+	return BossArena && BossArena->IsActorInside(Target);
+}
+
+void ABossCharacter::PerceivePlayersInArena()
+{
+	if (!HasAuthority() || !BossArena)
+	{
+		return;
+	}
+
+	TArray<AActor*> PlayersInArena;
+	BossArena->GetOverlappingPlayers(PlayersInArena);
+
+	//PerceiveTarget이 첫 유효 플레이어만 받고 이후는 무시
+	for (AActor* Player : PlayersInArena)
+	{
+		OnPlayerEnteredArena(Player);
+	}
 }
 
 void ABossCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (BossArena)
+	{
+		BossArena->OnPlayerEntered.RemoveAll(this);
+	}
+
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -61,6 +105,9 @@ void ABossCharacter::ResetEnemy()
 		bBossEncountered = false;
 		Multicast_OnBossDisengage();
 	}
+
+	//리셋으로 인지가 지워진 뒤 보스룸에 남아 있는 플레이어 재인지 (퇴장·재진입 없이도)
+	PerceivePlayersInArena();
 
 	DEBUG_LOG(TEXT("BossCharacter::ResetEnemy: Boss-specific reset complete"));
 }

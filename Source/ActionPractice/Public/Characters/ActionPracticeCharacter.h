@@ -22,6 +22,7 @@ class AWeapon;
 class ULockOnComponent;
 class UItemManagerComponent;
 class UInteractionComponent;
+class UPlayerNoiseComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -152,6 +153,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UInteractionComponent> InteractionComponent = nullptr;
+
+	//AI 청각용 소리 발생 (서버 전용)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UPlayerNoiseComponent> PlayerNoiseComponent = nullptr;
 
 	// ===== Input Action Data (for GAS ability mapping) =====
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input")

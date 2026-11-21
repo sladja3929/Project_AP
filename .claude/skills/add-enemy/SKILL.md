@@ -55,6 +55,7 @@ CDO와 컴포넌트 템플릿은 BlueprintDefaultsTools.set_blueprint_defaults(b
 -`:CharMoveComp` 회피: bUseRVOAvoidance=true, AvoidanceWeight=0.5, AvoidanceConsiderationRadius=300 (배회 무리끼리 비켜 가기, Wolf·StickMan 기준값)
 -BlueprintTools.compile_blueprint 후 저장
 -레벨에 상주시킬 때 Idle 배회 구역: AEnemyWanderArea를 SceneTools.add_to_scene_from_class로 배치(기본 반경 800, 액터 스케일로 크기 조절)하고 적 인스턴스의 WanderArea에 지정. 무리는 구역 하나를 공유. 배치 액터 저장은 LevelEditTools.save_actors (OFPA 맵의 외부 액터 포함, SceneTools.save_actor는 외부 액터에서 실패)
+-보스를 레벨에 배치할 때 보스룸 인지: ABossArena를 add_to_scene_from_class로 배치하고 ArenaBox.BoxExtent로 보스룸 전체를 덮은 뒤 보스 인스턴스의 BossArena에 지정 (지정하지 않으면 시야로만 인지, 보스는 청각 없음). 원형 보스룸은 사각형이 원 안에 들어가게 반폭을 바닥 반지름/√2보다 약간 작게 잡고, 높이는 trace_world로 바닥 Z를 확인해 덮는다. 플레이어 시작 지점이 범위 안이면 시작하자마자 전투가 시작되므로 확인. 보스 시야·해제 거리는 C++ 기본값이 아닌 AI 컨트롤러 BP의 SightConfig 값(예: WoodGiant Sight 1300 / LoseSight 2000)을 ObjectTools로 읽어 기준으로 삼는다 (CDO 경로 `.../BP_X.Default__BP_X_C:SightConfig`)
 
 ##3단계: 히트 소켓과 락온 소켓
 -EnemyDataAsset.hitSocketInfo의 {hitSocketName, hitSocketCount}는 메시 소켓 `<hitSocketName>_0 ~ _(N-1)`로 확장된다. 소켓은 끝단에서 몸쪽 순서로 배치 (예: Stickman HitS_HandR_0=middle_01_r, _1=hand_r, _2=lowerarm_r)

@@ -160,7 +160,8 @@ void UEnemyPackSubsystem::GatherRallyCandidates(const AEnemyCharacter* Instigato
 
 		AEnemyAIController* Controller = Candidate->GetEnemyAIController();
 
-		if (!Controller || Controller->IsInCombat() || Controller->GetPack())
+		//귀환 중인 구성원은 레시로 전투를 놓은 상태라 소집하지 않음 (소집 즉시 다시 레시에 걸려 추격·귀환 반복)
+		if (!Controller || Controller->IsInCombat() || Controller->GetPack() || Controller->IsReturningHome())
 		{
 			continue;
 		}

@@ -67,6 +67,9 @@ public:
 
 	void RotateToTarget(const AActor* TargetActor, float RotateTime);
 
+	//타깃이 이 적의 전투 구역 안에 있는지 (안에 있는 동안은 거리로 전투 해제하지 않음). 기본은 구역 없음, 보스는 보스룸으로 판정
+	virtual bool IsTargetInCombatArea(const AActor* Target) const { return false; }
+
 	// ===== Enemy Reset =====
 	void CacheInitialEnemyState();
 

@@ -7,6 +7,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "Perception/AISenseConfig_Hearing.h"
 #include "AI/EnemyWanderArea.h"
 #include "AI/EnemyPack.h"
 #include "Components/BoxComponent.h"
@@ -49,6 +50,9 @@ namespace EnemyAIDebug
 
 	//시야 표시 색 (범위 링의 난색 계열과 구분되는 청색)
 	static const FColor SightColor = FColorList::SkyBlue;
+
+	//청각 표시 색 (시야와 구분되는 청록)
+	static const FColor HearingColor = FColorList::Aquamarine;
 
 	constexpr float RingThickness = 3.0f;
 	constexpr int32 ArcSegments = 24;
@@ -102,6 +106,14 @@ void FGameplayDebuggerCategory_EnemyAI::CollectStateAndTarget(const AEnemyCharac
 		const FString StatePath = FString::JoinBy(ActiveStates, TEXT(" > "), [](const FName& Name) { return Name.ToString(); });
 		AddTextLine(FString::Printf(TEXT("State: {white}%s"), StatePath.IsEmpty() ? TEXT("(none)") : *StatePath));
 	}
+
+	//스폰 위치(레시 기준점)와 거리
+	const float HomeDistance = FVector::Dist2D(Enemy->GetActorLocation(), Enemy->SpawnLocation);
+	AddShape(FGameplayDebuggerShape::MakePoint(Enemy->SpawnLocation, 12.0f, FColorList::LimeGreen, TEXT("Spawn")));
+
+	AddTextLine(AIController->IsReturningHome()
+		? FString::Printf(TEXT("{cyan}Returning Home  {grey}HomeDist: {white}%.0f"), HomeDistance)
+		: FString::Printf(TEXT("{grey}HomeDist: {white}%.0f"), HomeDistance));
 
 	const FCurrentTarget& TargetInfo = AIController->GetCurrentTarget();
 	const AActor* TargetActor = TargetInfo.IsValid() ? TargetInfo.Actor.Get() : nullptr;
@@ -172,6 +184,13 @@ void FGameplayDebuggerCategory_EnemyAI::CollectPerception(const AEnemyCharacter*
 	const float LoseSightHalfAngle = AIController->IsInCombat() ? 180.0f : HalfAngle;
 	AddSightArc(Center, Forward, SightConfig->LoseSightRadius, LoseSightHalfAngle, FColor(128, 128, 128), FString::Printf(TEXT("LoseSight %.0f"), SightConfig->LoseSightRadius));
 	AddTextLine(FString::Printf(TEXT("{skyblue}Sight: {white}%.0f  {grey}LoseSight: {white}%.0f  {grey}Peripheral: {white}%.0f"), SightConfig->SightRadius, SightConfig->LoseSightRadius, HalfAngle));
+
+	//청각 (보스는 미구성). 링은 소리 크기 1 기준 거리
+	if (const UAISenseConfig_Hearing* HearingConfig = PerceptionComponent->GetSenseConfig<UAISenseConfig_Hearing>())
+	{
+		AddShape(FGameplayDebuggerShape::MakeCircle(Center, FVector::UpVector, HearingConfig->HearingRange, EnemyAIDebug::RingThickness, EnemyAIDebug::HearingColor, FString::Printf(TEXT("Hearing %.0f"), HearingConfig->HearingRange)));
+		AddTextLine(FString::Printf(TEXT("{aquamarine}Hearing: {white}%.0f  {grey}MaxAge: {white}%.1f"), HearingConfig->HearingRange, HearingConfig->GetMaxAge()));
+	}
 }
 
 void FGameplayDebuggerCategory_EnemyAI::CollectWanderArea(const AEnemyCharacter* Enemy, const FVector& Center)
