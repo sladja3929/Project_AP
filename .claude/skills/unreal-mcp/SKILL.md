@@ -46,6 +46,7 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 
 ##에셋 종류별 후처리
 -MCP 수정은 자동 저장되지 않는다. AssetTools.save_assets로 저장한다
+  -PIE 실행 중에는 save_assets가 "Asset does not exist"로 실패한다(실제로 있는 에셋도). 사용자가 PIE 중일 수 있으니 IsPIERunning을 확인하고, 끝난 뒤 다시 저장한다. 수정 내용은 메모리에 남아 있다
 -StateTree: 편집 후 반드시 컴파일한다 (edit-statetree 스킬)
 -블렌드스페이스: SampleData(샘플 추가·이동·삭제)를 바꾸면 AnimMontageTools.resample_blend_space를 호출한다. 리플렉션 편집은 블렌드 데이터를 재계산하지 않아 새 샘플이 무시된다
 -BP·ABP 그래프: 편집 후 BlueprintTools.compile_blueprint(warnings_as_errors=True)로 경고까지 확인한다

@@ -372,22 +372,53 @@ void AActionPracticePlayerController::OnInteractInput()
 {
 	if (!CachedCharacter) return;
 
-	//휴식 중이면 Ability.Rest 이벤트를 전송해 RestAbility의 WaitGameplayEvent를 트리거
-	//RestAbility는 ServerInitiated라 WaitInputPress 신호 전달이 불가능하므로 GameplayEvent 방식 사용
-	UActionPracticeAbilitySystemComponent* APASC = Cast<UActionPracticeAbilitySystemComponent>(CachedCharacter->GetAbilitySystemComponent());
-	if (APASC && APASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRestingTag()))
-	{
-		FGameplayEventData ExitEventData;
-		ExitEventData.EventTag = UGameplayTagsSubsystem::GetAbilityRestTag();
-		APASC->HandleGameplayEvent_NetPredicted(UGameplayTagsSubsystem::GetAbilityRestTag(), &ExitEventData);
-		DEBUG_LOG(TEXT("OnInteractInput: Sent exit rest event"));
-		return;
-	}
+	//휴식 중 일어서기는 InputKey에서 처리 (아무 키), 상호작용은 막음
+	if (IsResting()) return;
 
 	UInteractionComponent* InteractionComp = CachedCharacter->FindComponentByClass<UInteractionComponent>();
 	if (!InteractionComp) return;
 
 	InteractionComp->TryInteract();
+}
+
+bool AActionPracticePlayerController::InputKey(const FInputKeyEventArgs& Params)
+{
+	//마우스 이동·스틱 값 같은 아날로그 축은 제외 (스틱을 크게 기울인 가상 버튼 입력은 포함)
+	if (Params.Event == IE_Pressed && !Params.Key.IsAnalog() && IsResting() && !IsPauseKey(Params.Key))
+	{
+		SendExitRestEvent();
+	}
+
+	return Super::InputKey(Params);
+}
+
+bool AActionPracticePlayerController::IsResting() const
+{
+	if (!CachedCharacter) return false;
+
+	const UAbilitySystemComponent* ASC = CachedCharacter->GetAbilitySystemComponent();
+	return ASC && ASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRestingTag());
+}
+
+bool AActionPracticePlayerController::IsPauseKey(const FKey& Key) const
+{
+	if (!IA_Pause) return false;
+
+	const UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+	return Subsystem && Subsystem->QueryKeysMappedToAction(IA_Pause).Contains(Key);
+}
+
+void AActionPracticePlayerController::SendExitRestEvent()
+{
+	//RestAbility는 ServerInitiated라 WaitInputPress 신호 전달이 불가능하므로 GameplayEvent 방식 사용
+	UAbilitySystemComponent* ASC = CachedCharacter ? CachedCharacter->GetAbilitySystemComponent() : nullptr;
+	UActionPracticeAbilitySystemComponent* APASC = Cast<UActionPracticeAbilitySystemComponent>(ASC);
+	if (!APASC) return;
+
+	FGameplayEventData ExitEventData;
+	ExitEventData.EventTag = UGameplayTagsSubsystem::GetAbilityRestTag();
+	APASC->HandleGameplayEvent_NetPredicted(UGameplayTagsSubsystem::GetAbilityRestTag(), &ExitEventData);
+	DEBUG_LOG(TEXT("SendExitRestEvent: Sent exit rest event"));
 }
 
 #pragma region "UI"

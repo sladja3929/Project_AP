@@ -144,6 +144,9 @@ protected:
 	/** Input mapping context + action binding setup */
 	virtual void SetupInputComponent() override;
 
+	//휴식 중 아날로그 축을 제외한 아무 키 입력 시 일어서기 이벤트 전송 (일시정지 키 제외), 이후 기본 입력 처리
+	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
+
 	// ===== Input Handlers =====
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
@@ -211,6 +214,13 @@ private:
 #pragma endregion
 
 #pragma region "Private Functions"
+
+	// ===== Rest =====
+	bool IsResting() const;
+	bool IsPauseKey(const FKey& Key) const;
+
+	//RestAbility의 종료 대기(Ability.Rest 이벤트) 트리거
+	void SendExitRestEvent();
 
 	// ===== GAS Input Binding Wrappers =====
 	void OnJumpPressed()          { HandleGASInputPressed(IA_Jump); }

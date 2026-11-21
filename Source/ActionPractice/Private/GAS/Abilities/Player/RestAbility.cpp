@@ -11,6 +11,9 @@
 #include "Games/ActionPracticePlayerController.h"
 #include "Games/ActionPracticeGameMode.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
+#include "Effects/MaterialFadeCameraModifier.h"
 #include "Abilities/Tasks/AbilityTask_WaitDelay.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
@@ -25,6 +28,12 @@
 #else
 	#define DEBUG_LOG(Format, ...)
 #endif
+
+namespace
+{
+	//M_PP_RestLightMask의 화면 가림 중심 파라미터
+	const FName RestMaskFocusParamName(TEXT("FocusLocation"));
+}
 
 URestAbility::URestAbility()
 {
@@ -205,18 +214,59 @@ void URestAbility::TransitionToLoopMontage()
 {
 	CurrentRestState = ERestState::RestLoop;
 
-	//회복 GE 1회 적용
-	ApplyRestRecovery();
-
-	//보스 리셋 (stub)
-	RequestEnemyReset();
-
-	//루프 몽타주 시작
+	//루프 몽타주 즉시 시작 (Sit BlendOut 후 ABP 포즈 노출 방지)
 	StartMontageWithEventsTask();
 
-	//재입력 대기: PlayerController가 Ability.Rest 이벤트를 보내면 종료
+	if (!IsActive()) return;
+
+	//화면을 덮은 뒤 회복·적 리셋 (서버/클라 인스턴스가 각자 같은 타임라인으로 진행, 화면 가림은 로컬만)
+	SetLocalRestScreenMask(true, RestFadeOutTime);
+
+	END_ABILITY_TASK(RestFadeDelayTask);
+	RestFadeDelayTask = UAbilityTask_WaitDelay::WaitDelay(this, RestFadeOutTime);
+	if (RestFadeDelayTask)
+	{
+		RestFadeDelayTask->OnFinish.AddDynamic(this, &URestAbility::OnRestFadeOutFinished);
+		RestFadeDelayTask->ReadyForActivation();
+	}
+	else
+	{
+		OnRestFadeOutFinished();
+	}
+}
+
+void URestAbility::OnRestFadeOutFinished()
+{
+	//회복·적 리셋은 서버만 실행, 클라 인스턴스는 페이드 타이머만 진행 (결과는 복제로 수신)
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	if (ActorInfo && ActorInfo->IsNetAuthority())
+	{
+		ApplyRestRecovery();
+		RequestEnemyReset();
+	}
+
+	//리스폰 복제가 도착할 때까지 덮인 상태 유지
+	END_ABILITY_TASK(RestFadeDelayTask);
+	RestFadeDelayTask = UAbilityTask_WaitDelay::WaitDelay(this, RestFadeHoldTime);
+	if (RestFadeDelayTask)
+	{
+		RestFadeDelayTask->OnFinish.AddDynamic(this, &URestAbility::OnRestFadeHoldFinished);
+		RestFadeDelayTask->ReadyForActivation();
+	}
+	else
+	{
+		OnRestFadeHoldFinished();
+	}
+}
+
+void URestAbility::OnRestFadeHoldFinished()
+{
+	END_ABILITY_TASK(RestFadeDelayTask);
+
+	//화면 가림은 앉아 있는 동안 유지, 일어설 때 해제
+	//재입력 대기: 리셋 후 최소 유지 시간이 지나야 허용, PlayerController가 Ability.Rest 이벤트를 보내면 종료
 	START_WAIT_EVENT_TASK(WaitExitRestEventTask, AbilityRestTag, OnExitRestEventReceived, nullptr, true, true);
-	DEBUG_LOG(TEXT("TransitionToLoopMontage: Waiting for exit event (Ability.Rest)"));
+	DEBUG_LOG(TEXT("OnRestFadeHoldFinished: Waiting for exit event (Ability.Rest)"));
 }
 
 void URestAbility::StartStandMontage()
@@ -375,6 +425,56 @@ void URestAbility::RequestEnemyReset()
 	DEBUG_LOG(TEXT("RequestEnemyReset: ResetAllEnemies called"));
 }
 
+APlayerCameraManager* URestAbility::GetLocalCameraManager() const
+{
+	//화면 연출이므로 로컬 플레이어만 (데디 서버·원격 클라 인스턴스 제외)
+	if (!IsLocallyControlled()) return nullptr;
+
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	APlayerController* PC = ActorInfo ? ActorInfo->PlayerController.Get() : nullptr;
+	return PC ? PC->PlayerCameraManager.Get() : nullptr;
+}
+
+void URestAbility::SetLocalRestScreenMask(bool bCover, float Duration)
+{
+	APlayerCameraManager* CameraManager = GetLocalCameraManager();
+	if (!CameraManager) return;
+
+	//모디파이어는 PCM에 한 번 추가 후 재사용 (해제 시 Alpha 0에서 스스로 비활성화)
+	UMaterialFadeCameraModifier* Modifier = Cast<UMaterialFadeCameraModifier>(
+		CameraManager->FindCameraModifierByClass(UMaterialFadeCameraModifier::StaticClass()));
+
+	if (bCover)
+	{
+		if (!RestScreenMaskMaterial)
+		{
+			DEBUG_LOG(TEXT("SetLocalRestScreenMask: RestScreenMaskMaterial not set"));
+			return;
+		}
+
+		if (!Modifier)
+		{
+			Modifier = Cast<UMaterialFadeCameraModifier>(CameraManager->AddNewCameraModifier(UMaterialFadeCameraModifier::StaticClass()));
+			if (!Modifier) return;
+		}
+
+		//모닥불 주변만 남기고 어둡게 덮음 (모닥불 참조가 없으면 캐릭터 기준)
+		const AActor* FocusActor = CachedBonfire.IsValid() ? static_cast<const AActor*>(CachedBonfire.Get()) : GetAvatarActorFromActorInfo();
+		const FVector FocusLocation = FocusActor ? FocusActor->GetActorLocation() : FVector::ZeroVector;
+
+		Modifier->SetFadeMaterial(RestScreenMaskMaterial);
+		Modifier->SetVectorParameter(RestMaskFocusParamName, FLinearColor(FocusLocation));
+		Modifier->BlendIn(Duration);
+	}
+	else if (Modifier)
+	{
+		Modifier->BlendOut(Duration);
+	}
+
+	bRestFadeCovering = bCover;
+	DEBUG_LOG(TEXT("SetLocalRestScreenMask: %s (%.2fs)"), bCover ? TEXT("Cover") : TEXT("Uncover"), Duration);
+}
+
 void URestAbility::OnRotateDelayFinished()
 {
 	StartSitMontage();
@@ -383,6 +483,9 @@ void URestAbility::OnRotateDelayFinished()
 void URestAbility::OnExitRestEventReceived(FGameplayEventData Payload)
 {
 	DEBUG_LOG(TEXT("OnExitRestEventReceived: Starting stand montage"));
+
+	//일어서기와 함께 화면 가림 해제
+	SetLocalRestScreenMask(false, RestFadeInTime);
 	StartStandMontage();
 }
 
@@ -399,6 +502,13 @@ void URestAbility::EndAbility(
 	RestoreCharacterMovement();
 	SetWeaponsVisibility(true);
 
+	//화면 가림 도중 취소된 경우 현재 강도에서 화면 복구
+	if (bRestFadeCovering)
+	{
+		SetLocalRestScreenMask(false, RestFadeInTime);
+		bRestFadeCovering = false;
+	}
+
 	//태스크 정리
 	if (PlayMontageWithEventsTask)
 	{
@@ -407,6 +517,7 @@ void URestAbility::EndAbility(
 		PlayMontageWithEventsTask = nullptr;
 	}
 	END_ABILITY_TASK(WaitDelayTask);
+	END_ABILITY_TASK(RestFadeDelayTask);
 	END_ABILITY_TASK(WaitExitRestEventTask);
 
 	CachedBonfire = nullptr;
