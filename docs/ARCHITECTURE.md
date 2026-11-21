@@ -36,6 +36,7 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -3단 계층: APGameplayCueNotify_Instant(원샷 베이스) → APGameplayCueNotify_Impact(피격 전용, Surface×DefenseResult 분기) / APGameplayCueNotify_Duration(Duration GE 연동)
 -ImpactResponseDataAsset이 EPhysicalSurface × EDefenseResult별 이펙트/사운드를 매핑
 -BP 자식 클래스에서 프로퍼티만 세팅하면 코드 수정 없이 새 비주얼을 추가할 수 있는 구조
+-캐릭터 사운드 경로는 재생 주체로 나눔: 몽타주·로코모션에 묶인 소리는 AnimNotify_PlaySound (몽타주가 클라이언트에 복제되어 각자 재생), 몽타주 없는 StateTree 상태의 소리는 Execute Gameplay Cue 태스크 → Instant 큐 (StateTree AI는 서버 전용이라 사운드를 직접 재생하면 데디 서버에서 클라이언트에 들리지 않음). 이동하는 대상의 울음은 Instant 큐의 bAttachSound로 소켓에 붙여, 소유자 기준 SoundConcurrency(한 마리당 울음 1개 등)가 적용되게 함
 
 ##UI 설계
 -MasterHUDWidget이 중앙 HUD 컨테이너이며, PlayerController가 소유함

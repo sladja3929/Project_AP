@@ -79,11 +79,11 @@ CDO와 컴포넌트 템플릿은 BlueprintDefaultsTools.set_blueprint_defaults(b
 -플레이어 기준값: MaxPoise 100. 약공격 PoiseDamage는 Knight Sword 7 (콤보 3타 10), Bastard Sword 10, 차지 10~15
 -적 MaxPoise(DA_Stats): 일반몹은 약공격 1타에 무너지게 7 미만(Wolf 5). 버티는 적은 약공격 n타에 맞춰 7×n 근처로 정하고 근거를 보고
 -적 공격 PoiseDamage(DA_<Name> attackData.poiseDamage), 플레이어 Poise 가득 찬 상태 기준
-  -무너뜨리지 않음(견제·연타용): 100 미만 (Wolf Bite2 55)
-  -약한 리액션: 100~120 (Wolf Bite1·RunAttack 110)
+  -무너뜨리지 않음(견제·연타용): 100 미만 (Wolf Bite_Light 55)
+  -약한 리액션: 100~120 (Wolf Bite_Heavy·RunAttack 110)
   -중간 리액션: 120~150 (Wolf JumpAttack 135)
   -강한 리액션: 150 초과
--연속 피격 시 잔량이 이미 줄어 있으므로 같은 공격도 한 단계 강한 리액션이 날 수 있음 (예: Bite2 후 Bite1은 −65로 Heavy)
+-연속 피격 시 잔량이 이미 줄어 있으므로 같은 공격도 한 단계 강한 리액션이 날 수 있음 (예: Bite_Light 후 Bite_Heavy는 −65로 Heavy)
 -적이 받는 PoiseDamage의 일부(GroggyDamageRate)는 Stance(그로기 게이지)에도 들어가므로 MaxStance는 그로기까지 원하는 타수로 따로 정한다
 
 ###DA_AbilitySet_<Name>

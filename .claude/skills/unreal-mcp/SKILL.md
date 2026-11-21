@@ -49,6 +49,8 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 -StateTree: 편집 후 반드시 컴파일한다 (edit-statetree 스킬)
 -블렌드스페이스: SampleData(샘플 추가·이동·삭제)를 바꾸면 AnimMontageTools.resample_blend_space를 호출한다. 리플렉션 편집은 블렌드 데이터를 재계산하지 않아 새 샘플이 무시된다
 -BP·ABP 그래프: 편집 후 BlueprintTools.compile_blueprint(warnings_as_errors=True)로 경고까지 확인한다
+-사운드: AudioTools(import_sound_waves → create_sound_cue → create_sound_asset)로 만든다. 웨이브 여러 개를 넘기면 Random 노드 Cue가 된다. SoundCue 기본 VolumeMultiplier가 0.75이므로 음량을 맞춘 파일이면 1.0으로 바꾼다. 감쇠·동시 재생 제한·볼륨은 ObjectTools.set_properties로 설정한다 (Concurrency는 maxCount와 platformMaxCount.default를 함께 설정)
+-AnimNotify를 몽타주 0초에 두면 시작 프레임에서 건너뛸 수 있어 0.01초에 둔다. 몽타주의 Notifies 배열(TriggerChance 등 이벤트 필드)은 ObjectTools로 읽거나 쓸 수 없다. 사운드 빈도 조절은 SoundConcurrency의 retriggerTime으로 한다
 
 ##애님 그래프 (BlueprintTools)
 -노드 타입 ID가 에디터 언어로 현지화돼 있다. find_node_types는 한국어로 검색한다
@@ -61,6 +63,8 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 ##툴 테스트와 백업
 -툴 테스트로 실제 에셋을 바꿨으면 컴파일·저장 전에 원래 값으로 되돌린다. 실수로 저장했으면 즉시 복원하고 보고한다
 -툴 동작 확인은 임시 복제본에서 하고 끝나면 지운다
+-서로 참조하는 에셋이 든 폴더를 AssetTools.delete(폴더 경로)로 한 번에 지우지 않는다. DeleteDirectory → ForceDeleteObjects가 "사용 중" 모달 창을 띄운 뒤 에디터가 크래시했다(SoundCue + SoundWave 시험 폴더). 참조하는 쪽(Cue 등)부터 에셋 경로 단위로 하나씩 지우고 마지막에 폴더를 지운다
+-execute_tool_script 안에서 execute_tool 오류는 try/except로 잡히지 않는다. 실패를 기대하는 시험 호출은 스크립트에 섞지 말고 단독 호출로 한다 (오류 뒤 호출이 실행됐는지도 결과로 판단할 수 없으니 상태를 다시 조회한다)
 -백업은 AssetTools.duplicate로 `TEMP_` 접두사 사본을 만들고, 작업이 끝나면 사용자 확인 후 삭제한다. 이름 변경으로 백업하면 원래 경로에 리다이렉터가 남아 같은 이름으로 다시 만들 수 없다
 -검증용 임시 액터는 `TEMP_` 접두사로 배치하고 레벨은 저장하지 않는다
 

@@ -3,6 +3,7 @@
 from toolset_registry.registration import Registration
 
 from ap_toolset.toolsets import anim_montage
+from ap_toolset.toolsets import audio
 from ap_toolset.toolsets import blueprint_defaults
 from ap_toolset.toolsets import level_edit
 from ap_toolset.toolsets import retarget
@@ -12,6 +13,7 @@ from ap_toolset.toolsets import toolset_admin
 
 registration = Registration([
     anim_montage.AnimMontageTools,
+    audio.AudioTools,
     blueprint_defaults.BlueprintDefaultsTools,
     level_edit.LevelEditTools,
     retarget.RetargetTools,
