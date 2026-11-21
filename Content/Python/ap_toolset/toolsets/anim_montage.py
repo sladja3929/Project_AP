@@ -494,6 +494,59 @@ class AnimMontageTools(unreal.ToolsetDefinition):
 
     @toolset_registry.tool_call
     @staticmethod
+    def get_float_curves(
+            animation: unreal.AnimSequenceBase, curve_names: list[str], sample_count: int = 0) -> str:
+        """Returns the keys of float curves on an animation sequence or montage. Read only.
+
+        Use to find gameplay curve timing (e.g. where an "ActionRecovery" curve rises and
+        falls) before editing montage segments or notifies. Times are in the asset's own
+        time (sequence time for a sequence, montage time for a montage's own curves).
+        Keys alone do not show interpolation (a 1 -> 0 pair can be a step or a ramp), so
+        pass sample_count to also get evaluated values between keys.
+
+        Args:
+            animation: The animation sequence or montage to query.
+            curve_names: Curves to return. Pass [] to return every float curve.
+            sample_count: If > 1, also evaluate each curve at this many evenly spaced times.
+
+        Returns:
+            A JSON string: {"length": float, "curves": {name: [[time, value]]}}, plus
+            "samples": {name: [[time, value]]} when sample_count > 1.
+        """
+        existing = [str(name) for name in _anim_lib().get_animation_curve_names(
+            animation, unreal.RawCurveTrackTypes.RCT_FLOAT)]
+        requested = curve_names if curve_names else existing
+        missing = [name for name in requested if name not in existing]
+
+        if missing:
+            raise RuntimeError(f'Curves not found: {missing}. Existing float curves: {existing}')
+
+        curves = {}
+
+        for name in requested:
+            times, values = _anim_lib().get_float_keys(animation, name)
+            curves[name] = [[round(t, 4), round(v, 4)] for t, v in zip(times, values)]
+
+        length = _anim_lib().get_sequence_length(animation)
+        result = {'length': length, 'curves': curves}
+
+        if sample_count > 1:
+            samples = {}
+
+            for name in requested:
+                samples[name] = []
+
+                for index in range(sample_count):
+                    time = length * index / (sample_count - 1)
+                    value = _anim_lib().get_float_value_at_time(animation, name, time)
+                    samples[name].append([round(time, 4), round(value, 4)])
+
+            result['samples'] = samples
+
+        return json.dumps(result)
+
+    @toolset_registry.tool_call
+    @staticmethod
     def add_notify(
             animation: unreal.AnimSequenceBase, notify_class: unreal.Class,
             trigger_time: float, track_name: str = '1') -> unreal.AnimNotify:

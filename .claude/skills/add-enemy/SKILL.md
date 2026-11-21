@@ -138,6 +138,14 @@ AnimMontageTools로 만든다. 모든 몽타주는 slot_name='DefaultSlot'.
 -이동 거리만 늘리거나 줄일 때(회피·백점프 등)는 시퀀스를 다시 굽지 않고 이동 구간에 MotionWarping ANS를 추가한 뒤 AnimMontageTools.set_root_motion_modifier로 `/Script/MotionWarping.RootMotionModifier_Scale`, Scale=(X,Y 배율, Z 1)을 지정한다. 워프 타깃 불필요 (예: AM_Wolf_BackJump track '2', ×1.4)
   -이동량이 바뀌면 그 행동의 낙하 방지 검사 거리(Retreat Path Clear의 RetreatDistance 등)도 함께 맞춘다
 
+###공격 후딜 (행동 사이 idle 최소화)
+-ST ActivateAbilityTask의 EndDelay는 어빌리티가 끝난 뒤(몽타주 블렌드아웃 후)부터 세므로 그동안 ABP idle이 재생되어 어색하다. 후딜은 EndDelay 대신 몽타주 꼬리 구간을 늘려 만들고 공격 태스크의 EndDelay는 0으로 둔다 (Wolf·WoodGiant 적용)
+-AnimMontageTools.set_montage_segments로 같은 시퀀스를 [0, 분할]@1.0 + [분할, 끝]@배율로 나눈다. 노티파이·몽타주 커브는 몽타주 시간을 유지하므로 결과의 list_notifies 시간이 바뀌지 않았는지 확인
+  -분할 지점: HitDetection 등 노티파이 구간이 끝난 뒤, 본 속도(get_bone_location_info 샘플 차분)로 본 복귀 동작 시작 지점
+  -배율: 가벼운 공격 0.65~0.7 (Wolf), 무거운 공격 0.55~0.6 (WoodGiant). 0.5 아래는 슬로모션처럼 보이므로 정지에 가까운 짧은 구간(착지 직후 웅크림 등)에만 0.25 수준으로 쓴다
+-콤보 연계 몽타주: 다음 콤보는 몽타주 커브 ActionRecovery 하강(0.5 이하) 시점에 시작한다. 몽타주 커브는 몽타주 시간 기준이고 세그먼트 배율은 애니메이션 시간만 바꾸므로, 분할 지점을 하강 시점 뒤로 두면 연계 시 템포가 그대로이고 연계가 끊길 때만 꼬리가 늘어난다. 하강 시점은 AnimMontageTools.get_float_curves(sample_count 지정)로 계단/선형 보간까지 확인
+  -연계 몽타주 블렌드아웃은 짧게(0.15 이하) 두고, 자동 블렌드아웃 시작(길이 - 블렌드아웃)이 CheckCondition·ActionRecovery 하강보다 충분히 뒤에 오게 한다 (데디에서 블렌드아웃이 길면 노티파이 누락 사례)
+
 ###머리 바라보기 (선택, 요청 시)
 -ABP 부모를 EnemyAnimInstance로 (BlueprintTools.set_parent 후 compile)
 -AnimGraph: Slot → 로컬을컴포넌트로 → 본트랜스폼(변경) 목 → 본트랜스폼(변경) 머리 → 컴포넌트에서로컬로 → 출력. 변환 노드는 connect_pins가 자동으로 넣지 않으므로 직접 생성(type_id '애니메이션|스페이스변환|...')
