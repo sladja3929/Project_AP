@@ -4,9 +4,9 @@
 새 적을 추가하거나 기존 적에 행동을 넣을 때 이 규칙에 맞춰 배치한다.
 StateTree AI 전반(스키마, 인지·전투 상태 소유, 이벤트 전송)은 [ARCHITECTURE.md](ARCHITECTURE.md)의 StateTree AI 절을 따른다.
 
-## 1. 표준 분기: Chase / Engage / Melee / Turn To Target
+## 1. 표준 분기: Chase / Engage / Melee / Turn To Target / Wait
 
-`Root/Combat`은 위에서부터 차례로 고르는 방식(TrySelectChildrenInOrder)이다. 자식은 아래 네 가지 역할로만 나눈다.
+`Root/Combat`은 위에서부터 차례로 고르는 방식(TrySelectChildrenInOrder)이다. 자식은 아래 다섯 가지 역할로만 나눈다.
 
 | 분기 | 담당 | 진입 조건 | 빠져나오는 조건 |
 |---|---|---|---|
@@ -14,12 +14,22 @@ StateTree AI 전반(스키마, 인지·전투 상태 소유, 이벤트 전송)�
 | **Engage** | 근접 거리 밖에서 하는 행동 (원거리 공격·접근·견제) | `d > MeleeRange` (+ 필요하면 정면 각도) | 각 행동이 완료되거나 자체 OnTick으로 재선택 |
 | **Melee** | 근접 공격 | `d <= MeleeRange`, 정면 각도 | 공격 완료 후 재선택 |
 | **Turn To Target** | 각도가 맞지 않아 위의 어느 분기도 고를 수 없을 때의 회전 | 정면 각도 밖 | OnStateCompleted → Combat |
+| **Wait** | 위의 어느 분기도 고를 수 없을 때의 짧은 대기 (공격이 모두 쿨다운 등) | 없음 | Delay 0.3 → OnStateCompleted → Combat |
 
 - `d`는 Update Target Info Evaluator의 `DistanceToTarget`(수평 거리)이다.
 - **Chase는 항상 맨 앞에 둔다.** Engage에는 하한 조건만 있다. 상한(`d <= ChaseRange`)은 Chase가 먼저 선택되는 순서가 대신한다. Chase 앞에 다른 상태를 끼우면 Engage가 먼 거리에서도 선택된다.
 - **Engage와 Melee는 순서가 바뀌어도 된다.** 거리 조건이 겹치지 않는다(`d > MeleeRange` / `d <= MeleeRange`).
-- **Turn To Target은 맨 뒤에 둔다.** 정면이 필요한 분기가 각도 때문에 선택되지 않았을 때만 도달해야 한다. 회전 후에는 Combat을 처음부터 다시 고른다. 행동 노드 안에서 회전한 뒤 이어서 재생하지 않는 이유는 ARCHITECTURE.md의 시작 각도 항목에 있다.
+- **Turn To Target은 Wait 바로 앞에 둔다.** 정면이 필요한 분기가 각도 때문에 선택되지 않았을 때만 도달해야 한다. 회전 후에는 Combat을 처음부터 다시 고른다. 행동 노드 안에서 회전한 뒤 이어서 재생하지 않는 이유는 ARCHITECTURE.md의 시작 각도 항목에 있다.
+- **Wait는 항상 맨 끝에 둔다.** 조건이 없어 언제든 선택된다. 고를 상태가 하나도 없으면 엔진이 "Failed to select root state"로 트리를 정지시키고 다시 시작하지 않으므로, 이를 막는 안전장치다.
 - Engage의 각 행동 사용 거리(예: 점프 공격 300~700)는 그 행동 노드의 진입 조건에 직접 건다. 조건이 거짓이면 그 행동은 후보에서 빠지고 형제 중에서 다시 고른다.
+
+### 공격 쿨다운 조건
+
+- **공격(ActivateAbilityTask) 상태에는 항상 쿨다운 조건을 둔다.** 지금 쿨다운이 0이어도 넣어 공격 상태 구조를 통일한다. 나중에 DA에서 쿨다운을 주면 바로 반영된다.
+- 조건은 `HasGameplayTagsCondition`이다. Tags에는 어빌리티의 AbilityTags를 넣고 `bInvert = True`로 둔다. 쿨다운 GE가 AbilityTags를 부여하므로(UBaseAbility::ApplyCooldown) 쿨다운 동안 이 상태는 후보에서 빠진다.
+- 조건이 없으면 쿨다운 중인 공격이 선택된 뒤 어빌리티 실행이 실패하고 Combat을 다시 고른다. 가중치 선택에서는 쿨다운 중인 공격이 다른 행동의 몫을 가져가 비율이 틀어진다.
+- 링크 서브트리로 정의한 공격은 조건을 서브트리 루트에 한 번만 둔다.
+- 공격이 모두 쿨다운이면 그 분기는 선택되지 않고 Wait가 받는다.
 
 ### 무리 적 확장 (Wolf)
 
@@ -89,12 +99,12 @@ Combat
 
 | 적 | Combat 하위 구성 | 거리 파라미터 |
 |---|---|---|
-| Stickman | Chase(단일) / Engage[Strafe·Fast Approach·Approach] / Melee / Turn To Target | MeleeRange 110, ChaseRange 600, StrafeMinRange 300, StrafeDistance 600(Strafe 반경) |
-| WoodGiant | Engage[Approach To Target·Lunge: Super Jump·Ranged: Rock Throw·Gap Close[Super Jump·Rock Throw]] / Melee / Turn To Target | MeleeRange 150, SuperJumpMinRange 800 (Rock Throw도 같은 거리 사용) |
-| Wolf | Chase[Run Attack(비활성)·Approach To Target] / Attacker[Melee·Engage·Turn To Target] / Support[Hold Ring·Close In·Give Way] | MeleeRange 190, JumpAttackMinRange 300, JumpAttackMaxRange 700, HoldRingMin 700, HoldRingMax 1000, ChaseRange 1300, CombatEntryRange 1300, AlertRange 1800 |
+| Stickman | Chase(단일) / Engage[Strafe·Fast Approach·Approach] / Melee / Turn To Target / Wait | MeleeRange 110, ChaseRange 600, StrafeMinRange 300, StrafeDistance 600(Strafe 반경) |
+| WoodGiant | Engage[Approach To Target·Lunge: Super Jump·Ranged: Rock Throw·Gap Close[Super Jump·Rock Throw]] / Melee / Turn To Target / Wait | MeleeRange 150, SuperJumpMinRange 800 (Rock Throw도 같은 거리 사용) |
+| Wolf | Chase[Run Attack(비활성)·Approach To Target] / Attacker[Melee·Engage·Turn To Target] / Support[Hold Ring·Close In·Give Way] / Wait | MeleeRange 190, JumpAttackMinRange 300, JumpAttackMaxRange 700, HoldRingMin 700, HoldRingMax 1000, ChaseRange 1300, CombatEntryRange 1300, AlertRange 1800 |
 
 - **WoodGiant에는 Chase가 없다.** 근접 거리 밖은 모두 Engage가 맡는다. 그래서 Engage의 상한이 없다.
-- **WoodGiant의 첫 원거리 행동은 항상 Super Jump(개막 패턴)다.** ApproachUtility·RockThrowUtility가 0으로 시작하고, Super Jump가 끝날 때 Set Float Parameter로 JumpUtility 값을 넣는다. 그 뒤로 SuperJumpMinRange 밖에서는 Approach To Target·Super Jump·Rock Throw를 같은 비중으로 고르며, 원거리 공격은 Super Jump와 Rock Throw 중 하나가 된다.
+- **WoodGiant의 첫 원거리 행동은 항상 Super Jump(개막 패턴)다.** ApproachUtility·RockThrowUtility가 0으로 시작하고, Super Jump가 끝날 때 Set Float Parameter로 JumpUtility 값을 넣는다. Super Jump의 진입 조건은 `d > SuperJumpMinRange OR ApproachUtility <= 0`이라, 개막 전에는 거리와 상관없이(근접 거리 밖이면) Super Jump로 시작한다. 거리 조건만 두면 개막 전 중거리(MeleeRange~SuperJumpMinRange)에서 고를 행동이 없어 Wait만 반복한다. 그 뒤로 SuperJumpMinRange 밖에서는 Approach To Target·Super Jump·Rock Throw를 같은 비중으로 고르며, 원거리 공격은 Super Jump와 Rock Throw 중 하나가 된다.
 - **WoodGiant의 Gap Close는 접근 시간 초과용이다.** Approach To Target이 8초 동안 근접 거리에 닿지 못하면 지연 트랜지션(OnTick, DelayDuration 8)으로 Gap Close에 들어가 Super Jump·Rock Throw 중 하나를 거리 조건 없이 시도한다. Consideration이 없어 Engage의 일반 선택에서는 뽑히지 않는다. 쿨다운 등으로 둘 다 실패하면 Approach가 이어지고 8초 뒤 다시 시도한다.
 - **같은 행동을 두 곳에서 고를 때는 링크 서브트리를 쓴다.** WoodGiant의 Super Jump·Rock Throw는 최상위 서브트리(`Sub: Super Jump`, `Sub: Rock Throw`)에 어빌리티 실행·파라미터 기록·쿨다운 조건을 한 번만 두고, Engage와 Gap Close의 링크 상태(Linked)가 이를 불러 쓴다. 링크 상태에는 그 자리의 선택 조건(거리 조건, Consideration)과 완료 후 Combat 복귀 트랜지션만 둔다.
 - **Stickman의 StrafeDistance와 ChaseRange는 용도가 다르다.** 앞의 것은 Strafe 반경, 뒤의 것은 추격 경계다. 지금은 값이 같지만, Strafe 반경을 ChaseRange보다 크게 잡으면 Strafe 중 Chase 경계를 넘나든다.

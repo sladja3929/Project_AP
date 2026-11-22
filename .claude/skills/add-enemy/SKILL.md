@@ -107,6 +107,7 @@ CDO와 컴포넌트 템플릿은 BlueprintDefaultsTools.set_blueprint_defaults(b
   -구조 파악은 StateTreeEditTools.describe_state_tree (스테이트 경로, 태스크/컨디션/트랜지션과 ID 출력)
   -ActivateAbilityTask: StateTreeEditTools.set_node_property(state_path, node_id, "AbilityToActivate", "/Game/.../BP_X.BP_X_C"). 노드 ID가 유지되어 프로퍼티 바인딩이 보존된다
   -여러 공격을 쓰려면 공격 상태를 늘리는 대신 기존 ST 구조를 먼저 확인하고 사용자에게 구성 방식을 확인한다
+  -공격(ActivateAbilityTask) 상태에는 쿨다운이 0이어도 반드시 쿨다운 조건을 둔다. 바꾼 어빌리티의 AbilityTags와 조건 태그가 일치하는지 확인한다 (규칙: docs/STATETREE_COMBAT_LAYOUT.md 공격 쿨다운 조건)
   -구조 변경(스테이트·노드·트랜지션 추가/복사), 프로퍼티 바인딩, 전역 파라미터는 edit-statetree 스킬 절차를 따른다. 새 노드의 바인딩은 사용자에게 넘기지 않고 직접 설정한다
 -**반드시 StateTreeCompileTools.compile_state_tree(save=true) 실행**
   -에디터 데이터만 바꾸면 런타임 컴파일 데이터는 레퍼런스 적 스키마 그대로라 AI가 동작하지 않는다

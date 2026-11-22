@@ -179,6 +179,7 @@ private:
 #StateTree 주의사항
 -Property Binding은 Context Actor의 서브오브젝트(컴포넌트) 프로퍼티만 노출함. 액터 직속 UPROPERTY 멤버는 노출 안 됨
 -태그 기반 Condition은 노드 선택 시점에만 평가됨. 글로벌 전환이 필요하면 Root 레벨 On Event Transition 사용
+-공격(ActivateAbilityTask) 상태에는 쿨다운이 0이어도 항상 쿨다운 조건(HasGameplayTagsCondition, 어빌리티 AbilityTags, bInvert)을 두고, Combat 맨 끝에는 Wait 상태를 둠 (docs/STATETREE_COMBAT_LAYOUT.md)
 
 #응답 원칙
 -질문에서 AP 접두사를 사용하면 보통 ActionPractice를 줄여서 부르는 것으로 해석할 것
