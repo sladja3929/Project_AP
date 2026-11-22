@@ -10,6 +10,7 @@ from ap_toolset.toolsets import retarget
 from ap_toolset.toolsets import state_tree_compile
 from ap_toolset.toolsets import state_tree_edit
 from ap_toolset.toolsets import toolset_admin
+from ap_toolset.toolsets import ui_assets
 
 registration = Registration([
     anim_montage.AnimMontageTools,
@@ -20,4 +21,5 @@ registration = Registration([
     state_tree_compile.StateTreeCompileTools,
     state_tree_edit.StateTreeEditTools,
     toolset_admin.ProjectToolsetAdminTools,
+    ui_assets.UIAssetTools,
 ])

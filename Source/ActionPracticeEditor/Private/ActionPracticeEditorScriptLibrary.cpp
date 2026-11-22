@@ -7,6 +7,11 @@
 #include "Animation/AnimMontage.h"
 #include "Animation/BlendSpace.h"
 #include "Animation/Skeleton.h"
+#include "Engine/Font.h"
+#include "Engine/FontFace.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Misc/PackageName.h"
+#include "UObject/Package.h"
 
 #define ENABLE_DEBUG_LOG 1
 
@@ -373,5 +378,118 @@ FString UActionPracticeEditorScriptLibrary::AddNamedVirtualBone(USkeleton* Skele
 
 	Skeleton->MarkPackageDirty();
 	DEBUG_LOG(TEXT("AddNamedVirtualBone: %s (%s -> %s)"), *VirtualBoneName.ToString(), *SourceBoneName.ToString(), *TargetBoneName.ToString());
+	return FString();
+}
+
+FString UActionPracticeEditorScriptLibrary::CreateFontFromFaces(const FString& FontAssetPath, const TArray<FName>& TypefaceNames, const TArray<UFontFace*>& FontFaces)
+{
+	if (TypefaceNames.IsEmpty() || TypefaceNames.Num() != FontFaces.Num())
+	{
+		return TEXT("TypefaceNames and FontFaces must be non-empty and have the same length");
+	}
+
+	//쓰기 전에 입력 검사를 끝내 일부만 바뀐 에셋이 남지 않게 함
+	TSet<FName> UniqueNames;
+
+	for (int32 Index = 0; Index < TypefaceNames.Num(); ++Index)
+	{
+		if (TypefaceNames[Index].IsNone())
+		{
+			return FString::Printf(TEXT("TypefaceNames[%d] is None"), Index);
+		}
+
+		if (!FontFaces[Index])
+		{
+			return FString::Printf(TEXT("FontFaces[%d] is null"), Index);
+		}
+
+		bool bAlreadyInSet = false;
+		UniqueNames.Add(TypefaceNames[Index], &bAlreadyInSet);
+
+		if (bAlreadyInSet)
+		{
+			return FString::Printf(TEXT("Duplicate typeface name: %s"), *TypefaceNames[Index].ToString());
+		}
+	}
+
+	//'/Game/X/F_Name' 또는 '/Game/X/F_Name.F_Name' 모두 허용
+	FString PackageName;
+	FString ObjectName;
+
+	if (!FontAssetPath.Split(TEXT("."), &PackageName, &ObjectName))
+	{
+		PackageName = FontAssetPath;
+	}
+
+	FText InvalidReason;
+
+	if (!FPackageName::IsValidLongPackageName(PackageName, false, &InvalidReason))
+	{
+		return FString::Printf(TEXT("Invalid FontAssetPath '%s': %s"), *FontAssetPath, *InvalidReason.ToString());
+	}
+
+	const FString AssetName = FPackageName::GetShortName(PackageName);
+	const FString ObjectPath = PackageName + TEXT(".") + AssetName;
+
+	UFont* Font = LoadObject<UFont>(nullptr, *ObjectPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	const bool bCreated = Font == nullptr;
+
+	if (bCreated)
+	{
+		if (FPackageName::DoesPackageExist(PackageName))
+		{
+			return FString::Printf(TEXT("An asset that is not a UFont already exists at %s"), *PackageName);
+		}
+
+		UPackage* Package = CreatePackage(*PackageName);
+		Font = NewObject<UFont>(Package, *AssetName, RF_Public | RF_Standalone | RF_Transactional);
+
+		if (!Font)
+		{
+			return FString::Printf(TEXT("Failed to create UFont at %s"), *ObjectPath);
+		}
+	}
+
+	Font->Modify();
+	Font->FontCacheType = EFontCacheType::Runtime;
+
+	//타입페이스 목록 통째로 교체 (재실행해도 같은 결과)
+	FTypeface& Typeface = Font->GetMutableInternalCompositeFont().DefaultTypeface;
+	Typeface.Fonts.Reset();
+
+	for (int32 Index = 0; Index < TypefaceNames.Num(); ++Index)
+	{
+		FTypefaceEntry& Entry = Typeface.Fonts.AddDefaulted_GetRef();
+		Entry.Name = TypefaceNames[Index];
+		Entry.Font = FFontData(FontFaces[Index]);
+	}
+
+	//폰트 캐시 갱신
+	Font->PostEditChange();
+
+	if (bCreated)
+	{
+		FAssetRegistryModule::AssetCreated(Font);
+	}
+
+	Font->MarkPackageDirty();
+
+	//적용 결과 재검증
+	const TArray<FTypefaceEntry>& AppliedFonts = Font->GetInternalCompositeFont().DefaultTypeface.Fonts;
+
+	if (AppliedFonts.Num() != TypefaceNames.Num())
+	{
+		return FString::Printf(TEXT("Verification failed: %d typefaces applied, expected %d"), AppliedFonts.Num(), TypefaceNames.Num());
+	}
+
+	for (int32 Index = 0; Index < AppliedFonts.Num(); ++Index)
+	{
+		if (AppliedFonts[Index].Name != TypefaceNames[Index] || AppliedFonts[Index].Font.GetFontFaceAsset() != FontFaces[Index])
+		{
+			return FString::Printf(TEXT("Verification failed at typeface %d (%s)"), Index, *TypefaceNames[Index].ToString());
+		}
+	}
+
+	DEBUG_LOG(TEXT("CreateFontFromFaces: %s (%s, %d typefaces)"), *ObjectPath, bCreated ? TEXT("Created") : TEXT("Updated"), AppliedFonts.Num());
 	return FString();
 }

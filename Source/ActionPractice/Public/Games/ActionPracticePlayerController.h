@@ -192,6 +192,12 @@ protected:
 	// ===== Pause Menu =====
 	void OnPauseInput();
 
+	//일시정지 메뉴의 계속하기 버튼 — ESC 토글과 같은 경로로 닫고 입력 모드 복원
+	void HandlePauseMenuResumeRequested();
+
+	//메뉴 표시 상태에 맞춰 커서·입력 모드 적용
+	void ApplyPauseMenuInputMode();
+
 	// ===== Debug =====
 	//"6" 키: 보스룸(ABossArena)에 가장 가까운 Bonfire로 이동 (Shipping 빌드에서는 바인딩·동작 안 함)
 	void OnDebugTeleportToBossBonfire();

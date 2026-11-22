@@ -9,6 +9,7 @@ class UAnimMontage;
 class UAnimSequenceBase;
 class UBlendSpace;
 class USkeleton;
+class UFontFace;
 
 //에디터 Python/MCP 툴세트에서 호출하기 위한 스크립트 노출 함수 모음
 //엔진이 C++로만 제공하는 에디터 기능을 BlueprintCallable로 감싸 unreal.ActionPracticeEditorScriptLibrary로 노출
@@ -61,6 +62,12 @@ public:
 	//이름은 "VB " 접두사 필수. 같은 이름·소스·타깃이 이미 있으면 성공 처리. 실패 시 에러 메시지 반환, 성공 시 빈 문자열
 	UFUNCTION(BlueprintCallable, Category = "ActionPractice|Editor|Animation")
 	static FString AddNamedVirtualBone(USkeleton* Skeleton, FName SourceBoneName, FName TargetBoneName, FName VirtualBoneName);
+
+	//FontFace 에셋들을 기본 타입페이스로 묶은 런타임 폰트(UFont) 에셋 생성·갱신
+	//FTypefaceEntry·FFontData 필드는 스크립트에 노출되지 않아 C++로 감쌈. 두 배열은 같은 인덱스끼리 한 타입페이스
+	//같은 경로에 UFont가 있으면 타입페이스 목록을 교체. 저장은 하지 않음. 실패 시 에러 메시지 반환, 성공 시 빈 문자열
+	UFUNCTION(BlueprintCallable, Category = "ActionPractice|Editor|UI")
+	static FString CreateFontFromFaces(const FString& FontAssetPath, const TArray<FName>& TypefaceNames, const TArray<UFontFace*>& FontFaces);
 
 #pragma endregion
 

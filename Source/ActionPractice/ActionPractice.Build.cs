@@ -24,6 +24,7 @@ public class ActionPractice : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
+			"SlateCore",
 			"NetCore",
 			"Niagara",
 			"PhysicsCore",

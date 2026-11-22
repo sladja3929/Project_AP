@@ -26,6 +26,7 @@ public class ActionPracticeEditor : ModuleRules
 			"PropertyBindingUtils",
 			"ApplicationCore",
 			"Landscape",
+			"AssetRegistry",
 		});
 
 		PublicIncludePaths.AddRange(new string[]

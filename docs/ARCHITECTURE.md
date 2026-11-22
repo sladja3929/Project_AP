@@ -47,6 +47,10 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -3개 레이어(BaseLayer, WorldEventLayer, ModalLayer)로 위젯을 z-order 분리함
 -위젯은 Character가 아닌 PlayerController가 관리하는 것이 원칙 (관심사 분리)
 -타이틀 화면은 별도 GameMode/PlayerController 조합으로 분리됨
+-메뉴 버튼은 공용 UMenuButtonWidget(WBP_MenuButton)으로 통일: 폭·폰트·호버 연출은 WBP_MenuButton 한 곳에서 관리하고, 각 메뉴는 LabelText만 지정하며 OnMenuButtonClicked에 바인딩
+-조작법(UControlsWidget)은 타이틀·일시정지 메뉴가 각자의 ControlsOverlay에 생성해 재사용. 닫기 버튼·ESC로 닫히고 OnControlsClosed로 소유 메뉴가 숨겨 둔 메뉴 버튼을 복원
+-일시정지 메뉴는 게임을 멈추지 않음(SetPause 미사용). 계속하기 버튼은 OnResumeRequested → PlayerController가 ESC 토글과 같은 경로로 메뉴를 닫고 커서·입력 모드를 복원
+-메뉴 폰트는 F_Serif(Noto Serif KR: 제목·메뉴)·F_Sans(Noto Sans KR: 본문·키캡), OFL 라이선스 원문은 Content/UI/Fonts에 동봉
 
 ##상호작용 설계
 -IInteractable 인터페이스 기반, InteractionComponent가 감지/실행을 담당

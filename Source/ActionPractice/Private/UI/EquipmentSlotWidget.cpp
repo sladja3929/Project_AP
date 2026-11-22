@@ -55,6 +55,9 @@ void UEquipmentSlotWidget::NativeDestruct()
 	}
 	PendingIconRequests.Empty();
 
+	//진행 중이던 연출은 기본 포즈로 정리 (위젯 재사용 대비)
+	FinishAllSwitchAnims();
+
 	Super::NativeDestruct();
 }
 
@@ -73,6 +76,10 @@ void UEquipmentSlotWidget::SetDataSources(UWeaponManagerComponent* InWeaponManag
 	WeaponManager = InWeaponManager;
 	ItemManager = InItemManager;
 
+	//초기 표시는 전환이 아니므로 연출 생략 (이전 소스의 진행 중 연출도 정리)
+	FinishAllSwitchAnims();
+	bSuppressSwitchAnim = true;
+
 	if (WeaponManager)
 	{
 		WeaponManager->OnWeaponChanged.AddDynamic(this, &UEquipmentSlotWidget::RefreshWeaponSlot);
@@ -85,6 +92,8 @@ void UEquipmentSlotWidget::SetDataSources(UWeaponManagerComponent* InWeaponManag
 		ItemManager->OnEquippedItemChanged.AddDynamic(this, &UEquipmentSlotWidget::RefreshItemSlot);
 		RefreshItemSlot();
 	}
+
+	bSuppressSwitchAnim = false;
 }
 
 void UEquipmentSlotWidget::RefreshWeaponSlot(bool bIsLeftHand)
@@ -92,19 +101,20 @@ void UEquipmentSlotWidget::RefreshWeaponSlot(bool bIsLeftHand)
 	if (!WeaponManager) return;
 	DEBUG_LOG(TEXT("RefreshWeaponSlot: WeaponChanged Broadcasted, IsLeft=%d"), bIsLeftHand);
 	
-	if (bIsLeftHand)
+	AWeapon* ChangedWeapon = bIsLeftHand ? WeaponManager->GetLeftWeapon() : WeaponManager->GetRightWeapon();
+	const UBaseItemDataAsset* NewDA = ChangedWeapon ? ChangedWeapon->GetWeaponData() : nullptr;
+	UImage* TargetIcon = bIsLeftHand ? LeftWeaponIcon : RightWeaponIcon;
+	TWeakObjectPtr<const UBaseItemDataAsset>& LastDA = bIsLeftHand ? LastLeftWeaponDA : LastRightWeaponDA;
+
+	SetSlotIcon(TargetIcon, NewDA);
+
+	//무기가 실제로 바뀐 경우에만 전환 연출
+	if (!bSuppressSwitchAnim && LastDA.Get() != NewDA)
 	{
-		AWeapon* ChangedWeapon = WeaponManager->GetLeftWeapon();
-		const UBaseItemDataAsset* LeftDA = ChangedWeapon ? ChangedWeapon->GetWeaponData() : nullptr;
-		SetSlotIcon(LeftWeaponIcon, LeftDA);
+		PlaySwitchAnim(TargetIcon, SwitchAnimStartScale, FVector2D::ZeroVector);
 	}
-	
-	else
-	{
-		AWeapon* ChangedWeapon = WeaponManager->GetRightWeapon();
-		const UBaseItemDataAsset* RightDA = ChangedWeapon ? ChangedWeapon->GetWeaponData() : nullptr;
-		SetSlotIcon(RightWeaponIcon, RightDA);
-	}	
+
+	LastDA = NewDA;
 }
 
 void UEquipmentSlotWidget::RefreshItemSlot()
@@ -168,6 +178,139 @@ void UEquipmentSlotWidget::RefreshItemSlot()
 			SetSlotIcon(NextUsableItemIcon2, nullptr);
 		}
 	}
+
+	//장착 아이템이 실제로 바뀐 경우에만 전환 연출 (사용으로 수량만 줄어든 갱신은 제외)
+	const UBaseItemDataAsset* NewItemDA = CurrentSlot.ItemDA;
+
+	if (!bSuppressSwitchAnim && LastUsableItemDA.Get() != NewItemDA)
+	{
+		PlaySwitchAnim(UsableItemIcon, SwitchAnimStartScale, FVector2D::ZeroVector);
+
+		//슬롯이 비면 이름이 없으므로 이름 연출 생략
+		if (NewItemDA)
+		{
+			PlaySwitchAnim(UsableItemNameText, 1.f, FVector2D(SwitchAnimNameOffset, 0.f));
+		}
+
+		PlaySwitchAnim(NextUsableItemIcon1, 0.85f, FVector2D::ZeroVector);
+		PlaySwitchAnim(NextUsableItemIcon2, 0.85f, FVector2D::ZeroVector);
+	}
+
+	LastUsableItemDA = NewItemDA;
+}
+
+void UEquipmentSlotWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	if (ActiveSwitchAnims.Num() > 0)
+	{
+		TickSwitchAnims(InDeltaTime);
+	}
+}
+
+void UEquipmentSlotWidget::PlaySwitchAnim(UWidget* Target, float StartScale, const FVector2D& StartOffset)
+{
+	if (!Target) return;
+
+	FSwitchAnim* Existing = ActiveSwitchAnims.FindByPredicate([Target](const FSwitchAnim& Anim) { return Anim.Target.Get() == Target; });
+
+	//진행 중 재시작이면 기존 기본 포즈 유지 (진행 도중 값이 기본값으로 저장되지 않도록)
+	if (!Existing)
+	{
+		FSwitchAnim& NewAnim = ActiveSwitchAnims.AddDefaulted_GetRef();
+		NewAnim.Target = Target;
+		NewAnim.BaseOpacity = Target->GetRenderOpacity();
+		NewAnim.BaseTransform = Target->GetRenderTransform();
+		Existing = &NewAnim;
+	}
+
+	FSwitchAnim& Anim = *Existing;
+	Anim.Elapsed = 0.f;
+	Anim.StartScale = StartScale;
+	Anim.StartOffset = StartOffset;
+
+	//SetSlotIcon이 비동기 로드를 걸어 둔 이미지면 로드 완료까지 시작 포즈로 대기
+	UImage* TargetImage = Cast<UImage>(Target);
+	Anim.bWaitingForIcon = TargetImage && PendingIconRequests.Contains(TargetImage);
+	Anim.WaitElapsed = 0.f;
+
+	ApplySwitchAnimPose(Target, Anim, 0.f);
+}
+
+void UEquipmentSlotWidget::ReleaseSwitchAnimWait(UWidget* Target)
+{
+	FSwitchAnim* Anim = ActiveSwitchAnims.FindByPredicate([Target](const FSwitchAnim& Item) { return Item.Target.Get() == Target; });
+
+	if (Anim)
+	{
+		Anim->bWaitingForIcon = false;
+	}
+}
+
+void UEquipmentSlotWidget::FinishAllSwitchAnims()
+{
+	for (const FSwitchAnim& Anim : ActiveSwitchAnims)
+	{
+		if (UWidget* Target = Anim.Target.Get())
+		{
+			ApplySwitchAnimPose(Target, Anim, 1.f);
+		}
+	}
+
+	ActiveSwitchAnims.Empty();
+}
+
+void UEquipmentSlotWidget::TickSwitchAnims(float DeltaTime)
+{
+	const float Duration = FMath::Max(SwitchAnimDuration, KINDA_SMALL_NUMBER);
+
+	for (int32 Index = ActiveSwitchAnims.Num() - 1; Index >= 0; --Index)
+	{
+		FSwitchAnim& Anim = ActiveSwitchAnims[Index];
+		UWidget* Target = Anim.Target.Get();
+
+		if (!Target)
+		{
+			ActiveSwitchAnims.RemoveAtSwap(Index);
+			continue;
+		}
+
+		//아이콘 로드 대기 중에는 시작 포즈 유지 (상한 초과 시 그대로 진행)
+		if (Anim.bWaitingForIcon)
+		{
+			Anim.WaitElapsed += DeltaTime;
+
+			if (Anim.WaitElapsed < MaxIconWaitTime)
+			{
+				continue;
+			}
+
+			Anim.bWaitingForIcon = false;
+		}
+
+		Anim.Elapsed += DeltaTime;
+		const float Linear = FMath::Clamp(Anim.Elapsed / Duration, 0.f, 1.f);
+
+		//EaseOutCubic — 빠르게 커졌다가 부드럽게 멈춤
+		const float Alpha = 1.f - FMath::Cube(1.f - Linear);
+		ApplySwitchAnimPose(Target, Anim, Alpha);
+
+		if (Linear >= 1.f)
+		{
+			ActiveSwitchAnims.RemoveAtSwap(Index);
+		}
+	}
+}
+
+void UEquipmentSlotWidget::ApplySwitchAnimPose(UWidget* Target, const FSwitchAnim& Anim, float Alpha)
+{
+	//디자이너 기본 포즈 위에 연출을 얹어 끝나면 기본 포즈로 복귀
+	FWidgetTransform Transform = Anim.BaseTransform;
+	Transform.Translation = Anim.BaseTransform.Translation + Anim.StartOffset * (1.f - Alpha);
+	Transform.Scale = Anim.BaseTransform.Scale * FMath::Lerp(Anim.StartScale, 1.f, Alpha);
+	Target->SetRenderTransform(Transform);
+	Target->SetRenderOpacity(Anim.BaseOpacity * Alpha);
 }
 
 void UEquipmentSlotWidget::SetSlotIcon(UImage* TargetImage, const UBaseItemDataAsset* ItemDA)
@@ -250,6 +393,9 @@ void UEquipmentSlotWidget::SetSlotIcon(UImage* TargetImage, const UBaseItemDataA
 
 			//반영 완료 — 브러시(UImage UPROPERTY)가 텍스처 참조를 유지하므로 핸들 해제 안전
 			StrongThis->PendingIconRequests.Remove(Image);
+
+			//실제 아이콘이 들어온 시점에 전환 연출 시작
+			StrongThis->ReleaseSwitchAnimWait(Image);
 		}),
 		FStreamableManager::DefaultAsyncLoadPriority);
 

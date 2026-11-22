@@ -70,6 +70,15 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 -C++ AnimInstance 변수의 getter는 `Variables|<카테고리, 공백 제거>|Get<이름>`으로 만든다
 -스테이트 머신 내부 서브그래프에서는 find_node_types가 실패한다(AnimStateNode → Blueprint 캐스트 오류). 최상위 AnimGraph에서는 동작한다
 
+##UMG 위젯 (UMGToolSet)
+-C++ BindWidget 타입을 바꾸면(예: UButton → UMenuButtonWidget) 에디터 시작 시 기존 WBP 컴파일에서 "generated variable ... failed to find a property" ensure가 난다. WBP의 해당 위젯을 새 타입으로 교체하면 해소된다
+-같은 이름으로 위젯을 다시 만들 때는 기존 위젯을 RenameWidget(Legacy_ 접두사)으로 먼저 바꾼 뒤 RemoveWidget한다 (이름 충돌 방지)
+-다른 WBP(WBP_MenuButton 등)는 AddWidget의 widgetClass에 `/Game/UI/WBP_X.WBP_X_C`로 넣고, 인스턴스 프로퍼티(LabelText 등)는 ObjectTools.set_properties로 위젯 템플릿에 설정한다
+-폰트·브러시처럼 큰 구조체는 get_properties로 읽은 값을 고쳐 통째로 다시 쓴다. 텍스트는 일반 문자열로 넣어도 된다
+-WBP 위젯 템플릿 편집은 BP 기본값 규칙 대상이 아니다. WBP CDO 값(ControlsWidgetClass 등)은 set_blueprint_defaults로 바꾼다
+-폰트: ap_toolset UIAssetTools.import_font_faces(.ttf/.otf → FontFace) → create_font(타입페이스 이름·FontFace 목록 → 런타임 Font). 엔진 자동 임포트는 Font 에셋을 만들지 않는다. UMG에서는 Font + TypefaceFontName으로 지정
+-UI 그라데이션은 Custom 노드 1개 + VertexColor(위젯 ColorAndOpacity가 정점 색으로 들어옴) 머티리얼로 만든다 (M_UI_FadeBand: 가로 페이드 띠·구분선, M_UI_Vignette: 화면 비네트)
+
 ##툴 테스트와 백업
 -툴 테스트로 실제 에셋을 바꿨으면 컴파일·저장 전에 원래 값으로 되돌린다. 실수로 저장했으면 즉시 복원하고 보고한다
 -툴 동작 확인은 임시 복제본에서 하고 끝나면 지운다
@@ -87,6 +96,9 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 ##캡처
 -EditorAppToolset.CaptureEditorImage / CaptureViewport 결과는 커서 파일로 저장된다. base64를 디코드해 scratchpad나 collab/에 이미지로 저장한 뒤 확인한다
 -CaptureViewport는 annotations 인자가 필수다 (축소 보기 스크립트는 create-map 스킬 scripts/view.ps1)
+  -captureTransform도 스키마상 필수다. PIE 중에도 PIE 화면이 아닌 에디터 월드를 렌더해 PlayerStart·Bonfire 아이콘, 볼륨 와이어, 라이트 방향선, 좌하단 축 기즈모가 찍힌다
+  -깨끗한 장면 이미지(타이틀 배경 등)가 필요하면 아이콘 액터가 없는 방향으로 구도를 잡고, 가장자리(축 기즈모)를 비율 유지로 잘라낸다 (원본 2350×1226 → 16:9 크롭)
+-UMG 화면(PIE 중 위젯) 확인은 CaptureEditorImage로 한다. 에디터 창 전체가 약 1280×700으로 축소되어 세부 확인에는 한계가 있다
 
 ##ap_toolset 툴 추가·수정
 -Python 수정은 ProjectToolsetAdminTools.reload_project_toolsets로 반영한다. 새 툴세트 클래스는 `toolsets/__init__.py` 등록 목록에 추가한 뒤 리로드하면 등록된다

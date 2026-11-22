@@ -19,6 +19,7 @@
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "UI/MasterHUDWidget.h"
 #include "UI/DeathScreenWidget.h"
+#include "UI/PauseMenuWidget.h"
 #include "Characters/BossCharacter.h"
 #include "GAS/AttributeSet/EnemyAttributeSet.h"
 #include "GAS/AttributeSet/ActionPracticeAttributeSet.h"
@@ -435,6 +436,13 @@ void AActionPracticePlayerController::InitializeMasterHUD()
 		MasterHUDWidget->AddToViewport();
 		//AddToViewport 이후 호출 — UMG 초기화 완료 후 자식 위젯 생성
 		MasterHUDWidget->CreateChildWidgets();
+
+		//계속하기 버튼도 ESC 토글과 같은 입력 모드 복원 경로를 거치도록 PC가 처리
+		if (UPauseMenuWidget* PauseMenu = MasterHUDWidget->GetPauseMenuWidget())
+		{
+			PauseMenu->OnResumeRequested.AddUObject(this, &AActionPracticePlayerController::HandlePauseMenuResumeRequested);
+		}
+
 		DEBUG_LOG(TEXT("MasterHUDWidget created and added to viewport"));
 	}
 }
@@ -634,6 +642,21 @@ void AActionPracticePlayerController::OnPauseInput()
 	if (!MasterHUDWidget) return;
 
 	MasterHUDWidget->TogglePauseMenu();
+	ApplyPauseMenuInputMode();
+}
+
+void AActionPracticePlayerController::HandlePauseMenuResumeRequested()
+{
+	if (!IsLocalController()) return;
+	if (!MasterHUDWidget) return;
+
+	MasterHUDWidget->HidePauseMenu();
+	ApplyPauseMenuInputMode();
+}
+
+void AActionPracticePlayerController::ApplyPauseMenuInputMode()
+{
+	if (!MasterHUDWidget) return;
 
 	if (MasterHUDWidget->IsPauseMenuVisible())
 	{
