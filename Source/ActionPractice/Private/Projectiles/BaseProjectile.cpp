@@ -287,6 +287,14 @@ void ABaseProjectile::MulticastPlayImpactEffect_Implementation(FVector_NetQuanti
 	Request.Location = Location;
 	Request.Normal = Normal;
 	EffectManager->SpawnEnvironmentImpact(Request);
+
+	for (const FEnvironmentImpactRequest& Additional : AdditionalImpactEffects)
+	{
+		FEnvironmentImpactRequest AdditionalRequest = Additional;
+		AdditionalRequest.Location = Location;
+		AdditionalRequest.Normal = Normal;
+		EffectManager->SpawnEnvironmentImpact(AdditionalRequest);
+	}
 }
 
 #pragma endregion

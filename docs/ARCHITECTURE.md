@@ -33,7 +33,7 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -적 공격 데이터는 EnemyDataAsset의 FEnemyTaggedAttackData에서 관리됨
 -히트 판정은 IHitDetectionInterface 전략(AttackTrace 소켓 스윕 / CapsuleOverlap / 투사체 스윕)과 IHitDetectionUser(판정 결과로 GE 적용)로 나뉨. 근접 공격은 어빌리티가 User지만, 투사체는 투사체 자신(ABaseProjectile)이 User라서 발사 후 어빌리티가 끝나거나 취소돼도 판정·데미지가 유지됨
 -투사체 공격은 EComboAttackType::Projectile + FEnemyProjectileConfig + UEnemyProjectileAbility(EnemyAttackAbility 상속)로 구성. 몽타주의 Projectile Event 노티파이(Spawn → Grab → Launch)로 생성·부착·발사하며, 진행 단계(EProjectilePhase)는 복제되어 투사체 BP의 OnProjectilePhaseChanged에서 소유자별 등장 연출을 붙임 (공용 코드에 적 전용 연출을 넣지 않음)
--ABaseProjectile(플레이어/적 공용)은 공격 데이터 출처(ResolveAttackData)와 아군 판정(IsFriendlyActor)만 자식(AEnemyProjectile 등)에 맡김. 서버가 판정·착탄을 처리하고 착탄 연출은 EffectManagerSubsystem 멀티캐스트. 회피 무적(State.Invincible) 대상은 통과. 메시는 MeshPivot(메시 기하 중심) 아래에 붙어 있어 BP에서 회전·스케일은 MeshPivot으로 조정
+-ABaseProjectile(플레이어/적 공용)은 공격 데이터 출처(ResolveAttackData)와 아군 판정(IsFriendlyActor)만 자식(AEnemyProjectile 등)에 맡김. 서버가 판정·착탄을 처리하고 착탄 연출은 EffectManagerSubsystem 멀티캐스트 (ImpactEffect 1개 + 같은 위치·법선으로 겹쳐 띄우는 AdditionalImpactEffects 레이어). 회피 무적(State.Invincible) 대상은 통과. 메시는 MeshPivot(메시 기하 중심) 아래에 붙어 있어 BP에서 회전·스케일은 MeshPivot으로 조정
 
 ##GameplayCue 설계
 -3단 계층: APGameplayCueNotify_Instant(원샷 베이스) → APGameplayCueNotify_Impact(피격 전용, Surface×DefenseResult 분기) / APGameplayCueNotify_Duration(Duration GE 연동)

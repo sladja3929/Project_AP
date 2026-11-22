@@ -53,6 +53,15 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 -사운드: AudioTools(import_sound_waves → create_sound_cue → create_sound_asset)로 만든다. 웨이브 여러 개를 넘기면 Random 노드 Cue가 된다. SoundCue 기본 VolumeMultiplier가 0.75이므로 음량을 맞춘 파일이면 1.0으로 바꾼다. 감쇠·동시 재생 제한·볼륨은 ObjectTools.set_properties로 설정한다 (Concurrency는 maxCount와 platformMaxCount.default를 함께 설정)
 -AnimNotify를 몽타주 0초에 두면 시작 프레임에서 건너뛸 수 있어 0.01초에 둔다. 몽타주의 Notifies 배열(TriggerChance 등 이벤트 필드)은 ObjectTools로 읽거나 쓸 수 없다. 사운드 빈도 조절은 SoundConcurrency의 retriggerTime으로 한다
 
+##나이아가라 (NiagaraToolset_System)
+-마켓 팩 이펙트는 쇼케이스용으로 EmitterState Loop Behavior가 Infinite인 경우가 많다. 원샷으로 스폰하면 주기마다 다시 터지고 사라지지 않으므로 복제본에서 Once로 바꾼다
+-이미터가 월드 스페이스(bLocalSpace false)면 스폰 Scale은 위치 셰이프 오프셋에만 먹고 스프라이트 크기·속도는 안 커진다. 크기는 에셋 값으로 조절한다
+-scriptName은 ENiagaraScriptUsage 이름(EmitterUpdateScript, ParticleSpawnScript, ParticleUpdateScript)이다. SpawnBurst_Instantaneous는 EmitterUpdateScript에 있다
+-같은 시스템 안의 이미터를 템플릿으로 AddEmitter할 수 있다. templateEmitter 경로는 `<시스템>:<이미터이름>_N` 형태의 내부 객체 이름이며(예: `NS_X.NS_X:Shockwave_2`), 표시 이름만으로는 거부된다. uasset 문자열에서 후보를 찾는다
+-AddModule은 moduleLocationRef로 지정한 모듈 **뒤에** 넣는다. Drag 등 힘 모듈은 SolveForcesAndVelocity보다 앞이어야 하므로, Solve를 지우고 힘 모듈 뒤에 다시 추가해 순서를 맞춘다
+-다이내믹 입력 안쪽 값은 inputNameStack에 체인을 넣어 설정한다 (예: ['Scale Alpha', 'Scale Curve'], ['Scale RGB', 'Color']). 커브 DI는 DataInterface propertyValues JSON의 Curve.keys로 쓴다
+-다른 시스템과 공유하는 머티리얼(MI)은 바꾸지 말고 색·알파는 이미터의 ScaleColor·InitializeParticle Color로 조절한다
+
 ##애님 그래프 (BlueprintTools)
 -노드 타입 ID가 에디터 언어로 현지화돼 있다. find_node_types는 한국어로 검색한다
   -예: `Animation|SkeletalControls|스트라이드워핑`, `Animation|SkeletalControls|다리IK`, `애니메이션|스페이스변환|로컬을컴포넌트로`, `애니메이션|스페이스변환|컴포넌트에서로컬로`

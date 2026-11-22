@@ -123,6 +123,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Projectile")
 	FEnvironmentImpactRequest ImpactEffect;
 
+	//ImpactEffect와 같은 착탄 위치·법선으로 함께 스폰할 추가 연출 레이어 (먼지 등). 사운드·카메라 쉐이크는 보통 ImpactEffect에만 둠
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Projectile")
+	TArray<FEnvironmentImpactRequest> AdditionalImpactEffects;
+
 	//===== 히트 판정 =====
 	UPROPERTY()
 	FHitDetectionSetter HitDetectionSetter;
