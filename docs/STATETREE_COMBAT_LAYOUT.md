@@ -95,7 +95,8 @@ Combat
 
 - **WoodGiant에는 Chase가 없다.** 근접 거리 밖은 모두 Engage가 맡는다. 그래서 Engage의 상한이 없다.
 - **WoodGiant의 첫 원거리 행동은 항상 Super Jump(개막 패턴)다.** ApproachUtility·RockThrowUtility가 0으로 시작하고, Super Jump가 끝날 때 Set Float Parameter로 JumpUtility 값을 넣는다. 그 뒤로 SuperJumpMinRange 밖에서는 Approach To Target·Super Jump·Rock Throw를 같은 비중으로 고르며, 원거리 공격은 Super Jump와 Rock Throw 중 하나가 된다.
-- **WoodGiant의 Gap Close는 접근 시간 초과용이다.** Approach To Target이 4초 동안 근접 거리에 닿지 못하면 지연 트랜지션(OnTick, DelayDuration 4)으로 Gap Close에 들어가 Super Jump·Rock Throw 중 하나를 거리 조건 없이 시도한다. Consideration이 없어 Engage의 일반 선택에서는 뽑히지 않는다. 쿨다운 등으로 둘 다 실패하면 Approach가 이어지고 4초 뒤 다시 시도한다.
+- **WoodGiant의 Gap Close는 접근 시간 초과용이다.** Approach To Target이 8초 동안 근접 거리에 닿지 못하면 지연 트랜지션(OnTick, DelayDuration 8)으로 Gap Close에 들어가 Super Jump·Rock Throw 중 하나를 거리 조건 없이 시도한다. Consideration이 없어 Engage의 일반 선택에서는 뽑히지 않는다. 쿨다운 등으로 둘 다 실패하면 Approach가 이어지고 8초 뒤 다시 시도한다.
+- **같은 행동을 두 곳에서 고를 때는 링크 서브트리를 쓴다.** WoodGiant의 Super Jump·Rock Throw는 최상위 서브트리(`Sub: Super Jump`, `Sub: Rock Throw`)에 어빌리티 실행·파라미터 기록·쿨다운 조건을 한 번만 두고, Engage와 Gap Close의 링크 상태(Linked)가 이를 불러 쓴다. 링크 상태에는 그 자리의 선택 조건(거리 조건, Consideration)과 완료 후 Combat 복귀 트랜지션만 둔다.
 - **Stickman의 StrafeDistance와 ChaseRange는 용도가 다르다.** 앞의 것은 Strafe 반경, 뒤의 것은 추격 경계다. 지금은 값이 같지만, Strafe 반경을 ChaseRange보다 크게 잡으면 Strafe 중 Chase 경계를 넘나든다.
 
 ## 5. 디버깅

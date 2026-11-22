@@ -25,6 +25,11 @@ StateTree AI 설계(스키마, ASC 컨텍스트, 이벤트 전송)는 docs/ARCHI
   -노드 ID는 새로 발급되고, 복사 범위 내부의 트랜지션·바인딩은 새 ID로 다시 연결된다
   -복사 범위 밖을 가리키는 GotoState 트랜지션은 set_transition_target으로 재지정한다
   -같은 설정의 노드가 이미 있으면 새로 add_node 하기보다 copy_node_from이 값까지 가져와 빠르다
+-같은 행동을 여러 곳에서 고르면 상태를 복사하지 말고 링크 서브트리로 한 번만 정의한다 (예: ST_WoodGiant의 Sub: Super Jump)
+  -기존 행동 상태를 copy_state_from(target_parent_path="")으로 최상위에 복사하면 바인딩까지 따라온다. set_state_property("Type", "Subtree") 후 선택 조건·Consideration·복귀 트랜지션은 지우고 태스크·공통 조건만 남긴다
+  -불러 쓰는 상태는 태스크를 지우고 ("Type", "Linked"), ("LinkedSubtree", "(Name=\"Sub: X\",ID=<32자리 hex>,LinkType=GotoState)")로 연결한다. 선택 조건·Consideration·OnStateCompleted 트랜지션은 링크 상태에 남긴다
+  -GUID는 하이픈 없는 32자리로 넣는다. 하이픈 형식은 오류 없이 ID가 0으로 들어가 컴파일이 "Failed to resolve linked subtree"로 실패한다
+  -서브트리 ID는 ObjectTools.get_properties(<ST>:StateTreeEditorData_0, ["SubTrees"])로 상태 객체를 얻은 뒤 각 상태의 ID를 읽는다
 -SelectionBehavior는 자식 선택 방식이다. 무작위 선택이면 TrySelectChildrenAtRandom, 조건 기반이면 각 자식의 EnterCondition으로 거른다
   -...WeightedByUtility / HighestUtility에서 점수는 상태 Weight × 고려 노드 값. 고려 노드가 없는 자식은 점수 0이라 선택되지 않으므로 모든 자식에 고려 노드를 둔다 (고정 비중이면 Constant 1.0)
   -선택된 자식이 진입에 실패하면 남은 자식 중에서 다시 고른다. 진입 조건이 거짓인 자식은 후보에서 빠진다
