@@ -21,7 +21,7 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 
 -EDefenseResult(None/Blocked/GuardBroken/Parried)는 HandleOnDamagedResolved에서 결정되어 GE 컨텍스트와 GameplayCue로 전달됨
 -ActionPracticeGameplayEffectContext는 DamageType, PoiseDamage, DefenseResult, bUnparriable을 담는 커스텀 GE 컨텍스트
--아군 피격 제외는 데미지 파이프라인 이전의 히트 판정 단계에서 처리: UAttackTraceComponent::ValidateHit가 소유자별 IsFriendlyActor로 거르며, 적 공격(EnemyAttackComponent)은 다른 적 전체를 아군으로 봄. 플레이어 무기의 CapsuleOverlapComponent는 별도 구현이라 이 필터를 거치지 않음 (적이 이 방식을 쓰게 되면 아군 필터를 따로 추가해야 함)
+-아군 피격 제외는 데미지 파이프라인 이전의 히트 판정 단계에서 처리: UAttackTraceComponent::ValidateHit가 소유자별 IsFriendlyActor로 거르며, 적 공격(EnemyAttackComponent)은 다른 적 전체를 아군으로 봄. 플레이어 무기의 CapsuleOverlapComponent는 별도 구현이라 이 필터를 거치지 않음 (적이 이 방식을 쓰게 되면 아군 필터를 따로 추가해야 함). 투사체(ProjectileHitDetectionComponent)는 소유 투사체의 IsFriendlyActor로 거르며 EnemyProjectile은 다른 적 전체를 아군으로 봄
 -데미지·회복은 메타 어트리뷰트(IncomingDamage/IncomingHealing)로 들어와 파이프라인이 SetHealth로 직접 바꾸므로, Health 변화에 반응하는 로직(적 머리 위 HP바 등)은 GE가 바꾼 어트리뷰트가 아니라 PostGameplayEffectExecute 전후 값이나 OnRep으로 판단해야 함
 
 ##Attack 시스템 설계
@@ -31,11 +31,15 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -핵심 구현 흐름은 AttackSequenceAbility + NormalAttackAbility + ChargeAttackAbility이며, 답변 시 이 구조를 우선 반영할 것
 -무기별 공격 데이터는 WeaponDataAsset의 FTaggedAttackData 배열에서 태그로 식별됨
 -적 공격 데이터는 EnemyDataAsset의 FEnemyTaggedAttackData에서 관리됨
+-히트 판정은 IHitDetectionInterface 전략(AttackTrace 소켓 스윕 / CapsuleOverlap / 투사체 스윕)과 IHitDetectionUser(판정 결과로 GE 적용)로 나뉨. 근접 공격은 어빌리티가 User지만, 투사체는 투사체 자신(ABaseProjectile)이 User라서 발사 후 어빌리티가 끝나거나 취소돼도 판정·데미지가 유지됨
+-투사체 공격은 EComboAttackType::Projectile + FEnemyProjectileConfig + UEnemyProjectileAbility(EnemyAttackAbility 상속)로 구성. 몽타주의 Projectile Event 노티파이(Spawn → Grab → Launch)로 생성·부착·발사하며, 진행 단계(EProjectilePhase)는 복제되어 투사체 BP의 OnProjectilePhaseChanged에서 소유자별 등장 연출을 붙임 (공용 코드에 적 전용 연출을 넣지 않음)
+-ABaseProjectile(플레이어/적 공용)은 공격 데이터 출처(ResolveAttackData)와 아군 판정(IsFriendlyActor)만 자식(AEnemyProjectile 등)에 맡김. 서버가 판정·착탄을 처리하고 착탄 연출은 EffectManagerSubsystem 멀티캐스트. 회피 무적(State.Invincible) 대상은 통과. 메시는 MeshPivot(메시 기하 중심) 아래에 붙어 있어 BP에서 회전·스케일은 MeshPivot으로 조정
 
 ##GameplayCue 설계
 -3단 계층: APGameplayCueNotify_Instant(원샷 베이스) → APGameplayCueNotify_Impact(피격 전용, Surface×DefenseResult 분기) / APGameplayCueNotify_Duration(Duration GE 연동)
 -ImpactResponseDataAsset이 EPhysicalSurface × EDefenseResult별 이펙트/사운드를 매핑
 -BP 자식 클래스에서 프로퍼티만 세팅하면 코드 수정 없이 새 비주얼을 추가할 수 있는 구조
+-오브젝트 등장·퇴장 스윕 연출은 USweepRevealComponent(로컬 전용, 복제 없음)가 담당: MF_SweepReveal을 쓰는 머티리얼의 RevealAlpha(높이 마스크)와 경계 나이아가라(User.EdgeRadius)를 같은 진행값으로 움직임. BP에서는 정적 함수 PlaySweepOnMesh로 메시 소유 액터에 붙여 실행하며, StartDelay로 여러 메시를 순서대로 드러냄 (예: BP_WoodGiant_Rock의 그루터기 → 바위). 스윕이 끝나면 경계를 맵 밖 높이로 고정해 이후 메시가 움직여도 잘리지 않음
 -캐릭터 사운드 경로는 재생 주체로 나눔: 몽타주·로코모션에 묶인 소리는 AnimNotify_PlaySound (몽타주가 클라이언트에 복제되어 각자 재생), 몽타주 없는 StateTree 상태의 소리는 Execute Gameplay Cue 태스크 → Instant 큐 (StateTree AI는 서버 전용이라 사운드를 직접 재생하면 데디 서버에서 클라이언트에 들리지 않음). 이동하는 대상의 울음은 Instant 큐의 bAttachSound로 소켓에 붙여, 소유자 기준 SoundConcurrency(한 마리당 울음 1개 등)가 적용되게 함
 
 ##UI 설계

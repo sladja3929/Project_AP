@@ -9,6 +9,7 @@
 
 class UAnimMontage;
 class UCurveVector;
+class AEnemyProjectile;
 
 //적 전용 콤보 단위 (공용 FComboAttackUnit + 적 전용 설정)
 USTRUCT(BlueprintType)
@@ -51,6 +52,54 @@ struct FEnemyLungeConfig
     TObjectPtr<UCurveVector> HeightCurve = nullptr;
 };
 
+//적 투사체 공격 설정 (Projectile Spawn → (Grab) → Launch 노티파이 순서로 생성·부착·타깃 방향 포물선 발사)
+//투사체 고유 속성(메시·판정 반경·착탄 반경·착탄 큐)은 투사체 BP 기본값, 데미지 수치는 ComboSequence의 AttackData가 담당
+USTRUCT(BlueprintType)
+struct FEnemyProjectileConfig
+{
+    GENERATED_BODY()
+
+    //생성할 투사체 클래스
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile")
+    TSubclassOf<AEnemyProjectile> ProjectileClass;
+
+    //발사 전까지 투사체를 붙여 둘 메시 소켓(본) 이름
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile")
+    FName AttachSocketName = NAME_None;
+
+    //(선택) 양손으로 드는 투사체의 두 번째 소켓. 지정하면 AttachSocketName과의 중간 위치를 따라감
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile")
+    FName SecondaryAttachSocketName = NAME_None;
+
+    //true면 Spawn 노티파이에서 오너 앞 등장 위치에 놓았다가 Grab 노티파이에서 손에 부착 (등장 연출은 투사체 BP의 단계 이벤트)
+    //false면 Spawn 노티파이에서 바로 손에 부착
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile")
+    bool bPresentBeforeGrab = false;
+
+    //등장 위치 (오너 액터 로컬 공간, 액터 위치 기준). Grab 프레임의 손 소켓 위치에 맞춰야 부착 순간 튀지 않음
+    //등장 ~ Grab 사이에는 회전 워프를 걸지 않을 것 (오너가 돌면 손과 등장 위치가 어긋남)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile", meta = (EditCondition = "bPresentBeforeGrab"))
+    FVector PresentOffset = FVector(150.0f, 0.0f, 0.0f);
+
+    //수평 비행 속도 (cm/s). 비행 시간 = 수평 거리 / 이 값을 Min~Max FlightTime으로 클램프
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile", meta = (ClampMin = "1.0"))
+    float HorizontalSpeed = 2000.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile", meta = (ClampMin = "0.05"))
+    float MinFlightTime = 0.5f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile", meta = (ClampMin = "0.05"))
+    float MaxFlightTime = 1.5f;
+
+    //타깃 이동 예측 비율 (0: 발사 시점 위치, 1: 비행 시간 동안 현재 속도로 이동할 위치). 1 미만이어야 옆으로 움직여 피할 수 있음
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+    float LeadFactor = 0.5f;
+
+    //조준 지점 높이 오프셋 (타깃 액터 위치 = 캡슐 중심 기준)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile")
+    float TargetHeightOffset = 0.0f;
+};
+
 //GameplayTag로 식별되는 적 공격 데이터
 USTRUCT(BlueprintType)
 struct FEnemyTaggedAttackData
@@ -77,6 +126,11 @@ struct FEnemyTaggedAttackData
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Lunge",
         meta = (EditCondition = "AttackType == EComboAttackType::Lunge", EditConditionHides))
     FEnemyLungeConfig LungeConfig;
+
+    //투사체 설정 (AttackType이 Projectile일 때만 에디터에 표시)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile",
+        meta = (EditCondition = "AttackType == EComboAttackType::Projectile", EditConditionHides))
+    FEnemyProjectileConfig ProjectileConfig;
 };
 
 //무리 전투 설정 (UEnemyPack이 소집·공격권 분배에 사용)
@@ -169,6 +223,10 @@ public:
         }
         return nullptr;
     }
+
+    //AttackTags·콤보 인덱스의 공격 스탯으로 히트 판정에 넘길 최종 공격 데이터 조립 (인덱스는 범위로 클램프)
+    //본체 판정(EnemyAttackComponent)과 투사체 판정(EnemyProjectile)이 같은 계산을 공유
+    bool BuildFinalAttackData(const FGameplayTagContainer& AttackTags, int32 ComboIndex, FFinalAttackData& OutAttackData) const;
 
     //GetOptions용 함수 - HitSocketInfo에서 소켓 그룹 이름들을 반환
     UFUNCTION()

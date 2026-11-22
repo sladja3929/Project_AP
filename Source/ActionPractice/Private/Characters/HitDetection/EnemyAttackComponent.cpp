@@ -116,11 +116,12 @@ bool UEnemyAttackComponent::LoadTraceConfig(const FGameplayTagContainer& AttackT
 		}
 	}
 
-	//공격 데이터 설정
-	CurrentAttackData.FinalDamage = EnemyData->BaseDamage * AttackInfo.DamageMultiplier;
-	CurrentAttackData.PoiseDamage = AttackInfo.PoiseDamage;
-	CurrentAttackData.DamageType = AttackInfo.DamageType;
-	CurrentAttackData.bUnparriable = AttackInfo.bUnparriable;
+	//공격 데이터 설정 (투사체 판정과 같은 계산 공유)
+	if (!EnemyData->BuildFinalAttackData(AttackTags, ComboIndex, CurrentAttackData))
+	{
+		DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig FAILED"));
+		return false;
+	}
 
 	DEBUG_LOG(TEXT("EnemyAttackComponent::LoadTraceConfig SUCCESS (UsingSocketGroups=%d)"),
 		UsingHitSocketGroups.Num());

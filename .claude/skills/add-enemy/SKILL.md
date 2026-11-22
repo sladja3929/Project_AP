@@ -132,6 +132,9 @@ AnimMontageTools로 만든다. 모든 몽타주는 slot_name='DefaultSlot'.
 -그로기: Start / Loop / End 3종. 원본이 길면 몽타주 RateScale로 압축. 루프 지속 시간은 DA의 groggyLoopDuration이 결정
 -콤보: comboSequence 항목 추가 + 연계 판정 지점에 AnimNotify_CheckCondition
 -런지: AnimNotifyState_Lunging, AnimNotifyState_TrackingTarget 구간 배치 (WoodGiant SuperJump 몽타주를 list_notifies로 확인 후 따라 구성)
+-투사체: DA 공격 항목을 AttackType=Projectile + ProjectileConfig로, 어빌리티 BP는 EnemyProjectileAbility 자식, 투사체는 AEnemyProjectile BP 자식(메시·CollisionComponent·HitDetectionComponent.TraceRadius·ImpactRadius·ImpactEffect)
+  -몽타주에 Projectile Event 노티파이 Spawn(→ Grab) → Launch. 등장 후 잡는 연출이면 bPresentBeforeGrab + PresentOffset(Grab 프레임 손 위치를 액터 로컬로 변환), 양손이면 SecondaryAttachSocketName. 등장~Grab 사이에는 회전 워프 금지 (WoodGiant_RockThrow_Montage 참고)
+  -등장·잡기 연출은 투사체 BP의 OnProjectilePhaseChanged 이벤트에서 (적 전용 C++ 추가 금지)
 -레퍼런스 몽타주 구성은 AnimMontageTools.list_notifies로 조회해서 따른다
 -루프 몽타주(대기·경계 등): set_montage_sections로 Start/Loop/End 섹션을 만들고 Loop의 next를 자기 자신으로 둔다. End 섹션은 next가 없어야 한다. get_montage_info의 sections로 결과 확인
 -MotionWarping은 루트 모션에만 적용되므로 원본 시퀀스의 루트 모션이 꺼져 있으면 워프가 동작하지 않는다. get_root_motion_info로 루트 이동량을 확인해 켜도 캡슐이 움직이지 않는 제자리 애니메이션인지(회전 워프만 적용) 판단한다
