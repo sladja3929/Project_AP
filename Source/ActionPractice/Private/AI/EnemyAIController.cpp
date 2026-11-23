@@ -12,6 +12,7 @@
 #include "AbilitySystemGlobals.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/AbilitySystemComponent/BaseAbilitySystemComponent.h"
+#include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "TimerManager.h"
 #include "Navigation/PathFollowingComponent.h"
 
@@ -129,6 +130,7 @@ void AEnemyAIController::OnUnPossess()
 	StopReturnHome(false);
 	GetWorldTimerManager().ClearTimer(CombatReleaseCheckTimer);
 	bInCombat = false;
+	SetEngagedTarget(nullptr);
 	CurrentTarget.Reset();
 	LeavePack();
 
@@ -244,6 +246,7 @@ void AEnemyAIController::EnterCombat(AActor* Target)
 	}
 
 	bInCombat = true;
+	SetEngagedTarget(Target);
 	GetWorldTimerManager().SetTimer(CombatReleaseCheckTimer, this, &AEnemyAIController::CheckCombatRelease, CombatReleaseCheckInterval, true);
 
 	//귀환 중 피격으로 전투에 들어오면 귀환을 끝내고 StateTree 재시작 (전투 상태 설정 후라 바로 Combat 선택)
@@ -270,6 +273,7 @@ void AEnemyAIController::ExitCombat()
 	}
 
 	bInCombat = false;
+	SetEngagedTarget(nullptr);
 	GetWorldTimerManager().ClearTimer(CombatReleaseCheckTimer);
 	LeavePack();
 
@@ -298,6 +302,7 @@ void AEnemyAIController::ResetAwareness()
 	//리셋은 RestartEnemyAI가 StateTree를 재시작하므로 귀환만 정리
 	StopReturnHome(false);
 	bInCombat = false;
+	SetEngagedTarget(nullptr);
 	GetWorldTimerManager().ClearTimer(CombatReleaseCheckTimer);
 	CurrentTarget.Reset();
 	LeavePack();
@@ -318,9 +323,31 @@ void AEnemyAIController::ClearAwarenessOnDeath()
 {
 	StopReturnHome(false);
 	bInCombat = false;
+	SetEngagedTarget(nullptr);
 	GetWorldTimerManager().ClearTimer(CombatReleaseCheckTimer);
 	CurrentTarget.Reset();
 	LeavePack();
+}
+
+void AEnemyAIController::SetEngagedTarget(AActor* NewTarget)
+{
+	AActor* OldTarget = EngagedTarget.Get();
+	if (OldTarget == NewTarget)
+	{
+		return;
+	}
+
+	if (UActionPracticeAbilitySystemComponent* OldASC = Cast<UActionPracticeAbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OldTarget)))
+	{
+		OldASC->SetEngagedByEnemy(this, false);
+	}
+
+	EngagedTarget = NewTarget;
+
+	if (UActionPracticeAbilitySystemComponent* NewASC = Cast<UActionPracticeAbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(NewTarget)))
+	{
+		NewASC->SetEngagedByEnemy(this, true);
+	}
 }
 
 void AEnemyAIController::CheckCombatRelease()

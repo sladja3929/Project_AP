@@ -24,6 +24,8 @@ StateTree AI 설계(스키마, ASC 컨텍스트, 이벤트 전송)는 docs/ARCHI
 -복사: copy_state_from(하위 포함), copy_node_from(노드·트랜지션). 다른 트리에서도 가능
   -노드 ID는 새로 발급되고, 복사 범위 내부의 트랜지션·바인딩은 새 ID로 다시 연결된다
   -복사 범위 밖을 가리키는 GotoState 트랜지션은 set_transition_target으로 재지정한다
+  -copy_node_from은 이밸류에이터·전역 Parameters를 소스로 하는 바인딩을 가져오지 않는다 (같은 트리 안 복사도 동일). 복사 후 describe_bindings로 확인하고 set_property_binding으로 다시 건다
+  -Parameters 소스는 Global·상태별 섹션이 여러 개로 나오므로 get_binding_sources의 Global ID를 source_struct에 넣으면 확실하다
   -같은 설정의 노드가 이미 있으면 새로 add_node 하기보다 copy_node_from이 값까지 가져와 빠르다
 -공격(ActivateAbilityTask) 상태를 추가하거나 어빌리티를 바꾸면, 그 상태(또는 링크 서브트리 루트)에 쿨다운 조건을 함께 둔다. 쿨다운이 0이어도 넣는다 (규칙: docs/STATETREE_COMBAT_LAYOUT.md 공격 쿨다운 조건)
   -조건은 HasGameplayTagsCondition, Tags = 어빌리티의 AbilityTags, bInvert=True. 기존 조건을 copy_node_from으로 복사한 뒤 set_node_property("Tags", "(GameplayTags=((TagName=\"EnemyAbility.Attack.1\")))")로 태그만 바꾸면 빠르다 (ASC는 컨텍스트에서 자동 연결)

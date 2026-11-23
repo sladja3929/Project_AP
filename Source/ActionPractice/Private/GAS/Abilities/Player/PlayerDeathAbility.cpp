@@ -27,6 +27,9 @@ UPlayerDeathAbility::UPlayerDeathAbility()
 {
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
+	//사망은 스태미나와 무관하게 항상 발동 (0이면 잔량 임계값 체크가 남아 스태미나 고갈 시 사망 불가)
+	StaminaCost = -1.0f;
 }
 
 void UPlayerDeathAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)

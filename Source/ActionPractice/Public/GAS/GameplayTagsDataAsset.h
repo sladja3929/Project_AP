@@ -149,6 +149,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
 	FGameplayTag StateDead;
 
+	//플레이어 전투 상태 (교전 중인 적이 하나라도 있으면 부여, 비전투 시 스태미나 소모 없음)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
+	FGameplayTag StateInCombat;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State Tags")
 	FGameplayTag StateResting;
 

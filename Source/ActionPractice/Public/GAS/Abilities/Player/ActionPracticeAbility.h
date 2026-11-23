@@ -63,6 +63,9 @@ protected:
 	UFUNCTION(BlueprintPure, Category = "Ability")
 	UInputBufferComponent* GetInputBufferComponentFromActorInfo() const;
 
+	//비전투 상태(State.InCombat 없음)에서는 스태미나를 소모하지 않음
+	virtual bool ShouldConsumeStamina() const override;
+
 	// ===== Hold 계열 어빌리티 릴리즈 헬퍼 =====
 	
 	//ActivateAbility 이후 필요한 시점에 호출

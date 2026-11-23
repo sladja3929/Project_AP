@@ -216,6 +216,33 @@ void USprintAbility::CheckSprintConditions()
 	if (!CanContinueSprinting())
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return;
+	}
+
+	SyncStaminaDrainWithCombatState();
+}
+
+void USprintAbility::SyncStaminaDrainWithCombatState()
+{
+	const AActor* Avatar = GetAvatarActorFromActorInfo();
+	if (!Avatar || !Avatar->HasAuthority())
+	{
+		return;
+	}
+
+	const bool bShouldDrain = ShouldConsumeStamina();
+
+	if (bShouldDrain && !StaminaDrainHandle.IsValid())
+	{
+		//StartSprinting과 동일하게 드레인 적용 실패 시 스프린트 종료
+		if (!StartStaminaDrainEffect())
+		{
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		}
+	}
+	else if (!bShouldDrain && StaminaDrainHandle.IsValid())
+	{
+		StopStaminaDrainEffect();
 	}
 }
 
@@ -280,7 +307,14 @@ bool USprintAbility::StartStaminaDrainEffect()
 		DEBUG_LOG(TEXT("StartStaminaDrainEffect skipped on non-authority."));
 		return true;
 	}
-	
+
+	//비전투 시 드레인 없이 스프린트 (전투 진입 시 CheckSprintConditions에서 적용)
+	if (!ShouldConsumeStamina())
+	{
+		DEBUG_LOG(TEXT("StartStaminaDrainEffect skipped out of combat."));
+		return true;
+	}
+
 	UActionPracticeAbilitySystemComponent* APASC = GetActionPracticeAbilitySystemComponentFromActorInfo();
 	if (!APASC)
 	{

@@ -140,12 +140,24 @@ bool ULockOnComponent::ValidateLockOnRequest(const AActor* NewTarget) const
 
 	if (FVector::Dist(Owner->GetActorLocation(), NewTarget->GetActorLocation()) > MaxAllowedDistance) return false;
 
-	const FGameplayTag DeadTag = UGameplayTagsSubsystem::GetStateDeadTag();
-	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(const_cast<AActor*>(NewTarget));
-
-	if (TargetASC && DeadTag.IsValid() && TargetASC->HasMatchingGameplayTag(DeadTag)) return false;
+	if (IsTargetDead(NewTarget)) return false;
 
 	return true;
+}
+
+bool ULockOnComponent::IsTargetDead(const AActor* Target) const
+{
+	if (!IsValid(Target)) return true;
+
+	if (const AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Target))
+	{
+		if (Enemy->IsCorpse()) return true;
+	}
+
+	const FGameplayTag DeadTag = UGameplayTagsSubsystem::GetStateDeadTag();
+	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(const_cast<AActor*>(Target));
+
+	return TargetASC && DeadTag.IsValid() && TargetASC->HasMatchingGameplayTag(DeadTag);
 }
 
 void ULockOnComponent::SetRotationMode(bool bOrientToMovement, bool bUseControllerDesired)
@@ -269,8 +281,6 @@ void ULockOnComponent::GatherCandidates(TArray<FLockOnCandidate>& OutCandidates,
 	TArray<FOverlapResult> Overlaps;
 	World->OverlapMultiByObjectType(Overlaps, Owner->GetActorLocation(), FQuat::Identity, ObjectParams, FCollisionShape::MakeSphere(LockOnMaxDistance), QueryParams);
 
-	const FGameplayTag DeadTag = UGameplayTagsSubsystem::GetStateDeadTag();
-
 	//오버랩 결과는 컴포넌트 단위이므로 액터 단위로 중복 제거
 	TSet<const AActor*> UniqueActors;
 	UniqueActors.Reserve(Overlaps.Num());
@@ -285,10 +295,8 @@ void ULockOnComponent::GatherCandidates(TArray<FLockOnCandidate>& OutCandidates,
 
 		if (!Candidate->ActorHasTag(TargetActorTag)) continue;
 
-		//사망한 대상 제외
-		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Candidate);
-
-		if (TargetASC && DeadTag.IsValid() && TargetASC->HasMatchingGameplayTag(DeadTag)) continue;
+		//사망한 대상 제외 (사망 몽타주 재생 중인 적 포함)
+		if (IsTargetDead(Candidate)) continue;
 
 		UniqueActors.Add(Candidate);
 
@@ -581,6 +589,14 @@ void ULockOnComponent::TickLockOnMaintenance()
 		return;
 	}
 
+	//사망 시 Multicast_ReleaseLockOn이 즉시 해제하지만, 다른 적 사망으로 재지정된 직후 등 놓친 경우를 여기서 보완
+	if (IsTargetDead(Target))
+	{
+		DEBUG_LOG(TEXT("TickLockOnMaintenance: target dead, handling target lost"));
+		HandleTargetLost(Target);
+		return;
+	}
+
 	const AActor* Owner = GetOwner();
 
 	if (!Owner)
@@ -630,7 +646,7 @@ void ULockOnComponent::HandleTargetLost(AActor* LostTarget)
 
 	if (bAutoRetargetOnTargetLost)
 	{
-		//사망 태그는 몽타주 BlendOut 이후에 붙으므로 태그 필터만으로는 죽어가는 적이 재선택됨
+		//후보 필터는 시체 상태로 죽어가는 적도 거르지만, 클라이언트에서는 Multicast가 bIsCorpse 복제보다 먼저 도착할 수 있음
 		//반드시 잃은 타겟을 명시 제외해야 함
 		AActor* NextTarget = FindBestTarget(LostTarget);
 

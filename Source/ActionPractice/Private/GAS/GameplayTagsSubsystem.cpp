@@ -420,6 +420,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateDeadTag()
 	return FGameplayTag::EmptyTag;
 }
 
+const FGameplayTag& UGameplayTagsSubsystem::GetStateInCombatTag()
+{
+	if (UGameplayTagsSubsystem* Subsystem = Get())
+	{
+		return Subsystem->GetStateInCombatTagInternal();
+	}
+	return FGameplayTag::EmptyTag;
+}
+
 const FGameplayTag& UGameplayTagsSubsystem::GetStateRestingTag()
 {
 	if (UGameplayTagsSubsystem* Subsystem = Get())
@@ -1139,6 +1148,15 @@ const FGameplayTag& UGameplayTagsSubsystem::GetStateDeadTagInternal() const
 	if (GameplayTagsDataAsset)
 	{
 		return GameplayTagsDataAsset->StateDead;
+	}
+	return FGameplayTag::EmptyTag;
+}
+
+const FGameplayTag& UGameplayTagsSubsystem::GetStateInCombatTagInternal() const
+{
+	if (GameplayTagsDataAsset)
+	{
+		return GameplayTagsDataAsset->StateInCombat;
 	}
 	return FGameplayTag::EmptyTag;
 }

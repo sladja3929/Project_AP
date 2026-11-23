@@ -69,6 +69,13 @@ public:
 	//===== Death =====
 	virtual void HandleDeath() override;
 
+	//===== Combat State =====
+	//교전 중인 적 등록·해제 (서버, EnemyAIController 전투 진입·해제 시 호출). 하나라도 남아 있으면 State.InCombat 부여
+	void SetEngagedByEnemy(AActor* Enemy, bool bEngaged);
+
+	//전투 상태 여부 — State.InCombat은 소유 클라이언트까지 복제되어 예측 경로에서도 서버와 같은 판정
+	bool IsInCombat() const;
+
 	//===== Defense Policy Override =====
 	virtual void CalculateAndSetAttributes(AActor* SourceActor, const FFinalAttackData& FinalAttackData) override;
 	virtual void PrepareHitReactionEventData(FGameplayEventData& OutEventData, const FFinalAttackData& FinalAttackData) override;
@@ -111,6 +118,9 @@ private:
 	//내부 방어 판정 상태
 	EPlayerDefenseState LastDefenseState = EPlayerDefenseState::None;
 
+	//이 플레이어와 교전 중인 적 (서버 전용, 키는 적의 AIController)
+	TSet<TWeakObjectPtr<AActor>> EngagedEnemies;
+
 #pragma endregion
 
 #pragma region "Private Functions"
@@ -127,6 +137,9 @@ private:
 
 	//가드 스태미나 소모 후 일정 시간 리젠 차단
 	void ApplyGuardStaminaRegenBlock();
+
+	//EngagedEnemies 정리 후 State.InCombat 태그 동기화
+	void RefreshCombatStateTag();
 
 #pragma endregion
 };

@@ -120,6 +120,129 @@ def _quat_slerp(a: unreal.Quat, b: unreal.Quat, alpha: float) -> unreal.Quat:
     return unreal.Quat(x / length, y / length, z / length, w / length)
 
 
+def _quat_mul(a: unreal.Quat, b: unreal.Quat) -> unreal.Quat:
+    #a * b (Hamilton 곱, b를 먼저 적용한 뒤 a를 적용하는 회전)
+    return unreal.Quat(
+        a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+        a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+        a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z)
+
+
+def _quat_inverse(q: unreal.Quat) -> unreal.Quat:
+    return unreal.Quat(-q.x, -q.y, -q.z, q.w)
+
+
+def _quat_normalized(q: unreal.Quat) -> unreal.Quat:
+    length = math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)
+    return unreal.Quat(q.x / length, q.y / length, q.z / length, q.w / length)
+
+
+def _axis_angle_quat(axis: list, degrees: float) -> unreal.Quat:
+    length = math.sqrt(sum(value * value for value in axis))
+    half = math.radians(degrees) * 0.5
+    scale = math.sin(half) / length
+    return unreal.Quat(axis[0] * scale, axis[1] * scale, axis[2] * scale, math.cos(half))
+
+
+def _rotate_vector(q: unreal.Quat, v: list) -> list:
+    #q * v * q^-1
+    result = _quat_mul(_quat_mul(q, unreal.Quat(v[0], v[1], v[2], 0.0)), _quat_inverse(q))
+    return [result.x, result.y, result.z]
+
+
+def _normalize3(v: list) -> list:
+    length = math.sqrt(sum(value * value for value in v))
+    return [value / length for value in v]
+
+
+def _swing_quat(source: list, target: list) -> unreal.Quat:
+    #source 방향을 target 방향으로 돌리는 최소 회전 (FQuat::FindBetweenNormals와 같은 식)
+    a = _normalize3(source)
+    b = _normalize3(target)
+    dot = sum(x * y for x, y in zip(a, b))
+
+    if dot < -0.999999:
+        #반대 방향이면 a에 수직인 임의 축으로 180도
+        axis = [0.0, -a[2], a[1]] if abs(a[0]) < 0.9 else [-a[2], 0.0, a[0]]
+        return _axis_angle_quat(axis, 180.0)
+
+    cross = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+    return _quat_normalized(unreal.Quat(cross[0], cross[1], cross[2], 1.0 + dot))
+
+
+def _bone_chain_resolver(animation: unreal.AnimSequence, mesh: unreal.SkeletalMesh):
+    #메시 계층으로 루트→본 체인을 구하는 함수 반환. 메시에 없는 본은 부모가 None으로 나와 루트로 오인되므로 거부
+    animation_skeleton = animation.get_editor_property('skeleton')
+    mesh_skeleton = mesh.get_editor_property('skeleton')
+
+    if not mesh_skeleton or mesh_skeleton.get_path_name() != animation_skeleton.get_path_name():
+        raise ValueError(f'{mesh.get_name()} does not use the skeleton of {animation.get_name()}')
+
+    root_name = str(animation_skeleton.get_reference_pose().get_bone_names()[0]).lower()
+    subsystem = unreal.get_editor_subsystem(unreal.SkeletalMeshEditorSubsystem)
+
+    def _chain(bone_name: str) -> list:
+        chain = [bone_name]
+
+        while True:
+            parent = str(subsystem.get_bone_parent(mesh, chain[-1]))
+
+            if parent == 'None' or not parent:
+                break
+
+            chain.append(parent)
+
+        if chain[-1].lower() != root_name:
+            raise ValueError(f'{bone_name} is not in the bone hierarchy of {mesh.get_name()}')
+
+        chain.reverse()
+        return chain
+
+    return _chain
+
+
+def _sign_continuous(rotations: list) -> list:
+    #q와 -q는 같은 회전이지만 키 사이 보간이 먼 길로 돌지 않도록 이전 키와 같은 반구로 맞춤
+    result = []
+
+    for rotation in rotations:
+        if result:
+            previous = result[-1]
+
+            if previous.x * rotation.x + previous.y * rotation.y + previous.z * rotation.z + previous.w * rotation.w < 0.0:
+                rotation = unreal.Quat(-rotation.x, -rotation.y, -rotation.z, -rotation.w)
+
+        result.append(rotation)
+
+    return result
+
+
+def _write_bone_tracks(animation: unreal.AnimSequence, label: str, writes: list, originals: dict) -> None:
+    #writes: [(bone, positions, rotations, scales)], originals: {bone: (positions, rotations, scales)}
+    #트랜잭션 없이 쓰므로 중간 실패 시 이미 쓴 본을 원래 키로 되돌림
+    controller = animation.get_editor_property('controller')
+
+    if not controller:
+        raise RuntimeError(f'{animation.get_name()} has no animation data controller')
+
+    written = []
+    controller.open_bracket(unreal.Text(label), False)
+
+    try:
+        for bone, positions, rotations, scales in writes:
+            controller.set_bone_track_keys(bone, positions, rotations, scales, False)
+            written.append(bone)
+    except Exception:
+        for bone in written:
+            positions, rotations, scales = originals[bone]
+            controller.set_bone_track_keys(bone, positions, rotations, scales, False)
+
+        raise
+    finally:
+        controller.close_bracket(False)
+
+
 def _window_weight(time: float, start: float, end: float, blend_in: float, blend_out: float) -> float:
     if time < start or time > end:
         return 0.0
@@ -1172,3 +1295,467 @@ class AnimMontageTools(unreal.ToolsetDefinition):
             raise
 
         return json.dumps(result)
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def rotate_bones(
+            animation: unreal.AnimSequence, mesh: unreal.SkeletalMesh, rotations: str,
+            start_time: float, end_time: float, blend_in: float = 0.1, blend_out: float = 0.1) -> str:
+        """Rotates bones by component-space axis-angle offsets inside a time window, like
+        rotating them with a world-space gizmo in the animation editor. Edits keys in place;
+        the asset is not saved.
+
+        Each rotation pivots around its bone, so the bone's children follow (rotate the
+        upper arm to raise the whole arm, then the hand to aim the weapon). Rotations of a
+        parent and its child stack in hierarchy order regardless of list order; several
+        entries for one bone apply in list order. The offset angle is scaled by the window
+        weight (smoothstep blend in / out). Only local rotations of the listed bones change;
+        translations and scales are kept. Not transacted (no undo), so duplicate the
+        sequence as a backup first.
+
+        Args:
+            animation: The animation sequence to modify (must not be additive).
+            mesh: A skeletal mesh of the sequence's skeleton (used for the bone hierarchy).
+            rotations: JSON array of {"bone": str, "axis": [x, y, z] (component space, any
+                length), "angle": degrees}. Positive angles follow the right-hand rule
+                around the axis in Unreal's left-handed space as FQuat(axis, angle) does.
+                Use get_bone_axes to read the current component-space directions.
+            start_time: Window start in seconds.
+            end_time: Window end in seconds.
+            blend_in: Seconds to ease the offset in from 0 at the window start.
+            blend_out: Seconds to ease the offset out to 0 at the window end.
+
+        Returns:
+            A JSON string: {"asset", "modified_bones", "modified_keys", "modified_frame_range"}.
+        """
+        if animation.get_editor_property('additive_anim_type') != unreal.AdditiveAnimationType.AAT_NONE:
+            raise RuntimeError(f'{animation.get_name()} is additive; rotate_bones does not support it')
+
+        if end_time <= start_time or blend_in < 0.0 or blend_out < 0.0:
+            raise ValueError(f'Invalid window {start_time}-{end_time}s (blend_in {blend_in}, blend_out {blend_out})')
+
+        length = _anim_lib().get_sequence_length(animation)
+
+        if start_time >= length or end_time <= 0.0:
+            raise ValueError(f'Window {start_time}-{end_time}s is outside the sequence (length {length:.3f}s)')
+
+        entries = json.loads(rotations)
+
+        if not isinstance(entries, list) or not entries:
+            raise ValueError('rotations must be a non-empty JSON array')
+
+        model = animation.get_editor_property('data_model_interface')
+        num_keys = model.get_number_of_keys()
+        frame_rate = model.get_frame_rate()
+        fps = frame_rate.numerator / frame_rate.denominator
+        #FName은 대소문자 무시 비교이고 표기는 이름 테이블 첫 등록 기준이라 소문자로 매칭
+        track_names = {str(name).lower(): str(name) for name in model.get_bone_track_names()}
+        deltas = {}
+
+        for entry in entries:
+            bone = str(entry.get('bone', ''))
+            axis = entry.get('axis')
+            angle = entry.get('angle')
+
+            if bone.lower() not in track_names:
+                raise ValueError(f'Bone without an animation track: {bone!r}')
+
+            if (not isinstance(axis, list) or len(axis) != 3
+                    or math.sqrt(sum(float(value) ** 2 for value in axis)) < 1e-6):
+                raise ValueError(f'{bone}: axis must be a non-zero [x, y, z]')
+
+            if not isinstance(angle, (int, float)):
+                raise ValueError(f'{bone}: angle must be a number')
+
+            deltas.setdefault(track_names[bone.lower()], []).append(([float(value) for value in axis], float(angle)))
+
+        _chain = _bone_chain_resolver(animation, mesh)
+        chains = {bone: _chain(bone) for bone in deltas}
+        listed = {bone.lower() for bone in deltas}
+        ancestors = sorted({name for chain in chains.values() for name in chain[:-1]}, key=str.lower)
+        query = list(deltas) + [name for name in ancestors if name.lower() not in listed]
+        weights = [_window_weight(frame / fps, start_time, end_time, blend_in, blend_out) for frame in range(num_keys)]
+        #쓰기 중 실패로 일부 본만 바뀌는 범위를 줄이도록 모든 키를 먼저 계산
+        frames = [_anim_lib().get_bone_poses_for_frame(animation, query, frame, False) for frame in range(num_keys)]
+        tracks = {bone: [] for bone in deltas}
+
+        for frame, poses in enumerate(frames):
+            local = {name.lower(): pose for name, pose in zip(query, poses)}
+            weight = weights[frame]
+            frame_deltas = {}
+
+            for bone, items in deltas.items():
+                delta = unreal.Quat(0.0, 0.0, 0.0, 1.0)
+
+                for axis, angle in items:
+                    delta = _quat_mul(_axis_angle_quat(axis, angle * weight), delta)
+
+                frame_deltas[bone.lower()] = delta
+
+            for bone, chain in chains.items():
+                transform = local[bone.lower()]
+
+                if weight <= 0.0:
+                    tracks[bone].append(transform.rotation)
+                    continue
+
+                #부모의 컴포넌트 회전과 부모까지 누적된 오프셋
+                parent_rotation = unreal.Quat(0.0, 0.0, 0.0, 1.0)
+                parent_offset = unreal.Quat(0.0, 0.0, 0.0, 1.0)
+
+                for name in chain[:-1]:
+                    parent_rotation = _quat_mul(parent_rotation, local[name.lower()].rotation)
+
+                    if name.lower() in frame_deltas:
+                        parent_offset = _quat_mul(frame_deltas[name.lower()], parent_offset)
+
+                offset = _quat_mul(frame_deltas[bone.lower()], parent_offset)
+                old_component = _quat_mul(parent_rotation, transform.rotation)
+                new_component = _quat_mul(offset, old_component)
+                new_parent = _quat_mul(parent_offset, parent_rotation)
+                tracks[bone].append(_quat_normalized(_quat_mul(_quat_inverse(new_parent), new_component)))
+
+        bone_order = list(deltas)
+        writes = []
+        originals = {}
+
+        for bone in bone_order:
+            index = query.index(bone)
+            transforms = [poses[index] for poses in frames]
+            positions = [transform.translation for transform in transforms]
+            scales = [transform.scale3d for transform in transforms]
+            writes.append((bone, positions, _sign_continuous(tracks[bone]), scales))
+            originals[bone] = (positions, [transform.rotation for transform in transforms], scales)
+
+        _write_bone_tracks(animation, 'Rotate Bones', writes, originals)
+        _mark_dirty(animation)
+        modified_frames = [frame for frame, weight in enumerate(weights) if weight > 0.0]
+
+        return json.dumps({
+            'asset': animation.get_path_name(),
+            'modified_bones': bone_order,
+            'modified_keys': len(modified_frames),
+            'modified_frame_range': [modified_frames[0], modified_frames[-1]] if modified_frames else None,
+        })
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def aim_bones(
+            animation: unreal.AnimSequence, mesh: unreal.SkeletalMesh, aims: str,
+            start_time: float, end_time: float, blend_in: float = 0.1, blend_out: float = 0.1) -> str:
+        """Re-aims bones every frame so a bone-local axis points in a component-space
+        direction inside a time window (a baked look-at). Edits keys in place; the asset is
+        not saved.
+
+        Use it to straighten an arm or point a held weapon (e.g. aim the hand so the blade
+        points forward during a thrust). Each frame the bone gets the smallest rotation that
+        turns its aim axis toward the target, scaled by weight x window weight (smoothstep
+        blend in / out), pivoting around the bone so children follow. Bones are processed
+        parent first and each one sees its parent's new pose, so aiming an upper arm and
+        then its hand works in one call. Only local rotations of the listed bones change.
+        Not transacted (no undo), so duplicate the sequence as a backup first.
+
+        Args:
+            animation: The animation sequence to modify (must not be additive).
+            mesh: A skeletal mesh of the sequence's skeleton (used for the bone hierarchy).
+            aims: JSON array of {"bone": str, "target": [x, y, z] (component-space direction),
+                "aim_axis": [x, y, z] (direction in the bone's local space) or "aim_child": str
+                (aim along the local offset to this child bone, e.g. lowerarm for an upper
+                arm), "weight": 0..1 (default 1)}.
+            start_time: Window start in seconds.
+            end_time: Window end in seconds.
+            blend_in: Seconds to ease in from 0 at the window start.
+            blend_out: Seconds to ease out to 0 at the window end.
+
+        Returns:
+            A JSON string: {"asset", "modified_bones", "modified_keys", "modified_frame_range",
+            "max_correction" {bone: degrees}} (largest per-frame aim rotation before weighting).
+        """
+        if animation.get_editor_property('additive_anim_type') != unreal.AdditiveAnimationType.AAT_NONE:
+            raise RuntimeError(f'{animation.get_name()} is additive; aim_bones does not support it')
+
+        if end_time <= start_time or blend_in < 0.0 or blend_out < 0.0:
+            raise ValueError(f'Invalid window {start_time}-{end_time}s (blend_in {blend_in}, blend_out {blend_out})')
+
+        length = _anim_lib().get_sequence_length(animation)
+
+        if start_time >= length or end_time <= 0.0:
+            raise ValueError(f'Window {start_time}-{end_time}s is outside the sequence (length {length:.3f}s)')
+
+        entries = json.loads(aims)
+
+        if not isinstance(entries, list) or not entries:
+            raise ValueError('aims must be a non-empty JSON array')
+
+        model = animation.get_editor_property('data_model_interface')
+        num_keys = model.get_number_of_keys()
+        frame_rate = model.get_frame_rate()
+        fps = frame_rate.numerator / frame_rate.denominator
+        track_names = {str(name).lower(): str(name) for name in model.get_bone_track_names()}
+        subsystem = unreal.get_editor_subsystem(unreal.SkeletalMeshEditorSubsystem)
+        _chain = _bone_chain_resolver(animation, mesh)
+        specs = []
+
+        for entry in entries:
+            bone = str(entry.get('bone', ''))
+
+            if bone.lower() not in track_names:
+                raise ValueError(f'Bone without an animation track: {bone!r}')
+
+            bone = track_names[bone.lower()]
+
+            if any(spec['bone'] == bone for spec in specs):
+                raise ValueError(f'{bone} is listed twice')
+
+            target = entry.get('target')
+
+            if not isinstance(target, list) or len(target) != 3 or math.sqrt(sum(float(v) ** 2 for v in target)) < 1e-6:
+                raise ValueError(f'{bone}: target must be a non-zero [x, y, z]')
+
+            weight = float(entry.get('weight', 1.0))
+
+            if not 0.0 <= weight <= 1.0:
+                raise ValueError(f'{bone}: weight must be within 0..1')
+
+            aim_axis = entry.get('aim_axis')
+            aim_child = entry.get('aim_child')
+
+            if (aim_axis is None) == (aim_child is None):
+                raise ValueError(f'{bone}: set exactly one of aim_axis or aim_child')
+
+            if aim_child is not None:
+                aim_child = str(aim_child)
+                parent = str(subsystem.get_bone_parent(mesh, aim_child))
+
+                if parent.lower() != bone.lower():
+                    raise ValueError(f'{aim_child} is not a child of {bone}')
+            elif (not isinstance(aim_axis, list) or len(aim_axis) != 3
+                  or math.sqrt(sum(float(v) ** 2 for v in aim_axis)) < 1e-6):
+                raise ValueError(f'{bone}: aim_axis must be a non-zero [x, y, z]')
+
+            chain = _chain(bone)
+            specs.append({
+                'bone': bone, 'chain': chain, 'depth': len(chain),
+                'target': _normalize3([float(v) for v in target]), 'weight': weight,
+                'aim_axis': [float(v) for v in aim_axis] if aim_axis is not None else None,
+                'aim_child': aim_child,
+            })
+
+        #부모가 먼저 바뀌어야 자식이 새 부모 기준으로 조준됨
+        specs.sort(key=lambda spec: spec['depth'])
+        query = []
+
+        for spec in specs:
+            for name in spec['chain'] + ([spec['aim_child']] if spec['aim_child'] else []):
+                if name.lower() not in {q.lower() for q in query}:
+                    query.append(name)
+
+        weights = [_window_weight(frame / fps, start_time, end_time, blend_in, blend_out) for frame in range(num_keys)]
+        frames = [_anim_lib().get_bone_poses_for_frame(animation, query, frame, False) for frame in range(num_keys)]
+        tracks = {spec['bone']: [] for spec in specs}
+        max_correction = {spec['bone']: 0.0 for spec in specs}
+
+        for frame, poses in enumerate(frames):
+            local = {name.lower(): pose for name, pose in zip(query, poses)}
+            new_local = {}
+            weight = weights[frame]
+
+            for spec in specs:
+                bone = spec['bone']
+                transform = local[bone.lower()]
+
+                if weight <= 0.0:
+                    tracks[bone].append(transform.rotation)
+                    continue
+
+                parent_rotation = unreal.Quat(0.0, 0.0, 0.0, 1.0)
+
+                for name in spec['chain'][:-1]:
+                    rotation = new_local.get(name.lower(), local[name.lower()].rotation)
+                    parent_rotation = _quat_mul(parent_rotation, rotation)
+
+                component = _quat_mul(parent_rotation, transform.rotation)
+
+                if spec['aim_child']:
+                    offset = local[spec['aim_child'].lower()].translation
+                    axis = [offset.x, offset.y, offset.z]
+
+                    if math.sqrt(sum(value * value for value in axis)) < 1e-6:
+                        raise ValueError(f'{spec["aim_child"]} has no offset from {bone} at frame {frame}; use aim_axis')
+                else:
+                    axis = spec['aim_axis']
+
+                current = _rotate_vector(component, axis)
+                swing = _swing_quat(current, spec['target'])
+                angle = math.degrees(2.0 * math.acos(min(1.0, abs(swing.w))))
+                max_correction[bone] = max(max_correction[bone], angle)
+                weighted = _quat_slerp(unreal.Quat(0.0, 0.0, 0.0, 1.0), swing, spec['weight'] * weight)
+                new_component = _quat_mul(weighted, component)
+                rotation = _quat_normalized(_quat_mul(_quat_inverse(parent_rotation), new_component))
+                new_local[bone.lower()] = rotation
+                tracks[bone].append(rotation)
+
+        writes = []
+        originals = {}
+        lowered = [q.lower() for q in query]
+
+        for spec in specs:
+            index = lowered.index(spec['bone'].lower())
+            transforms = [poses[index] for poses in frames]
+            positions = [transform.translation for transform in transforms]
+            scales = [transform.scale3d for transform in transforms]
+            writes.append((spec['bone'], positions, _sign_continuous(tracks[spec['bone']]), scales))
+            originals[spec['bone']] = (positions, [transform.rotation for transform in transforms], scales)
+
+        _write_bone_tracks(animation, 'Aim Bones', writes, originals)
+        _mark_dirty(animation)
+        modified_frames = [frame for frame, weight in enumerate(weights) if weight > 0.0]
+
+        return json.dumps({
+            'asset': animation.get_path_name(),
+            'modified_bones': [spec['bone'] for spec in specs],
+            'modified_keys': len(modified_frames),
+            'modified_frame_range': [modified_frames[0], modified_frames[-1]] if modified_frames else None,
+            'max_correction': {bone: round(angle, 1) for bone, angle in max_correction.items()},
+        })
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def preview_animation_pose(
+            animation: unreal.AnimSequence, time: float, mesh: unreal.SkeletalMesh,
+            location: unreal.Vector, yaw: float = 0.0, weapon_mesh: unreal.StaticMesh = None,
+            hand_socket: str = '', grip_socket: str = 'grip_oh_socket', label: str = 'Default',
+            keep_root_in_place: bool = True) -> str:
+        """Shows an animation frame in the open level for screenshots (CaptureViewport).
+
+        Spawns a TEMP_AnimPreview_<label> SkeletalMeshActor playing the sequence frozen at
+        `time`, optionally with a static weapon mesh attached the way AWeapon does in game
+        (snapped to hand_socket, then offset by the inverse of the weapon's grip socket).
+        Calling again with the same label replaces that preview (fresh actors, so key edits
+        made since are shown). Remove the actors with
+        clear_animation_previews and do not save the level with them.
+
+        Args:
+            animation: The sequence to show.
+            time: Sequence time in seconds.
+            mesh: The skeletal mesh to show it on.
+            location: World location of the preview actor.
+            yaw: Actor yaw in degrees.
+            weapon_mesh: Optional static mesh to attach (None for no weapon).
+            hand_socket: Character socket for the weapon (e.g. 'hand_r_greatsword').
+            grip_socket: Weapon mesh socket aligned to the hand socket.
+            label: Preview name suffix, so several previews can coexist.
+            keep_root_in_place: Offset the actor by the root bone translation at `time` so
+                the character stays at `location`. Skipped for sequences with root motion
+                enabled, whose root bone is locked on playback anyway.
+
+        Returns:
+            A JSON string: {"actor", "weapon_actor", "actor_location", "root_offset",
+            "weapon": {"location", "x", "y", "z"} (world-space axes of the weapon mesh)}.
+        """
+        if unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).is_in_play_in_editor():
+            raise RuntimeError('Stop the Play-In-Editor session before previewing poses')
+
+        length = _anim_lib().get_sequence_length(animation)
+
+        if not 0.0 <= time <= length:
+            raise ValueError(f'time {time} is outside the sequence (length {length:.3f}s)')
+
+        if weapon_mesh is not None:
+            if not hand_socket:
+                raise ValueError('hand_socket is required with weapon_mesh')
+
+            if mesh.find_socket(hand_socket) is None:
+                raise ValueError(f'{mesh.get_name()} has no socket {hand_socket!r}')
+
+            if weapon_mesh.find_socket(grip_socket) is None:
+                raise ValueError(f'{weapon_mesh.get_name()} has no socket {grip_socket!r}')
+
+        actor_subsystem = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+        actor_label = f'TEMP_AnimPreview_{label}'
+        weapon_label = f'{actor_label}_Weapon'
+        existing = [actor for actor in actor_subsystem.get_all_level_actors()
+                    if actor.get_actor_label() in (actor_label, weapon_label)]
+        rotation = unreal.Rotator(0.0, 0.0, yaw)
+        root_offset = unreal.Vector(0.0, 0.0, 0.0)
+
+        #루트 모션 시퀀스는 재생 시 루트 본이 잠겨(RootMotionRootLock) 화면상 이동이 없으므로 보정하지 않음
+        if keep_root_in_place and not animation.get_editor_property('enable_root_motion'):
+            pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(
+                animation, time, unreal.AnimPoseEvaluationOptions())
+            root_name = animation.get_editor_property('skeleton').get_reference_pose().get_bone_names()[0]
+            root_offset = unreal.AnimPoseExtensions.get_bone_pose(
+                pose, root_name, unreal.AnimPoseSpaces.WORLD).translation
+            root_offset = unreal.Vector(root_offset.x, root_offset.y, 0.0)
+
+        yaw_radians = math.radians(yaw)
+        rotated_offset = unreal.Vector(
+            root_offset.x * math.cos(yaw_radians) - root_offset.y * math.sin(yaw_radians),
+            root_offset.x * math.sin(yaw_radians) + root_offset.y * math.cos(yaw_radians), 0.0)
+        actor_location = location - rotated_offset
+
+        #기존 액터에 같은 시퀀스를 다시 지정하면 키 수정 전 포즈가 남으므로 매번 새로 생성
+        for previous in existing:
+            actor_subsystem.destroy_actor(previous)
+
+        actor = actor_subsystem.spawn_actor_from_class(unreal.SkeletalMeshActor, actor_location, rotation)
+        actor.set_actor_label(actor_label)
+        component = actor.get_editor_property('skeletal_mesh_component')
+        component.set_skeletal_mesh_asset(mesh)
+        #단일 노드로 지정 시점에 고정 (내부에서 틱 0 + 본 갱신)
+        component.override_animation_data(animation, False, False, time, 0.0)
+        weapon_actor = None
+        weapon_info = None
+
+        if weapon_mesh is not None:
+            weapon_actor = actor_subsystem.spawn_actor_from_class(unreal.StaticMeshActor, actor_location, rotation)
+            weapon_actor.set_actor_label(weapon_label)
+
+            weapon_component = weapon_actor.get_editor_property('static_mesh_component')
+            weapon_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+            weapon_component.set_static_mesh(weapon_mesh)
+            weapon_actor.attach_to_component(
+                component, hand_socket, unreal.AttachmentRule.SNAP_TO_TARGET,
+                unreal.AttachmentRule.SNAP_TO_TARGET, unreal.AttachmentRule.KEEP_WORLD, False)
+            socket = weapon_mesh.find_socket(grip_socket)
+            grip = unreal.Transform(
+                socket.get_editor_property('relative_location'), socket.get_editor_property('relative_rotation'),
+                socket.get_editor_property('relative_scale'))
+            weapon_component.set_relative_transform(grip.inverse(), False, False)
+            world = weapon_component.get_world_transform()
+            axes = world.rotation
+
+            def _round(vector: unreal.Vector) -> list:
+                return [round(vector.x, 3), round(vector.y, 3), round(vector.z, 3)]
+
+            weapon_info = {
+                'location': _round(world.translation),
+                'x': _round(axes.get_axis_x()),
+                'y': _round(axes.get_axis_y()),
+                'z': _round(axes.get_axis_z()),
+            }
+
+        return json.dumps({
+            'actor': actor.get_path_name(),
+            'weapon_actor': weapon_actor.get_path_name() if weapon_actor else None,
+            'actor_location': [round(actor_location.x, 2), round(actor_location.y, 2), round(actor_location.z, 2)],
+            'root_offset': [round(root_offset.x, 2), round(root_offset.y, 2), round(root_offset.z, 2)],
+            'weapon': weapon_info,
+        })
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def clear_animation_previews() -> int:
+        """Destroys every TEMP_AnimPreview_* actor spawned by preview_animation_pose.
+
+        Returns:
+            The number of destroyed actors.
+        """
+        actor_subsystem = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+        previews = [actor for actor in actor_subsystem.get_all_level_actors()
+                    if actor.get_actor_label().startswith('TEMP_AnimPreview_')]
+
+        for actor in previews:
+            actor_subsystem.destroy_actor(actor)
+
+        return len(previews)

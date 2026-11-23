@@ -45,6 +45,12 @@ UActionPracticeAbilitySystemComponent* UActionPracticeAbility::GetActionPractice
 	return nullptr;
 }
 
+bool UActionPracticeAbility::ShouldConsumeStamina() const
+{
+	const UActionPracticeAbilitySystemComponent* APASC = GetActionPracticeAbilitySystemComponentFromActorInfo();
+	return !APASC || APASC->IsInCombat();
+}
+
 AActionPracticeCharacter* UActionPracticeAbility::GetActionPracticeCharacterFromActorInfo() const
 {
 	return Cast<AActionPracticeCharacter>(GetActorInfo().AvatarActor.Get());

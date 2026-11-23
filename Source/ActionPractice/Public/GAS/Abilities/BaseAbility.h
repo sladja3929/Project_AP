@@ -105,6 +105,9 @@ protected:
 	//쿨다운 태그를 AbilityTags로 사용
 	virtual const FGameplayTagContainer* GetCooldownTags() const override;
 
+	//스태미나 실제 소모 여부 (false면 ApplyStaminaCost가 잔량 체크만 하고 GE를 적용하지 않음). 플레이어는 비전투 시 false
+	virtual bool ShouldConsumeStamina() const { return true; }
+
 	// ===== WaitGameplayEvent 헬퍼 =====
 	// 매크로 START_WAIT_EVENT_TASK 사용 권장
 	UAbilityTask_WaitGameplayEvent* CreateWaitGameplayEventTask(

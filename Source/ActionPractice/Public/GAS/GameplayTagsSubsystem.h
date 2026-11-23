@@ -64,6 +64,7 @@ public:
 	static const FGameplayTag& GetStateCanMoveTag();
 	static const FGameplayTag& GetStateCantMoveTag();
 	static const FGameplayTag& GetStateDeadTag();
+	static const FGameplayTag& GetStateInCombatTag();
 	static const FGameplayTag& GetStateRestingTag();
 	static const FGameplayTag& GetStateUndetectableTag();
 	static const FGameplayTag& GetStateHitReactionTag();
@@ -165,6 +166,7 @@ private:
 	const FGameplayTag& GetStateCanMoveTagInternal() const;
 	const FGameplayTag& GetStateCantMoveTagInternal() const;
 	const FGameplayTag& GetStateDeadTagInternal() const;
+	const FGameplayTag& GetStateInCombatTagInternal() const;
 	const FGameplayTag& GetStateRestingTagInternal() const;
 	const FGameplayTag& GetStateUndetectableTagInternal() const;
 	const FGameplayTag& GetStateHitReactionTagInternal() const;
