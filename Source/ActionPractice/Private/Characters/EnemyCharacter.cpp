@@ -95,6 +95,17 @@ void AEnemyCharacter::CreateAttributeSet()
 	AttributeSet = CreateDefaultSubobject<UEnemyAttributeSet>(TEXT("EnemyAttributeSet"));
 }
 
+void AEnemyCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	//시체 충돌 복구용 원래 캡슐 응답 캐시 — 클라이언트 초기 복제(OnRep_IsCorpse)가 BeginPlay보다 먼저 올 수 있어 복제 전 시점에 캐시
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		DefaultCapsulePawnResponse = Capsule->GetCollisionResponseToChannel(ECC_Pawn);
+	}
+}
+
 void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
@@ -171,6 +182,7 @@ void AEnemyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AEnemyCharacter, CombatTarget);
+	DOREPLIFETIME(AEnemyCharacter, bIsCorpse);
 }
 
 void AEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -246,6 +258,29 @@ void AEnemyCharacter::Multicast_FreezeAnimPose_Implementation()
 	{
 		InMesh->bPauseAnims = true;
 	}
+}
+
+void AEnemyCharacter::SetCorpseCollision(bool bCorpse)
+{
+	if (!HasAuthority()) return;
+
+	bIsCorpse = bCorpse;
+	ApplyCorpseCollision();
+}
+
+void AEnemyCharacter::OnRep_IsCorpse()
+{
+	ApplyCorpseCollision();
+}
+
+void AEnemyCharacter::ApplyCorpseCollision()
+{
+	UCapsuleComponent* Capsule = GetCapsuleComponent();
+	if (!Capsule) return;
+
+	//Pawn 채널만 해제 — WorldStatic 등 지형 응답은 유지
+	Capsule->SetCollisionResponseToChannel(ECC_Pawn, bIsCorpse ? ECR_Ignore : DefaultCapsulePawnResponse.GetValue());
+	DEBUG_LOG(TEXT("ApplyCorpseCollision: %s, bIsCorpse=%d"), *GetName(), bIsCorpse);
 }
 
 void AEnemyCharacter::Multicast_ReleaseLockOn_Implementation()
@@ -340,6 +375,9 @@ void AEnemyCharacter::ResetEnemy()
 
 	//초기 위치로 텔레포트
 	SetActorTransform(InitialTransform, false, nullptr, ETeleportType::TeleportPhysics);
+
+	//시체 충돌 복구 (텔레포트 후 — 사망 위치에서 플레이어와 겹친 채 복구되지 않도록)
+	SetCorpseCollision(false);
 
 	//DA 기반 어트리뷰트 재초기화
 	ApplyInitialAttributes();

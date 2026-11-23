@@ -76,6 +76,9 @@ protected:
 	virtual bool StartStaminaDrainEffect();
 	virtual void StopStaminaDrainEffect();
 
+	//스프린트 도중 전투 진입·이탈에 맞춰 드레인 GE 적용·해제 (서버)
+	void SyncStaminaDrainWithCombatState();
+
 	virtual void OnWaitInputRelease(float TimeHeld) override;
 	
 	void CheckSprintConditions();

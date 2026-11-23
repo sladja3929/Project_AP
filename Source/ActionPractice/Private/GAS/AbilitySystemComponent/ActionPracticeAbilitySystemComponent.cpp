@@ -71,14 +71,17 @@ void UActionPracticeAbilitySystemComponent::HandleDeath()
 	if (!AbilityDeathTag.IsValid())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("APASC::HandleDeath - AbilityDeathTag is not valid"));
+		ResetDeathHandled();
 		return;
 	}
 
 	TArray<FGameplayAbilitySpec*> DeathSpecs;
 	GetActivatableGameplayAbilitySpecsByAllMatchingTags(FGameplayTagContainer(AbilityDeathTag), DeathSpecs);
+
 	if (DeathSpecs.IsEmpty())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("APASC::HandleDeath - No Death ability spec found"));
+		ResetDeathHandled();
 		return;
 	}
 
@@ -91,8 +94,69 @@ void UActionPracticeAbilitySystemComponent::HandleDeath()
 
 	if (!TryActivateAbilityWithEventData(DeathSpecs[0]->Handle, nullptr))
 	{
+		//가드를 풀어 다음 피격에서 재시도 (가드가 남으면 HP 0인 채로 영구 불사)
 		UE_LOG(LogTemp, Warning, TEXT("APASC::HandleDeath - Failed to activate PlayerDeathAbility"));
+		ResetDeathHandled();
 	}
+}
+
+void UActionPracticeAbilitySystemComponent::SetEngagedByEnemy(AActor* Enemy, bool bEngaged)
+{
+	if (!Enemy || !OwnerCharacter || !OwnerCharacter->HasAuthority()) return;
+
+	if (bEngaged)
+	{
+		EngagedEnemies.Add(Enemy);
+	}
+	else
+	{
+		EngagedEnemies.Remove(Enemy);
+	}
+
+	RefreshCombatStateTag();
+}
+
+bool UActionPracticeAbilitySystemComponent::IsInCombat() const
+{
+	const FGameplayTag StateInCombatTag = UGameplayTagsSubsystem::GetStateInCombatTag();
+
+	//태그 미설정 시 기존처럼 항상 소모 (전투 판정 불가로 스태미나가 무한이 되는 것 방지)
+	if (!StateInCombatTag.IsValid())
+	{
+		static bool bWarned = false;
+
+		if (!bWarned)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("APASC::IsInCombat - StateInCombatTag is not valid, treating as in combat"));
+			bWarned = true;
+		}
+
+		return true;
+	}
+
+	//전투 진입·이탈 직후 태그 복제 전에 클라이언트가 예측 소모하면 서버와 판정이 어긋날 수 있음
+	//예측 GE는 서버 결과로 롤백되고 서버 값이 최종값이라 순간적인 스태미나 바 흔들림만 허용
+	return HasMatchingGameplayTag(StateInCombatTag);
+}
+
+void UActionPracticeAbilitySystemComponent::RefreshCombatStateTag()
+{
+	const FGameplayTag StateInCombatTag = UGameplayTagsSubsystem::GetStateInCombatTag();
+	if (!StateInCombatTag.IsValid()) return;
+
+	//알림 없이 파괴된 적 정리
+	for (auto It = EngagedEnemies.CreateIterator(); It; ++It)
+	{
+		if (!It->IsValid())
+		{
+			It.RemoveCurrent();
+		}
+	}
+
+	//CountToOwner — 시뮬레이티드 프록시뿐 아니라 소유 클라이언트에도 복제 (예측 스태미나 소모 판정용, Iris 폴백 경로 포함)
+	const int32 NewCount = EngagedEnemies.IsEmpty() ? 0 : 1;
+	SetLooseGameplayTagCount(StateInCombatTag, NewCount, EGameplayTagReplicationState::CountToOwner);
+	DEBUG_LOG(TEXT("RefreshCombatStateTag: EngagedEnemies=%d, InCombat=%d"), EngagedEnemies.Num(), NewCount);
 }
 
 void UActionPracticeAbilitySystemComponent::AbilitySpecInputPressed(FGameplayAbilitySpec& Spec)
@@ -291,9 +355,10 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 		const float OldPoise = APAttributeSet->GetPoise();
 		LastEffectivePoise = OldPoise - FinalAttackData.PoiseDamage;
 
-		//===== 가드 스태미나 소모 (엘든링 가드 공식) =====
+		//===== 가드 스태미나 소모 (엘든링 가드 공식, 비전투 시 소모 없음) =====
 		bool bGuardBroken = false;
-		if (FinalAttackData.PoiseDamage > 0.0f && BlockData)
+
+		if (FinalAttackData.PoiseDamage > 0.0f && BlockData && IsInCombat())
 		{
 			const float GuardStrength = FMath::Clamp(BlockData->GuardStrength, 0.0f, 100.0f);
 			const float ParryFallbackMultiplier = bIsParryActive ? 4.0f : 1.0f;

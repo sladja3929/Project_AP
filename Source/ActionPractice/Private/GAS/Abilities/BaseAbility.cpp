@@ -114,6 +114,12 @@ bool UBaseAbility::ApplyStaminaCost()
 		return false;
 	}
 
+	//잔량 체크는 통과, 실제 소모만 생략 (플레이어 비전투 등)
+	if (!ShouldConsumeStamina())
+	{
+		return true;
+	}
+
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
 	if (!ASC || !StaminaCostEffect)
 	{

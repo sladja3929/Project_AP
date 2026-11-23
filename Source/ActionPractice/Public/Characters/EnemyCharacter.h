@@ -44,6 +44,7 @@ public:
 	AEnemyCharacter();
 
 	virtual void Tick(float DeltaTime) override;
+	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 
 	//AI 빙의 시 GAS 초기화 (컨트롤러 OnPossess가 StateTree를 시작하기 전에 ASC를 준비)와 전투 상태 델리게이트 바인딩
@@ -92,6 +93,9 @@ public:
 	//사망 포즈 고정 — ServerOnly 어빌리티는 bPauseAnims가 복제되지 않으므로 Multicast로 전파
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_FreezeAnimPose();
+
+	//시체 충돌 전환 (서버 전용) — 사망 시 true로 캡슐의 Pawn 충돌을 해제해 이동을 막지 않게 하고, 리셋 시 false로 복구
+	void SetCorpseCollision(bool bCorpse);
 
 	// ===== Replication =====
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -148,12 +152,25 @@ private:
 	//HP바 자동 숨김 타이머
 	FTimerHandle HealthBarVisibilityTimer;
 
+	//시체 상태 — 충돌 응답은 복제되지 않으므로 상태를 복제해 각 머신에서 캡슐 충돌 적용 (늦게 relevant된 클라이언트 포함)
+	UPROPERTY(ReplicatedUsing = OnRep_IsCorpse, Transient)
+	bool bIsCorpse = false;
+
+	//복구용 캡슐 Pawn 채널 원래 응답 (BeginPlay 캐시, BP 오버라이드 반영)
+	TEnumAsByte<ECollisionResponse> DefaultCapsulePawnResponse = ECR_Block;
+
 #pragma endregion
 
 #pragma region "Private Functions"
 
 	//타이머 콜백 — 락온 중이 아니면 HP바 숨김
 	void OnHealthBarTimerExpired();
+
+	UFUNCTION()
+	void OnRep_IsCorpse();
+
+	//bIsCorpse에 맞춰 캡슐 Pawn 채널 응답 적용
+	void ApplyCorpseCollision();
 
 #pragma endregion
 };

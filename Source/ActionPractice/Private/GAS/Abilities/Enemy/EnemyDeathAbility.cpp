@@ -23,6 +23,9 @@ UEnemyDeathAbility::UEnemyDeathAbility()
 	//적은 서버 전용 (클라이언트는 몽타주 복제로 재생)
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
+	//사망은 스태미나와 무관하게 항상 발동
+	StaminaCost = -1.0f;
 }
 
 void UEnemyDeathAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
@@ -78,10 +81,13 @@ void UEnemyDeathAbility::ExecuteDeathServerLogic()
 	//AI 로직 정지
 	StopEnemyAI();
 
-	//락온 해제 — 모든 클라이언트에서 이 적을 타깃으로 한 락온 해제
 	if (AEnemyCharacter* Enemy = GetEnemyCharacterFromActorInfo())
 	{
+		//락온 해제 — 모든 클라이언트에서 이 적을 타깃으로 한 락온 해제
 		Enemy->Multicast_ReleaseLockOn();
+
+		//시체가 플레이어·다른 적의 이동을 막지 않도록 캡슐 Pawn 충돌 해제
+		Enemy->SetCorpseCollision(true);
 	}
 }
 

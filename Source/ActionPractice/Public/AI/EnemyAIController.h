@@ -163,6 +163,9 @@ private:
 	//전투 상태 여부 (true면 시야 변화로 타깃을 잃지 않음)
 	bool bInCombat = false;
 
+	//교전을 통지한 플레이어 (플레이어 전투 상태 State.InCombat 집계용, CurrentTarget과 별도로 해제 통지 대상 보관)
+	TWeakObjectPtr<AActor> EngagedTarget;
+
 	FTimerHandle CombatReleaseCheckTimer;
 
 	//소속 무리 (UEnemyPackSubsystem 소유, 전투 중에만 존재)
@@ -184,6 +187,9 @@ private:
 
 	//전투 해제 조건 검사 (타이머 콜백)
 	void CheckCombatRelease();
+
+	//교전 대상 변경 — 이전 대상에 이탈, 새 대상에 참여 통지 (플레이어 ASC가 State.InCombat 집계). nullptr이면 이탈만
+	void SetEngagedTarget(AActor* NewTarget);
 
 	//소속 무리 탈퇴
 	void LeavePack();

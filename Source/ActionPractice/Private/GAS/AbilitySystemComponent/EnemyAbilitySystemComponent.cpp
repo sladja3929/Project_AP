@@ -284,6 +284,7 @@ void UEnemyAbilitySystemComponent::HandleDeath()
 	if (!AbilityDeathTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("EnemyASC::HandleDeath - AbilityDeathTag is not valid"));
+		ResetDeathHandled();
 		return;
 	}
 
@@ -292,6 +293,7 @@ void UEnemyAbilitySystemComponent::HandleDeath()
 	if (DeathSpecs.IsEmpty())
 	{
 		DEBUG_LOG(TEXT("EnemyASC::HandleDeath - No Death ability spec found"));
+		ResetDeathHandled();
 		return;
 	}
 
@@ -304,6 +306,8 @@ void UEnemyAbilitySystemComponent::HandleDeath()
 
 	if (!TryActivateAbilityWithEventData(DeathSpecs[0]->Handle, nullptr))
 	{
+		//가드를 풀어 다음 피격에서 재시도
 		DEBUG_LOG(TEXT("EnemyASC::HandleDeath - Failed to activate EnemyDeathAbility"));
+		ResetDeathHandled();
 	}
 }

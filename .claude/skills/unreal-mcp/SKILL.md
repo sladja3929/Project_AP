@@ -70,6 +70,17 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 -C++ AnimInstance 변수의 getter는 `Variables|<카테고리, 공백 제거>|Get<이름>`으로 만든다
 -스테이트 머신 내부 서브그래프에서는 find_node_types가 실패한다(AnimStateNode → Blueprint 캐스트 오류). 최상위 AnimGraph에서는 동작한다
 
+##애니메이션 포즈 수정 (AnimMontageTools)
+-키 편집 전 AssetTools.duplicate로 TEMP_ 백업을 만들고, 반복 수정은 TEMP_ 작업본에서 한 뒤 copy_bone_keys로 원본에 옮긴다 (원본의 몽타주 참조·노티파이 유지)
+-포즈 확인: preview_animation_pose(무기 메시·손 소켓·grip_oh_socket 지정 시 게임과 같은 방식으로 부착) → CaptureViewport → clear_animation_previews. 레벨은 저장하지 않는다
+  -여러 시점을 다른 label·위치로 나란히 띄우면 한 장으로 흐름을 본다 (ProgrammaticToolset 스크립트로 일괄 생성)
+  -같은 액터에 같은 시퀀스를 다시 지정하면 키 수정 전 포즈가 남는다. 툴이 매번 액터를 새로 만들므로 직접 재사용하지 않는다
+  -루트 모션 시퀀스는 재생 시 루트가 잠겨 제자리에서 보인다
+-수정: 특정 방향으로 맞출 때는 aim_bones(본 로컬 축 → 컴포넌트 공간 목표 방향, 매 프레임 조준), 일정 각도만 더할 때는 rotate_bones(컴포넌트 공간 축·각도). 둘 다 구간 블렌드 인·아웃 지원
+  -상체 등 부모를 먼저 돌린 뒤 손을 조준해야 손 방향이 유지된다. 순서를 바꿔야 하면 copy_bone_keys로 백업에서 되돌린 뒤 다시 적용
+  -무기 방향 조준축은 preview 결과의 무기 축과 get_bone_axes(같은 시점)의 손 축 내적으로 손 로컬 축을 구한다 (플레이어 검은 무기 메시 +Z가 검날)
+  -get_bone_axes·get_bone_poses는 원시 키 기준이라 편집 직후 바로 검증할 수 있다
+
 ##UMG 위젯 (UMGToolSet)
 -C++ BindWidget 타입을 바꾸면(예: UButton → UMenuButtonWidget) 에디터 시작 시 기존 WBP 컴파일에서 "generated variable ... failed to find a property" ensure가 난다. WBP의 해당 위젯을 새 타입으로 교체하면 해소된다
 -같은 이름으로 위젯을 다시 만들 때는 기존 위젯을 RenameWidget(Legacy_ 접두사)으로 먼저 바꾼 뒤 RemoveWidget한다 (이름 충돌 방지)
