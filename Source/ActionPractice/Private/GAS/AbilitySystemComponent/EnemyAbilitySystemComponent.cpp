@@ -2,6 +2,7 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Actor.h"
 #include "Characters/EnemyCharacter.h"
+#include "Characters/Enemy/EnemyDataAsset.h"
 #include "GAS/AttributeSet/EnemyAttributeSet.h"
 #include "GAS/AttributeSet/BaseAttributeSet.h"
 #include "GAS/GameplayTagsSubsystem.h"
@@ -20,6 +21,16 @@
 #else
 	#define DEBUG_LOG(Format, ...)
 #endif
+
+namespace
+{
+	//그로기가 있는 적인지 (DA에 그로기 시작 몽타주가 없으면 그로기 자체가 없는 적. 예: 늑대)
+	bool HasGroggy(const AEnemyCharacter* Enemy)
+	{
+		const UEnemyDataAsset* EnemyData = Enemy ? Enemy->GetEnemyData() : nullptr;
+		return EnemyData && !EnemyData->GroggyStartMontage.IsNull();
+	}
+}
 
 UEnemyAbilitySystemComponent::UEnemyAbilitySystemComponent()
 {
@@ -100,6 +111,15 @@ void UEnemyAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, 
 		return;
 	}
 
+	//피격 시 공격자와 전투 진입 (시야 밖에서 맞아도 전투로 전환, 이미 전투 중이면 무시)
+	if (CachedEnemyCharacter.IsValid())
+	{
+		if (AEnemyAIController* AIC = CachedEnemyCharacter->GetEnemyAIController())
+		{
+			AIC->EnterCombat(SourceActor);
+		}
+	}
+
 	//2. 그로기 체크 (HitReaction보다 우선)
 	if (ShouldActivateGroggy())
 	{
@@ -139,6 +159,12 @@ void UEnemyAbilitySystemComponent::HandleOnDamagedResolved(AActor* SourceActor, 
 
 bool UEnemyAbilitySystemComponent::ShouldActivateGroggy() const
 {
+	//그로기 없는 적은 Stance가 바닥나도 HitReaction 판정으로 넘어감
+	if (!HasGroggy(CachedEnemyCharacter.Get()))
+	{
+		return false;
+	}
+
 	const UEnemyAttributeSet* EnemyAttributeSet = GetEnemyAttributeSet();
 	if (!EnemyAttributeSet)
 	{
@@ -150,6 +176,13 @@ bool UEnemyAbilitySystemComponent::ShouldActivateGroggy() const
 
 void UEnemyAbilitySystemComponent::ActivateGroggyAbility(const FFinalAttackData& FinalAttackData)
 {
+	//그로기 없는 적은 패리 강제 그로기도 무시 (어빌리티·State.Groggy 태그·ST 이벤트 모두 생략)
+	if (!HasGroggy(CachedEnemyCharacter.Get()))
+	{
+		DEBUG_LOG(TEXT("ActivateGroggyAbility: %s has no groggy"), *GetNameSafe(GetAvatarActor()));
+		return;
+	}
+
 	if (!EnemyAbilityGroggyTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("ActivateGroggyAbility: GroggyTag is not valid"));

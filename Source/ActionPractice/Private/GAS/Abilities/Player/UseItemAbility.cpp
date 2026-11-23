@@ -29,9 +29,6 @@ UUseItemAbility::UUseItemAbility()
 	//아이템 사용은 스태미나 소모 없음
 	StaminaCost = -1.0f;
 
-	//회전 불필요 (제자리에서 사용)
-	RotateTime = 0.0f;
-
 	//네트워크: LocalPredicted
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -248,14 +245,14 @@ void UUseItemAbility::ApplyItemEffect()
 	DEBUG_LOG(TEXT("ApplyItemEffect: Effect applied. Magnitude=%.2f Duration=%.2f"),
 		CachedItemDA->EffectMagnitude, CachedItemDA->EffectDuration);
 
-	//아이템 수량 차감 (서버 권위)
+	//아이템 수량 차감 (서버 권위) — 사용 도중 퀵슬롯이 바뀌어도 실제 사용한 아이템 기준
 	AActionPracticeCharacter* Character = GetActionPracticeCharacterFromActorInfo();
 	if (Character)
 	{
 		UItemManagerComponent* ItemManager = Character->GetItemManagerComponent();
 		if (ItemManager)
 		{
-			ItemManager->ConsumeEquippedItem();
+			ItemManager->ConsumeItem(CachedItemDA);
 		}
 	}
 }

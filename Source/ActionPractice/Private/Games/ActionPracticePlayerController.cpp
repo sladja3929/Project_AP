@@ -12,17 +12,22 @@
 #include "Characters/ItemManagerComponent.h"
 #include "Characters/InteractionComponent.h"
 #include "Interaction/Bonfire.h"
+#include "AI/BossArena.h"
+#include "EngineUtils.h"
 #include "Interaction/IInteractable.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "GAS/AbilitySystemComponent/ActionPracticeAbilitySystemComponent.h"
 #include "UI/MasterHUDWidget.h"
 #include "UI/DeathScreenWidget.h"
+#include "UI/PauseMenuWidget.h"
 #include "Characters/BossCharacter.h"
 #include "GAS/AttributeSet/EnemyAttributeSet.h"
 #include "GAS/AttributeSet/ActionPracticeAttributeSet.h"
 #include "Characters/WeaponManagerComponent.h"
 #include "Characters/ItemManagerComponent.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "Blueprint/UserWidget.h"
 
@@ -138,6 +143,14 @@ void AActionPracticePlayerController::SetupInputComponent()
 			EIC->BindAction(IA_Pause, ETriggerEvent::Started, this, &AActionPracticePlayerController::OnPauseInput);
 		}
 	}
+
+#if !UE_BUILD_SHIPPING
+	//디버그: "6" 키로 보스룸 앞 Bonfire 이동 (1·2·3은 무기/적 디버그 트레이스·히트디텍션 토글이 사용)
+	if (InputComponent)
+	{
+		InputComponent->BindKey(EKeys::Six, IE_Pressed, this, &AActionPracticePlayerController::OnDebugTeleportToBossBonfire);
+	}
+#endif
 }
 
 void AActionPracticePlayerController::OnPossess(APawn* InPawn)
@@ -360,22 +373,53 @@ void AActionPracticePlayerController::OnInteractInput()
 {
 	if (!CachedCharacter) return;
 
-	//휴식 중이면 Ability.Rest 이벤트를 전송해 RestAbility의 WaitGameplayEvent를 트리거
-	//RestAbility는 ServerInitiated라 WaitInputPress 신호 전달이 불가능하므로 GameplayEvent 방식 사용
-	UActionPracticeAbilitySystemComponent* APASC = Cast<UActionPracticeAbilitySystemComponent>(CachedCharacter->GetAbilitySystemComponent());
-	if (APASC && APASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRestingTag()))
-	{
-		FGameplayEventData ExitEventData;
-		ExitEventData.EventTag = UGameplayTagsSubsystem::GetAbilityRestTag();
-		APASC->HandleGameplayEvent_NetPredicted(UGameplayTagsSubsystem::GetAbilityRestTag(), &ExitEventData);
-		DEBUG_LOG(TEXT("OnInteractInput: Sent exit rest event"));
-		return;
-	}
+	//휴식 중 일어서기는 InputKey에서 처리 (아무 키), 상호작용은 막음
+	if (IsResting()) return;
 
 	UInteractionComponent* InteractionComp = CachedCharacter->FindComponentByClass<UInteractionComponent>();
 	if (!InteractionComp) return;
 
 	InteractionComp->TryInteract();
+}
+
+bool AActionPracticePlayerController::InputKey(const FInputKeyEventArgs& Params)
+{
+	//마우스 이동·스틱 값 같은 아날로그 축은 제외 (스틱을 크게 기울인 가상 버튼 입력은 포함)
+	if (Params.Event == IE_Pressed && !Params.Key.IsAnalog() && IsResting() && !IsPauseKey(Params.Key))
+	{
+		SendExitRestEvent();
+	}
+
+	return Super::InputKey(Params);
+}
+
+bool AActionPracticePlayerController::IsResting() const
+{
+	if (!CachedCharacter) return false;
+
+	const UAbilitySystemComponent* ASC = CachedCharacter->GetAbilitySystemComponent();
+	return ASC && ASC->HasMatchingGameplayTag(UGameplayTagsSubsystem::GetStateRestingTag());
+}
+
+bool AActionPracticePlayerController::IsPauseKey(const FKey& Key) const
+{
+	if (!IA_Pause) return false;
+
+	const UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+	return Subsystem && Subsystem->QueryKeysMappedToAction(IA_Pause).Contains(Key);
+}
+
+void AActionPracticePlayerController::SendExitRestEvent()
+{
+	//RestAbility는 ServerInitiated라 WaitInputPress 신호 전달이 불가능하므로 GameplayEvent 방식 사용
+	UAbilitySystemComponent* ASC = CachedCharacter ? CachedCharacter->GetAbilitySystemComponent() : nullptr;
+	UActionPracticeAbilitySystemComponent* APASC = Cast<UActionPracticeAbilitySystemComponent>(ASC);
+	if (!APASC) return;
+
+	FGameplayEventData ExitEventData;
+	ExitEventData.EventTag = UGameplayTagsSubsystem::GetAbilityRestTag();
+	APASC->HandleGameplayEvent_NetPredicted(UGameplayTagsSubsystem::GetAbilityRestTag(), &ExitEventData);
+	DEBUG_LOG(TEXT("SendExitRestEvent: Sent exit rest event"));
 }
 
 #pragma region "UI"
@@ -392,6 +436,13 @@ void AActionPracticePlayerController::InitializeMasterHUD()
 		MasterHUDWidget->AddToViewport();
 		//AddToViewport 이후 호출 — UMG 초기화 완료 후 자식 위젯 생성
 		MasterHUDWidget->CreateChildWidgets();
+
+		//계속하기 버튼도 ESC 토글과 같은 입력 모드 복원 경로를 거치도록 PC가 처리
+		if (UPauseMenuWidget* PauseMenu = MasterHUDWidget->GetPauseMenuWidget())
+		{
+			PauseMenu->OnResumeRequested.AddUObject(this, &AActionPracticePlayerController::HandlePauseMenuResumeRequested);
+		}
+
 		DEBUG_LOG(TEXT("MasterHUDWidget created and added to viewport"));
 	}
 }
@@ -591,6 +642,21 @@ void AActionPracticePlayerController::OnPauseInput()
 	if (!MasterHUDWidget) return;
 
 	MasterHUDWidget->TogglePauseMenu();
+	ApplyPauseMenuInputMode();
+}
+
+void AActionPracticePlayerController::HandlePauseMenuResumeRequested()
+{
+	if (!IsLocalController()) return;
+	if (!MasterHUDWidget) return;
+
+	MasterHUDWidget->HidePauseMenu();
+	ApplyPauseMenuInputMode();
+}
+
+void AActionPracticePlayerController::ApplyPauseMenuInputMode()
+{
+	if (!MasterHUDWidget) return;
 
 	if (MasterHUDWidget->IsPauseMenuVisible())
 	{
@@ -606,6 +672,77 @@ void AActionPracticePlayerController::OnPauseInput()
 		SetInputMode(FInputModeGameOnly());
 		DEBUG_LOG(TEXT("Pause Menu Closed"));
 	}
+}
+
+#pragma endregion
+
+#pragma region "Debug"
+
+void AActionPracticePlayerController::OnDebugTeleportToBossBonfire()
+{
+	Server_DebugTeleportToBossBonfire();
+}
+
+void AActionPracticePlayerController::Server_DebugTeleportToBossBonfire_Implementation()
+{
+#if !UE_BUILD_SHIPPING
+	APawn* ControlledPawn = GetPawn();
+	UWorld* World = GetWorld();
+
+	if (!ControlledPawn || !World)
+	{
+		return;
+	}
+
+	//보스룸이 있는 맵에서만 동작 (보스룸에 가장 가까운 Bonfire = 보스 직전 휴식 지점)
+	TActorIterator<ABossArena> ArenaIt(World);
+
+	if (!ArenaIt)
+	{
+		DEBUG_LOG(TEXT("DebugTeleportToBossBonfire: No BossArena in this map"));
+		return;
+	}
+
+	const FVector ArenaLocation = ArenaIt->GetActorLocation();
+	ABonfire* NearestBonfire = nullptr;
+	double NearestDistSq = TNumericLimits<double>::Max();
+
+	for (TActorIterator<ABonfire> It(World); It; ++It)
+	{
+		const double DistSq = FVector::DistSquared(It->GetActorLocation(), ArenaLocation);
+
+		if (DistSq < NearestDistSq)
+		{
+			NearestDistSq = DistSq;
+			NearestBonfire = *It;
+		}
+	}
+
+	if (!NearestBonfire)
+	{
+		DEBUG_LOG(TEXT("DebugTeleportToBossBonfire: No Bonfire in this map"));
+		return;
+	}
+
+	//사망 중에는 이동하지 않음 (리스폰 흐름과 충돌 방지)
+	const UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(ControlledPawn);
+	const FGameplayTag& DeadTag = UGameplayTagsSubsystem::GetStateDeadTag();
+
+	if (ASC && DeadTag.IsValid() && ASC->HasMatchingGameplayTag(DeadTag))
+	{
+		return;
+	}
+
+	//낙하 등 남은 속도 제거 후, 리스폰과 같은 위치·방식으로 이동하고 카메라도 리스폰 방향으로 맞춤
+	if (const ACharacter* ControlledCharacter = Cast<ACharacter>(ControlledPawn))
+	{
+		ControlledCharacter->GetCharacterMovement()->StopMovementImmediately();
+	}
+
+	ControlledPawn->SetActorTransform(NearestBonfire->GetRespawnTransform(), false, nullptr, ETeleportType::TeleportPhysics);
+	ClientSetRotation(NearestBonfire->GetRespawnRotation());
+	DEBUG_LOG(TEXT("DebugTeleportToBossBonfire: %s"), *GetNameSafe(NearestBonfire));
+#endif
 }
 
 #pragma endregion

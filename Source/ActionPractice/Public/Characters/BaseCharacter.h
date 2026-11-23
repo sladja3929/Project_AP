@@ -11,6 +11,7 @@ class UAbilitySystemComponent;
 class UAttributeSet;
 class AWeapon;
 class IHitDetectionInterface;
+class UAPMotionWarpingComponent;
 struct FGameplayTag;
 
 UCLASS(abstract)
@@ -29,6 +30,9 @@ public:
 	ABaseCharacter();
 
 	virtual void Tick(float DeltaTime) override;
+
+	//===== Motion Warping =====
+	FORCEINLINE UAPMotionWarpingComponent* GetMotionWarpingComponent() const { return MotionWarpingComponent; }
 
 	//===== GAS Interface =====
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
@@ -64,7 +68,13 @@ protected:
 	//부여된 AbilitySet 핸들 (회수용)
 	TArray<FAbilitySetGrantedHandles> GrantedSetHandles;
 
+	//===== Motion Warping =====
+	//몽타주 워프 윈도우 기반 회전 보정 (몽타주 종료/중단 시 함께 종료)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Motion Warping", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAPMotionWarpingComponent> MotionWarpingComponent = nullptr;
+
 	//===== Rotation Variables =====
+	//몽타주 워핑을 쓸 수 없는 경우에만 사용하는 틱 기반 회전 (이동 비활성 상태의 Rest, 비루트모션 런지의 TrackingTarget ANS)
 	FRotator TargetActionRotation;
 	FRotator StartActionRotation;
 	float CurrentRotationTime = 0;

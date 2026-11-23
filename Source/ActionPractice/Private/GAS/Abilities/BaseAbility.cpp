@@ -189,9 +189,9 @@ const UBaseAttributeSet* UBaseAbility::GetBaseAttributeSetFromActorInfo(const FG
 const FGameplayTagContainer* UBaseAbility::GetCooldownTags() const
 {
 	//AbilityTags를 쿨다운 태그로 사용
-	if (AbilityTags.IsValid() && AbilityTags.Num() > 0)
+	if (GetAssetTags().IsValid() && GetAssetTags().Num() > 0)
 	{
-		return &AbilityTags;
+		return &GetAssetTags();
 	}
 
 	return Super::GetCooldownTags();
@@ -244,10 +244,10 @@ void UBaseAbility::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const 
 	}
 
 	//AbilityTags를 동적으로 부여 (GetCooldownTags와 일치시킴)
-	if (AbilityTags.IsValid() && AbilityTags.Num() > 0)
+	if (GetAssetTags().IsValid() && GetAssetTags().Num() > 0)
 	{
-		SpecHandle.Data->DynamicGrantedTags.AppendTags(AbilityTags);
-		DEBUG_LOG(TEXT("ApplyCooldown: Added AbilityTags as Granted Tags"));
+		SpecHandle.Data->DynamicGrantedTags.AppendTags(GetAssetTags());
+		DEBUG_LOG(TEXT("ApplyCooldown: Added AssetTags as Granted Tags"));
 	}
 
 	//자기 자신에게 적용

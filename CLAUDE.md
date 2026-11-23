@@ -1,7 +1,7 @@
 #프로젝트 개요
--언어: 한국어로 소통
--Unreal Engine 5.7 C++ 프로젝트
--클래스 API를 제공할 때 무조건 언리얼 5.7 버전에서 유효한지 확인할 것
+-언어: 한국어로 소통. 툴 호출 사이 한 줄 진행 문장, 컨텍스트 압축 직후 재개, 리포트까지 사용자에게 보이는 모든 텍스트는 한국어 (코드 식별자·에셋 이름·로그 원문만 예외)
+-Unreal Engine 5.8 C++ 프로젝트
+-클래스 API를 제공할 때 무조건 언리얼 5.8 버전에서 유효한지 확인할 것
 -엘든 링, 몬스터 헌터 월드를 레퍼런스로 하는 액션 RPG 게임 개발
 -취업 포트폴리오 용 토이 프로젝트
 -현업에서 자주 사용하는 기술들을 제공할 것
@@ -9,9 +9,31 @@
 
 #빌드
 -빌드는 반드시 아래 명령 한 가지 형태로만 실행할 것 (git bash 기준, 경로/인자 변형 금지 — 권한 프롬프트 난립 방지)
--"C:/Program Files/Epic Games/UE_5.7/Engine/Build/BatchFiles/Build.bat" ActionPracticeEditor Win64 Development "D:/unreal/ActionPractice/ActionPractice.uproject" -waitmutex
+-"D:/Epic Games/UE_5.8/Engine/Build/BatchFiles/Build.bat" ActionPracticeEditor Win64 Development "D:/unreal/ActionPractice/ActionPractice.uproject" -waitmutex
 -데디케이티드 서버 타깃 빌드가 필요하면 타깃명만 ActionPracticeServer로 바꾸고 나머지 형태는 동일하게 유지할 것
 -cmd.exe 래퍼, 백슬래시 경로(C:\...), UnrealBuildTool.exe 직접 호출 등 다른 형태로 조합하지 말 것
+-에디터가 켜져 있으면 빌드 전에 사용자에게 종료를 요청할 것 (미저장 작업 보호). 사용자가 닫았다고 하면 재확인 없이 바로 빌드
+-함수 본문만 바뀐 경우 에디터가 켜져 있으면 MCP Live Coding으로 반영 가능. 이 경우 다음 에디터 종료 시 정식 빌드로 마무리 (새 UFUNCTION·헤더 변경은 정식 빌드 필수)
+-빌드 후 에디터는 내가 MCP로 할 작업이 남아 있을 때만 직접 실행하고 MCP 응답을 기다린 뒤 진행. 확인할 것이 없거나 사용자 작업(PIE 확인 등)만 남으면 켜지 않음
+
+#작업 흐름 (구현 / 검수)
+-구현은 메인 세션이 직접 수행하고, 완료 후 reviewer 서브에이전트로 검수할 것
+-reviewer 호출 프롬프트에는 플랜 범위(목표·제외 항목)와 변경 파일 목록, 빌드 결과만 넣을 것. 구현 의도에 대한 해명이나 "이건 의도한 것" 같은 설명은 넣지 않음 (검수 독립성 유지)
+-reviewer 피드백은 메인 세션이 판단해 직접 반영하고, Critical 수정 후에는 필요 시 재검수
+-문서 구분: docs/는 git으로 외부에 공유되는 프로젝트 필수 문서(현재 ARCHITECTURE.md, STATETREE_COMBAT_LAYOUT.md)만 둠
+-소통용 파일(plan/result, 작업 정리 md, png 스크린샷, log/txt)과 개인 문서(하네스 정리, 현황 분석, 포트폴리오용 회고 등)는 collab/에 두고 git에 올리지 않음
+-docs/에 새 문서를 추가할 때는 "다른 개발자가 이 프로젝트를 이해·수정하는 데 필요한가"를 기준으로 판단하고, 애매하면 collab/에 둘 것
+-사용자가 이미지·로그를 언급하면 collab/에서 먼저 찾고, 사용자용 정리 문서를 새로 만들 때도 collab/에 생성할 것
+-developer 서브에이전트는 설계가 확정된 기계적 대량 변경(리네이밍, 레거시 삭제, 다수 파일 일괄 수정)이나 메인 컨텍스트 보호가 필요한 작업에만 위임
+-커밋은 사용자가 요청할 때만 하고, 커밋 시 push까지 함께 수행. 커밋 메시지에 Co-Authored-By 줄은 넣지 않음
+
+#MCP 에셋 편집 주의사항
+-unreal-mcp 툴로 에셋·BP·레벨을 편집하거나 에디터·PIE를 다루기 전에 unreal-mcp 스킬(공통 규칙과 함정 원본)을 읽을 것. 아래는 그중 반드시 지킬 BP 기본값 규칙
+-BP 기본값(CDO·컴포넌트 템플릿)은 반드시 ap_toolset BlueprintDefaultsTools.set_blueprint_defaults로 수정 (레벨 배치 인스턴스 전파 + BP·액터 패키지 저장)
+-ObjectTools.set_properties로 BP CDO·컴포넌트 템플릿을 직접 바꾸지 말 것. 열린 레벨의 배치 인스턴스에 전파되지 않아 PIE에 반영 안 되고, 이 상태로 레벨을 저장하면 이전 값이 인스턴스 오버라이드로 굳음
+-ObjectTools.reset_properties를 BP 인스턴스·컴포넌트에 쓰지 말 것. BP 값이 아닌 네이티브 클래스 기본값으로 되돌림 (인스턴스를 BP 값으로 맞출 때는 sync_blueprint_instances)
+-BP 값을 바꿨는데 PIE 동작이 그대로면 check_blueprint_instances로 배치 인스턴스 값부터 확인. 결과의 unloaded_map_references(로드 안 된 맵)는 해당 맵을 열었을 때 다시 확인
+-set_blueprint_defaults 결과의 failed_instances·kept_overrides가 비어 있지 않거나 호출이 중간에 실패하면 check_blueprint_instances → sync_blueprint_instances(force=True)로 복구 (재호출은 이전 값이 이미 바뀌어 전파 안 됨)
 
 #코드 컨벤션
 -중괄호는 Allman 스타일
@@ -111,6 +133,10 @@ private:
 -새 어빌리티/전투 액션을 추가할 때는 add-ability 스킬의 절차(부모 클래스 선택 → 태스크 구성 → 태그 흐름)를 따를 것
 -직접 구현 요청이 없으면 부모 클래스 선택, 상속 이유, 태스크 구성, 태그 흐름을 먼저 설명할 것
 
+#새 적 NPC 추가
+-일반몹/보스를 추가할 때는 add-enemy 스킬의 절차(레퍼런스 복제 → BP/DA/AI/StateTree 연결 → 몽타주 → 검증)를 따를 것
+-몽타주는 사망·피격·기본 공격 1개만 필수, 그로기·추가 공격·콤보·런지는 요청 시에만 구성할 것
+
 #태그 및 이벤트 규칙
 -GameplayTagsSubsystem은 프로젝트 전반의 태그 접근 진입점으로 간주할 것
 -태그 관련 답변은 GameplayTagsSubsystem의 Static Getter 패턴과 Internal Getter 패턴을 기준으로 설명할 것
@@ -153,9 +179,10 @@ private:
 #StateTree 주의사항
 -Property Binding은 Context Actor의 서브오브젝트(컴포넌트) 프로퍼티만 노출함. 액터 직속 UPROPERTY 멤버는 노출 안 됨
 -태그 기반 Condition은 노드 선택 시점에만 평가됨. 글로벌 전환이 필요하면 Root 레벨 On Event Transition 사용
+-공격(ActivateAbilityTask) 상태에는 쿨다운이 0이어도 항상 쿨다운 조건(HasGameplayTagsCondition, 어빌리티 AbilityTags, bInvert)을 두고, Combat 맨 끝에는 Wait 상태를 둠 (docs/STATETREE_COMBAT_LAYOUT.md)
 
 #응답 원칙
 -질문에서 AP 접두사를 사용하면 보통 ActionPractice를 줄여서 부르는 것으로 해석할 것
 -직접 구현 요청이 없으면 설계 의도, 시스템 관계, 리팩터링 포인트, 클래스 책임 분리를 우선 설명할 것
 -새 코드를 제안할 때는 현재 프로젝트의 GAS, StateTree, InputBuffer, GameplayTagsSubsystem 중심 구조를 해치지 않는 방향으로 제안할 것
--언리얼 5.7에서 유효하지 않은 API나 구버전 방식은 사용하지 말 것
+-언리얼 5.8에서 유효하지 않은 API나 구버전 방식은 사용하지 말 것

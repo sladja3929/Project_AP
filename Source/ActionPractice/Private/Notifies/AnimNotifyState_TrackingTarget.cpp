@@ -96,6 +96,7 @@ void UAnimNotifyState_TrackingTarget::NotifyTick(USkeletalMeshComponent* MeshCom
 	if (!ResolveCurrentTarget(Enemy, TargetActor, TargetLocation)) return;
 
 	//매 틱 회전 보간 유지
+	//런지 몽타주는 애니메이션 루트 모션이 아니라 모션 워핑 적용 불가 → 틱 회전 유지
 	Enemy->RotateToTarget(TargetActor, RotateInterpTime);
 
 	//timer 비활성화 시 destination 이벤트는 Begin/End에서만 발사 (기존 동작 폴백)

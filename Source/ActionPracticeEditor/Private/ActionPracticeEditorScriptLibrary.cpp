@@ -1,0 +1,495 @@
+#include "ActionPracticeEditorScriptLibrary.h"
+
+#include "StateTree.h"
+#include "StateTreeCompilerLog.h"
+#include "StateTreeEditingSubsystem.h"
+#include "Logging/TokenizedMessage.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/Skeleton.h"
+#include "Engine/Font.h"
+#include "Engine/FontFace.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Misc/PackageName.h"
+#include "UObject/Package.h"
+
+#define ENABLE_DEBUG_LOG 1
+
+#if ENABLE_DEBUG_LOG
+	DEFINE_LOG_CATEGORY_STATIC(LogActionPracticeEditorScriptLibrary, Log, All);
+#define DEBUG_LOG(Format, ...) UE_LOG(LogActionPracticeEditorScriptLibrary, Warning, Format, ##__VA_ARGS__)
+#else
+#define DEBUG_LOG(Format, ...)
+#endif
+
+TArray<FString> UActionPracticeEditorScriptLibrary::CompileStateTree(UStateTree* StateTree, bool& bOutSucceeded)
+{
+	TArray<FString> Messages;
+	bOutSucceeded = false;
+
+	if (!StateTree)
+	{
+		Messages.Add(TEXT("StateTree is null"));
+		return Messages;
+	}
+
+	FStateTreeCompilerLog Log;
+	bOutSucceeded = UStateTreeEditingSubsystem::CompileStateTree(StateTree, Log);
+
+	for (const TSharedRef<FTokenizedMessage>& Message : Log.ToTokenizedMessages())
+	{
+		Messages.Add(Message->ToText().ToString());
+	}
+
+	DEBUG_LOG(TEXT("CompileStateTree: %s -> %s (%d messages)"), *GetNameSafe(StateTree), bOutSucceeded ? TEXT("Succeeded") : TEXT("Failed"), Messages.Num());
+	return Messages;
+}
+
+bool UActionPracticeEditorScriptLibrary::StateTreeNeedsRecompile(UStateTree* StateTree)
+{
+	if (!StateTree)
+	{
+		return false;
+	}
+
+	return UStateTreeEditingSubsystem::NeedsRecompile(StateTree);
+}
+
+bool UActionPracticeEditorScriptLibrary::SetMontageSlotName(UAnimMontage* Montage, int32 SlotTrackIndex, FName SlotName)
+{
+	if (!Montage || !Montage->SlotAnimTracks.IsValidIndex(SlotTrackIndex) || SlotName.IsNone())
+	{
+		return false;
+	}
+
+	//스켈레톤 Anim Slot Manager에 등록되지 않은 슬롯은 ABP Slot 노드와 매칭되지 않음
+	const USkeleton* Skeleton = Montage->GetSkeleton();
+
+	if (!Skeleton || !Skeleton->ContainsSlotName(SlotName))
+	{
+		DEBUG_LOG(TEXT("SetMontageSlotName: slot %s is not registered on skeleton %s"), *SlotName.ToString(), *GetNameSafe(Skeleton));
+		return false;
+	}
+
+	Montage->Modify();
+	Montage->SlotAnimTracks[SlotTrackIndex].SlotName = SlotName;
+	Montage->PostEditChange();
+	Montage->MarkPackageDirty();
+
+	DEBUG_LOG(TEXT("SetMontageSlotName: %s[%d] -> %s"), *GetNameSafe(Montage), SlotTrackIndex, *SlotName.ToString());
+	return true;
+}
+
+void UActionPracticeEditorScriptLibrary::GetMontageSections(UAnimMontage* Montage, TArray<FName>& OutNames, TArray<float>& OutStartTimes, TArray<FName>& OutNextNames)
+{
+	OutNames.Reset();
+	OutStartTimes.Reset();
+	OutNextNames.Reset();
+
+	if (!Montage)
+	{
+		return;
+	}
+
+	TArray<const FCompositeSection*> Sorted;
+
+	for (const FCompositeSection& Section : Montage->CompositeSections)
+	{
+		Sorted.Add(&Section);
+	}
+
+	Sorted.Sort([](const FCompositeSection& A, const FCompositeSection& B) { return A.GetTime() < B.GetTime(); });
+
+	for (const FCompositeSection* Section : Sorted)
+	{
+		OutNames.Add(Section->SectionName);
+		OutStartTimes.Add(Section->GetTime());
+		OutNextNames.Add(Section->NextSectionName);
+	}
+}
+
+FString UActionPracticeEditorScriptLibrary::SetMontageSections(UAnimMontage* Montage, const TArray<FName>& Names, const TArray<float>& StartTimes, const TArray<FName>& NextNames)
+{
+	if (!Montage)
+	{
+		return TEXT("Montage is null");
+	}
+
+	if (Names.IsEmpty() || Names.Num() != StartTimes.Num() || Names.Num() != NextNames.Num())
+	{
+		return TEXT("Names, StartTimes and NextNames must be non-empty and have the same length");
+	}
+
+	const float PlayLength = Montage->GetPlayLength();
+	TSet<FName> NameSet;
+	TSet<float> StartTimeSet;
+	TArray<int32> Order;
+	bool bHasZeroSection = false;
+
+	for (int32 Index = 0; Index < Names.Num(); ++Index)
+	{
+		if (Names[Index].IsNone())
+		{
+			return FString::Printf(TEXT("Section %d has no name"), Index);
+		}
+
+		if (NameSet.Contains(Names[Index]))
+		{
+			return FString::Printf(TEXT("Duplicate section name %s"), *Names[Index].ToString());
+		}
+
+		if (StartTimes[Index] < 0.0f || StartTimes[Index] >= PlayLength)
+		{
+			return FString::Printf(TEXT("Section %s start time %.3f is outside [0, %.3f)"), *Names[Index].ToString(), StartTimes[Index], PlayLength);
+		}
+
+		//시작 시간이 같으면 길이 0 섹션이 생기고 정렬 순서도 비결정적
+		if (StartTimeSet.Contains(StartTimes[Index]))
+		{
+			return FString::Printf(TEXT("Duplicate section start time %.3f"), StartTimes[Index]);
+		}
+
+		bHasZeroSection |= FMath::IsNearlyZero(StartTimes[Index]);
+		NameSet.Add(Names[Index]);
+		StartTimeSet.Add(StartTimes[Index]);
+		Order.Add(Index);
+	}
+
+	//첫 섹션 이전 구간은 어떤 섹션에도 속하지 않아 재생 흐름에서 빠짐
+	if (!bHasZeroSection)
+	{
+		return TEXT("A section starting at 0 is required");
+	}
+
+	for (const FName& NextName : NextNames)
+	{
+		if (!NextName.IsNone() && !NameSet.Contains(NextName))
+		{
+			return FString::Printf(TEXT("Next section %s does not exist"), *NextName.ToString());
+		}
+	}
+
+	//SortAnimCompositeSectionByPos는 엔진 모듈 외부에 노출되지 않아 직접 시간순 정렬
+	Order.Sort([&StartTimes](int32 A, int32 B) { return StartTimes[A] < StartTimes[B]; });
+
+	Montage->Modify();
+	Montage->CompositeSections.Reset();
+
+	for (const int32 Index : Order)
+	{
+		FCompositeSection Section;
+		Section.SectionName = Names[Index];
+		Section.NextSectionName = NextNames[Index];
+		Section.Link(Montage, StartTimes[Index]);
+		Montage->CompositeSections.Add(Section);
+	}
+
+	Montage->PostEditChange();
+	Montage->MarkPackageDirty();
+
+	DEBUG_LOG(TEXT("SetMontageSections: %s -> %d sections"), *GetNameSafe(Montage), Montage->CompositeSections.Num());
+	return FString();
+}
+
+FString UActionPracticeEditorScriptLibrary::SetMontageSegments(UAnimMontage* Montage, int32 SlotTrackIndex, const TArray<UAnimSequenceBase*>& Animations, const TArray<float>& AnimStartTimes, const TArray<float>& AnimEndTimes, const TArray<float>& PlayRates)
+{
+	if (!Montage)
+	{
+		return TEXT("Montage is null");
+	}
+
+	if (!Montage->SlotAnimTracks.IsValidIndex(SlotTrackIndex))
+	{
+		return FString::Printf(TEXT("Slot track index %d is out of range (%d tracks)"), SlotTrackIndex, Montage->SlotAnimTracks.Num());
+	}
+
+	const int32 NumSegments = Animations.Num();
+
+	if (NumSegments == 0 || AnimStartTimes.Num() != NumSegments || AnimEndTimes.Num() != NumSegments || PlayRates.Num() != NumSegments)
+	{
+		return TEXT("Animations, AnimStartTimes, AnimEndTimes and PlayRates must be non-empty and have the same length");
+	}
+
+	//새 트랙을 먼저 구성해 검증 실패 시 몽타주를 건드리지 않음
+	FAnimTrack NewTrack;
+	float NextStartPos = 0.0f;
+
+	for (int32 Index = 0; Index < NumSegments; ++Index)
+	{
+		UAnimSequenceBase* Animation = Animations[Index];
+		FText Reason;
+
+		//몽타주 중첩, 길이 0, 가산 타입 불일치 등 엔진 규칙 검사
+		if (!NewTrack.IsValidToAdd(Animation, &Reason))
+		{
+			return FString::Printf(TEXT("Segment %d: %s"), Index, Reason.IsEmpty() ? TEXT("animation is not valid for a montage") : *Reason.ToString());
+		}
+
+		const USkeleton* Skeleton = Montage->GetSkeleton();
+
+		if (Skeleton && !Skeleton->IsCompatibleForEditor(Animation->GetSkeleton()))
+		{
+			return FString::Printf(TEXT("Segment %d: %s uses a skeleton incompatible with the montage"), Index, *GetNameSafe(Animation));
+		}
+
+		const float AnimLength = Animation->GetPlayLength();
+
+		if (AnimStartTimes[Index] < 0.0f || AnimEndTimes[Index] > AnimLength + UE_KINDA_SMALL_NUMBER || AnimStartTimes[Index] >= AnimEndTimes[Index])
+		{
+			return FString::Printf(TEXT("Segment %d: range %.3f-%.3f is invalid for %s (length %.3f)"), Index, AnimStartTimes[Index], AnimEndTimes[Index], *GetNameSafe(Animation), AnimLength);
+		}
+
+		//역재생은 노티파이·루트 모션 해석이 달라 지원하지 않음
+		if (PlayRates[Index] <= 0.0f)
+		{
+			return FString::Printf(TEXT("Segment %d: play rate must be positive (got %.3f)"), Index, PlayRates[Index]);
+		}
+
+		FAnimSegment Segment;
+		Segment.SetAnimReference(Animation, true);
+		Segment.AnimStartTime = AnimStartTimes[Index];
+		Segment.AnimEndTime = FMath::Min(AnimEndTimes[Index], AnimLength);
+		Segment.AnimPlayRate = PlayRates[Index];
+		Segment.LoopingCount = 1;
+		Segment.StartPos = NextStartPos;
+		NextStartPos += Segment.GetLength();
+		NewTrack.AnimSegments.Add(Segment);
+	}
+
+	//교체 전 이 슬롯에 링크된 섹션·노티파이의 몽타주 절대 시간 저장 (교체 후 같은 시간으로 재링크)
+	TArray<float> SectionTimes;
+	TArray<float> NotifyTimes;
+	TArray<float> NotifyEndTimes;
+	float LatestLinkedTime = 0.0f;
+
+	for (const FCompositeSection& Section : Montage->CompositeSections)
+	{
+		SectionTimes.Add(Section.GetTime());
+
+		if (Section.GetSlotIndex() == SlotTrackIndex)
+		{
+			LatestLinkedTime = FMath::Max(LatestLinkedTime, Section.GetTime());
+		}
+	}
+
+	for (const FAnimNotifyEvent& Notify : Montage->Notifies)
+	{
+		NotifyTimes.Add(Notify.GetTime());
+		NotifyEndTimes.Add(Notify.GetTime() + Notify.GetDuration());
+
+		if (Notify.GetSlotIndex() == SlotTrackIndex)
+		{
+			LatestLinkedTime = FMath::Max(LatestLinkedTime, Notify.GetTime() + Notify.GetDuration());
+		}
+	}
+
+	//몽타주 에디터의 ClampToEndTime처럼 이벤트를 몰래 당기지 않고 거부
+	if (NextStartPos + UE_KINDA_SMALL_NUMBER < LatestLinkedTime)
+	{
+		return FString::Printf(TEXT("New track length %.3f is shorter than linked sections/notifies (latest %.3f)"), NextStartPos, LatestLinkedTime);
+	}
+
+	Montage->Modify();
+	Montage->SlotAnimTracks[SlotTrackIndex].AnimTrack = NewTrack;
+
+	for (int32 Index = 0; Index < Montage->CompositeSections.Num(); ++Index)
+	{
+		FCompositeSection& Section = Montage->CompositeSections[Index];
+
+		if (Section.GetSlotIndex() == SlotTrackIndex)
+		{
+			Section.Link(Montage, SectionTimes[Index], SlotTrackIndex);
+		}
+	}
+
+	for (int32 Index = 0; Index < Montage->Notifies.Num(); ++Index)
+	{
+		FAnimNotifyEvent& Notify = Montage->Notifies[Index];
+
+		if (Notify.GetSlotIndex() == SlotTrackIndex)
+		{
+			Notify.Link(Montage, NotifyTimes[Index], SlotTrackIndex);
+			Notify.EndLink.Link(Montage, NotifyEndTimes[Index], SlotTrackIndex);
+		}
+	}
+
+	//몽타주 에디터 RecalculateSequenceLength와 같은 순서 (재귀 참조 검사 → 길이 → 링크·트리거 오프셋)
+	Montage->InvalidateRecursiveAsset();
+	Montage->SetCompositeLength(Montage->CalculateSequenceLength());
+	Montage->UpdateLinkableElements();
+	Montage->PostEditChange();
+	Montage->MarkPackageDirty();
+
+	DEBUG_LOG(TEXT("SetMontageSegments: %s[%d] -> %d segments, length %.3f"), *GetNameSafe(Montage), SlotTrackIndex, NumSegments, Montage->GetPlayLength());
+	return FString();
+}
+
+int32 UActionPracticeEditorScriptLibrary::ResampleBlendSpace(UBlendSpace* BlendSpace)
+{
+	if (!BlendSpace)
+	{
+		DEBUG_LOG(TEXT("ResampleBlendSpace: BlendSpace is null"));
+		return 0;
+	}
+
+	//블렌드스페이스 에디터가 샘플 추가·이동 후 호출하는 순서 (검증 → 세그먼트·삼각분할 재계산)
+	BlendSpace->Modify();
+	BlendSpace->ValidateSampleData();
+	BlendSpace->ResampleData();
+	BlendSpace->MarkPackageDirty();
+
+	const int32 NumSamples = BlendSpace->GetNumberOfBlendSamples();
+	DEBUG_LOG(TEXT("ResampleBlendSpace: %s -> %d samples"), *GetNameSafe(BlendSpace), NumSamples);
+	return NumSamples;
+}
+
+FString UActionPracticeEditorScriptLibrary::AddNamedVirtualBone(USkeleton* Skeleton, FName SourceBoneName, FName TargetBoneName, FName VirtualBoneName)
+{
+	if (!Skeleton)
+	{
+		return TEXT("Skeleton is null");
+	}
+
+	const FReferenceSkeleton& RefSkeleton = Skeleton->GetReferenceSkeleton();
+
+	if (RefSkeleton.FindBoneIndex(SourceBoneName) == INDEX_NONE || RefSkeleton.FindBoneIndex(TargetBoneName) == INDEX_NONE)
+	{
+		return FString::Printf(TEXT("Bone not found: %s or %s"), *SourceBoneName.ToString(), *TargetBoneName.ToString());
+	}
+
+	//재실행 시 중복 추가 방지 (같은 구성이면 성공, 이름만 같고 구성이 다르면 실패)
+	for (const FVirtualBone& VirtualBone : Skeleton->GetVirtualBones())
+	{
+		if (VirtualBone.VirtualBoneName == VirtualBoneName)
+		{
+			if (VirtualBone.SourceBoneName == SourceBoneName && VirtualBone.TargetBoneName == TargetBoneName)
+			{
+				return FString();
+			}
+
+			return FString::Printf(TEXT("%s already exists with a different source/target"), *VirtualBoneName.ToString());
+		}
+	}
+
+	if (!Skeleton->AddNewNamedVirtualBone(SourceBoneName, TargetBoneName, VirtualBoneName))
+	{
+		return FString::Printf(TEXT("AddNewNamedVirtualBone failed (name needs 'VB ' prefix, or the same source/target pair already exists): %s"), *VirtualBoneName.ToString());
+	}
+
+	Skeleton->MarkPackageDirty();
+	DEBUG_LOG(TEXT("AddNamedVirtualBone: %s (%s -> %s)"), *VirtualBoneName.ToString(), *SourceBoneName.ToString(), *TargetBoneName.ToString());
+	return FString();
+}
+
+FString UActionPracticeEditorScriptLibrary::CreateFontFromFaces(const FString& FontAssetPath, const TArray<FName>& TypefaceNames, const TArray<UFontFace*>& FontFaces)
+{
+	if (TypefaceNames.IsEmpty() || TypefaceNames.Num() != FontFaces.Num())
+	{
+		return TEXT("TypefaceNames and FontFaces must be non-empty and have the same length");
+	}
+
+	//쓰기 전에 입력 검사를 끝내 일부만 바뀐 에셋이 남지 않게 함
+	TSet<FName> UniqueNames;
+
+	for (int32 Index = 0; Index < TypefaceNames.Num(); ++Index)
+	{
+		if (TypefaceNames[Index].IsNone())
+		{
+			return FString::Printf(TEXT("TypefaceNames[%d] is None"), Index);
+		}
+
+		if (!FontFaces[Index])
+		{
+			return FString::Printf(TEXT("FontFaces[%d] is null"), Index);
+		}
+
+		bool bAlreadyInSet = false;
+		UniqueNames.Add(TypefaceNames[Index], &bAlreadyInSet);
+
+		if (bAlreadyInSet)
+		{
+			return FString::Printf(TEXT("Duplicate typeface name: %s"), *TypefaceNames[Index].ToString());
+		}
+	}
+
+	//'/Game/X/F_Name' 또는 '/Game/X/F_Name.F_Name' 모두 허용
+	FString PackageName;
+	FString ObjectName;
+
+	if (!FontAssetPath.Split(TEXT("."), &PackageName, &ObjectName))
+	{
+		PackageName = FontAssetPath;
+	}
+
+	FText InvalidReason;
+
+	if (!FPackageName::IsValidLongPackageName(PackageName, false, &InvalidReason))
+	{
+		return FString::Printf(TEXT("Invalid FontAssetPath '%s': %s"), *FontAssetPath, *InvalidReason.ToString());
+	}
+
+	const FString AssetName = FPackageName::GetShortName(PackageName);
+	const FString ObjectPath = PackageName + TEXT(".") + AssetName;
+
+	UFont* Font = LoadObject<UFont>(nullptr, *ObjectPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	const bool bCreated = Font == nullptr;
+
+	if (bCreated)
+	{
+		if (FPackageName::DoesPackageExist(PackageName))
+		{
+			return FString::Printf(TEXT("An asset that is not a UFont already exists at %s"), *PackageName);
+		}
+
+		UPackage* Package = CreatePackage(*PackageName);
+		Font = NewObject<UFont>(Package, *AssetName, RF_Public | RF_Standalone | RF_Transactional);
+
+		if (!Font)
+		{
+			return FString::Printf(TEXT("Failed to create UFont at %s"), *ObjectPath);
+		}
+	}
+
+	Font->Modify();
+	Font->FontCacheType = EFontCacheType::Runtime;
+
+	//타입페이스 목록 통째로 교체 (재실행해도 같은 결과)
+	FTypeface& Typeface = Font->GetMutableInternalCompositeFont().DefaultTypeface;
+	Typeface.Fonts.Reset();
+
+	for (int32 Index = 0; Index < TypefaceNames.Num(); ++Index)
+	{
+		FTypefaceEntry& Entry = Typeface.Fonts.AddDefaulted_GetRef();
+		Entry.Name = TypefaceNames[Index];
+		Entry.Font = FFontData(FontFaces[Index]);
+	}
+
+	//폰트 캐시 갱신
+	Font->PostEditChange();
+
+	if (bCreated)
+	{
+		FAssetRegistryModule::AssetCreated(Font);
+	}
+
+	Font->MarkPackageDirty();
+
+	//적용 결과 재검증
+	const TArray<FTypefaceEntry>& AppliedFonts = Font->GetInternalCompositeFont().DefaultTypeface.Fonts;
+
+	if (AppliedFonts.Num() != TypefaceNames.Num())
+	{
+		return FString::Printf(TEXT("Verification failed: %d typefaces applied, expected %d"), AppliedFonts.Num(), TypefaceNames.Num());
+	}
+
+	for (int32 Index = 0; Index < AppliedFonts.Num(); ++Index)
+	{
+		if (AppliedFonts[Index].Name != TypefaceNames[Index] || AppliedFonts[Index].Font.GetFontFaceAsset() != FontFaces[Index])
+		{
+			return FString::Printf(TEXT("Verification failed at typeface %d (%s)"), Index, *TypefaceNames[Index].ToString());
+		}
+	}
+
+	DEBUG_LOG(TEXT("CreateFontFromFaces: %s (%s, %d typefaces)"), *ObjectPath, bCreated ? TEXT("Created") : TEXT("Updated"), AppliedFonts.Num());
+	return FString();
+}

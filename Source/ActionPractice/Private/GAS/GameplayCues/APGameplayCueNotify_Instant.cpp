@@ -57,11 +57,30 @@ bool UAPGameplayCueNotify_Instant::OnExecute_Implementation(AActor* MyTarget, co
 	//사운드 원샷 재생
 	if (InstantSound)
 	{
-		UGameplayStatics::PlaySoundAtLocation(
-			MyTarget,
-			InstantSound,
-			SpawnLocation
-		);
+		USkeletalMeshComponent* MeshComp = bAttachSound ? MyTarget->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+
+		if (MeshComp)
+		{
+			//메시(소켓)에 부착 재생: 대상 이동을 따라가고 오디오 컴포넌트 소유자가 대상이 됨
+			const FName SocketName = (bAttachToSocket && MeshComp->DoesSocketExist(AttachSocketName)) ? AttachSocketName : NAME_None;
+
+			UGameplayStatics::SpawnSoundAttached(
+				InstantSound,
+				MeshComp,
+				SocketName,
+				FVector::ZeroVector,
+				EAttachLocation::KeepRelativeOffset,
+				true  //bStopWhenAttachedToDestroyed
+			);
+		}
+		else
+		{
+			UGameplayStatics::PlaySoundAtLocation(
+				MyTarget,
+				InstantSound,
+				SpawnLocation
+			);
+		}
 	}
 
 	return false;

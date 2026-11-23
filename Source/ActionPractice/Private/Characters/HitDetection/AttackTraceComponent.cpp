@@ -344,12 +344,72 @@ bool UAttackTraceComponent::UpdateSocketPositions()
 
 void UAttackTraceComponent::PerformPierceTrace(FHitSocketGroupConfig& SocketGroup)
 {
+	//찌르기: 각 소켓의 이전 → 현재 위치 이동 경로를 구체로 스윕 (끝점 궤적 판정, 소켓 1개부터 가능)
+	//Slash처럼 소켓 사이 선분을 쓰지 않으므로 소켓 간 공간이 아닌 소켓이 지나간 경로만 판정
+	const int32 NumSockets = FMath::Min(SocketGroup.PreviousSocketPositions.Num(), SocketGroup.CurrentSocketPositions.Num());
 
+	if (NumSockets == 0)
+	{
+		DEBUG_LOG(TEXT("PerformPierceTrace - FAILED: No socket positions"));
+		return;
+	}
+
+	const FCollisionQueryParams Params = GetCollisionQueryParams();
+	const FCollisionShape SweepShape = FCollisionShape::MakeSphere(SocketGroup.TraceRadius);
+	TArray<FHitResult> AllHits;
+
+	for (int32 i = 0; i < NumSockets; ++i)
+	{
+		const FVector& Start = SocketGroup.PreviousSocketPositions[i];
+		const FVector& End = SocketGroup.CurrentSocketPositions[i];
+
+		//이동이 없는 프레임은 길이 0 스윕 = 시작 지점 오버랩 판정 (bStartPenetrating 히트)
+		TArray<FHitResult> SubHits;
+		GetWorld()->SweepMultiByChannel(SubHits, Start, End, FQuat::Identity, GetTraceChannel(), SweepShape, Params);
+
+		//시작부터 겹친 히트는 ImpactPoint가 부정확할 수 있어 소켓 현재 위치로 보정 (임팩트 GameplayCue 위치로 사용됨)
+		for (FHitResult& SubHit : SubHits)
+		{
+			if (SubHit.bStartPenetrating)
+			{
+				SubHit.ImpactPoint = End;
+			}
+		}
+
+		AllHits.Append(SubHits);
+
+		++DebugSweepTraceCounter;
+
+		if (bDrawDebugTrace)
+		{
+			const FVector Direction = (End - Start).GetSafeNormal();
+			const FQuat CapsuleRotation = Direction.IsNearlyZero() ? FQuat::Identity : FQuat::FindBetweenNormals(FVector::UpVector, Direction);
+
+			DrawDebugCapsule(GetWorld(),
+			                 (Start + End) * 0.5f,
+			                 (End - Start).Size() * 0.5f + SocketGroup.TraceRadius,
+			                 SocketGroup.TraceRadius,
+			                 CapsuleRotation,
+			                 DebugTraceColor,
+			                 false,
+			                 DebugTraceDuration);
+		}
+	}
+
+	for (const FHitResult& Hit : AllHits)
+	{
+		//일단 다단히트가 아닌 일반 공격으로 호출
+		if (ValidateHit(Hit.GetActor(), Hit, false))
+		{
+			ProcessHit(Hit.GetActor(), Hit);
+		}
+	}
 }
 
 void UAttackTraceComponent::PerformStrikeTrace(FHitSocketGroupConfig& SocketGroup)
 {
-
+	//타격: 둔기 전용 판정 형태(범위 확장 등)가 정해지기 전까지 찌르기와 같은 소켓 경로 판정 사용
+	PerformPierceTrace(SocketGroup);
 }
 
 void UAttackTraceComponent::PerformSlashTrace(FHitSocketGroupConfig& SocketGroup)
@@ -398,7 +458,8 @@ bool UAttackTraceComponent::ValidateHit(AActor* HitActor, const FHitResult& HitR
 	AActor* Owner = GetOwnerActor();
 	if (HitActor == Owner) return false;
 
-	//필요 시 아군 제외 구현해야 함
+	//아군 제외 (적끼리 등, 판정 기준은 소유자 종류별 IsFriendlyActor)
+	if (IsFriendlyActor(HitActor)) return false;
 
 	//중복 체크
 	float CurrentTime = GetWorld()->GetTimeSeconds();

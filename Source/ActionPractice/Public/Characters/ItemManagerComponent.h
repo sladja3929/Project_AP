@@ -50,9 +50,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void CycleQuickSlot();
 
-	//아이템 사용 (수량 차감) — 서버에서만 호출
+	//사용한 아이템 DA의 슬롯 수량 차감 — 서버에서만 호출
+	//사용 도중 퀵슬롯이 바뀌어도 실제로 사용한 아이템을 차감하도록 장착 인덱스가 아닌 DA로 슬롯 탐색
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	bool ConsumeEquippedItem();
+	bool ConsumeItem(const UUsableItemDataAsset* InItemDA);
 
 	//UsableItem을 슬롯에 추가 — 서버에서만 호출
 	//동일 DA 슬롯이 이미 있으면 수량 추가, 없으면 새 슬롯 생성
@@ -115,6 +116,9 @@ private:
 	//슬롯 초기화(BeginPlay)/전환(CycleQuickSlot)/복제(OnRep) 시점에 호출해
 	//사용 시점의 동기 로드 hitch를 앞당긴다 (서버/클라 모두)
 	void PreloadEquippedItemAssets();
+
+	//DA가 일치하는 슬롯 인덱스 반환 (장착 슬롯 우선), 없으면 INDEX_NONE
+	int32 FindSlotIndexByItemDA(const UUsableItemDataAsset* InItemDA) const;
 
 #pragma endregion
 };

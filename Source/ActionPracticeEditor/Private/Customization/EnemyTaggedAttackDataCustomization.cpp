@@ -111,6 +111,11 @@ void FEnemyTaggedAttackDataCustomization::CustomizeHeader(TSharedRef<IPropertyHa
 				{
 					return FText::FromString(TEXT("| Lunge"));
 				}
+
+				if (Type == EComboAttackType::Projectile)
+				{
+					return FText::FromString(TEXT("| Projectile"));
+				}
 				return FText::GetEmpty();
 			})
 		]

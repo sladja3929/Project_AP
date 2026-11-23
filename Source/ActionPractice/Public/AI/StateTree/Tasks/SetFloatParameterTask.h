@@ -19,13 +19,19 @@ struct FSetFloatParameterTaskInstanceData
 	UPROPERTY(EditAnywhere, Category = "Output")
 	float OutputValue = 0.0f;
 
+	//true면 값 설정 후 Running 유지 (부모 상태에 둘 때 사용, 상태 완료는 자식 상태가 결정)
+	//false면 즉시 Succeeded (단독 상태나, 같은 상태에 다른 태스크가 있을 때 완료 판정에서 제외해 사용)
+	UPROPERTY(EditAnywhere, Category = "Parameter")
+	bool bKeepRunning = false;
+
 #pragma endregion
 };
 
 /**
- * 전역 파라미터(float)의 값을 변경하는 즉발형 Task
- * - EnterState에서 NewValue → OutputValue 복사 후 Succeeded 반환
+ * 전역 파라미터(float)의 값을 변경하는 Task
+ * - EnterState에서 NewValue → OutputValue 복사 후 Succeeded 반환 (bKeepRunning이면 Running 유지)
  * - 에디터에서 OutputValue를 전역 파라미터에 바인딩하여 사용
+ * - 부모 상태에 즉발형으로 두면 진입 즉시 부모가 완료되므로 bKeepRunning 사용
  */
 USTRUCT(meta = (DisplayName = "Set Float Parameter", Category = "Parameter"))
 struct ACTIONPRACTICE_API FSetFloatParameterTask : public FStateTreeTaskBase

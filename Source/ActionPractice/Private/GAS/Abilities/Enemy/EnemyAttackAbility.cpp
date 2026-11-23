@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Characters/EnemyCharacter.h"
+#include "Characters/APMotionWarpingComponent.h"
 #include "Characters/Enemy/EnemyDataAsset.h"
 #include "GAS/AbilitySystemComponent/EnemyAbilitySystemComponent.h"
 #include "GAS/Abilities/Tasks/AbilityTask_PlayMontageWithEvents.h"
@@ -10,6 +11,8 @@
 #include "Items/AttackData.h"
 #include "AI/EnemyAIController.h"
 #include "Characters/ActionPracticeCharacter.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -43,7 +46,7 @@ void UEnemyAttackAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 		const UEnemyDataAsset* EnemyData = EnemyCharacter->GetEnemyData();
 		if (EnemyData)
 		{
-			FGameplayTagContainer AssetTag = AbilityTags;
+			FGameplayTagContainer AssetTag = GetAssetTags();
 			const FEnemyTaggedAttackData* AttackData = EnemyData->GetAttackDataByTags(AssetTag);
 			if (AttackData)
 			{
@@ -82,14 +85,9 @@ void UEnemyAttackAbility::ActivateInitSettings()
 void UEnemyAttackAbility::CacheGameplayTags()
 {
 	//이벤트 태그
-	EventNotifyRotateToTargetTag = UGameplayTagsSubsystem::GetEventNotifyRotateToTargetTag();
 	EventNotifyCheckConditionTag = UGameplayTagsSubsystem::GetEventNotifyCheckConditionTag();
 
 	//태그 유효성 검사
-	if (!EventNotifyRotateToTargetTag.IsValid())
-	{
-		DEBUG_LOG(TEXT("EventNotifyRotateToTargetTag is not valid"));
-	}
 	if (!EventNotifyCheckConditionTag.IsValid())
 	{
 		DEBUG_LOG(TEXT("EventNotifyCheckConditionTag is not valid"));
@@ -113,7 +111,7 @@ void UEnemyAttackAbility::CacheEnemyData()
 	}
 
 	//어빌리티의 Asset Tag로 DA에서 공격 데이터 조회
-	FGameplayTagContainer AssetTag = AbilityTags;
+	FGameplayTagContainer AssetTag = GetAssetTags();
 	EnemyAttackData = EnemyData->GetAttackDataByTags(AssetTag);
 	if (!EnemyAttackData || EnemyAttackData->ComboSequence.Num() == 0)
 	{
@@ -176,9 +174,91 @@ void UEnemyAttackAbility::ExecuteAttack()
 
 	SetHitDetectionConfig();
 
-	START_WAIT_EVENT_TASK(WaitRotateToTargetEventTask, EventNotifyRotateToTargetTag, OnEventRotateToTarget, nullptr, true, true);
+	//몽타주 시작 전에 워프 타깃을 세팅해야 첫 워프 윈도우부터 반영됨
+	UpdateAttackWarpTarget();
+
 	START_WAIT_EVENT_TASK(WaitCheckConditionEventTask, EventNotifyCheckConditionTag, OnEventCheckCondition, nullptr, true, true);
 	StartMontageWithEventsTask();
+}
+
+void UEnemyAttackAbility::UpdateAttackWarpTarget()
+{
+	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	UAPMotionWarpingComponent* MotionWarpingComponent = EnemyCharacter ? EnemyCharacter->GetMotionWarpingComponent() : nullptr;
+
+	if (!MotionWarpingComponent)
+	{
+		DEBUG_LOG(TEXT("UpdateAttackWarpTarget: No MotionWarpingComponent"));
+		return;
+	}
+
+	//타깃이 없으면 내부에서 워프 타깃 제거 → 몽타주 워프 윈도우 비활성 (회전 없음)
+	const AActor* TargetActor = CachedTargetInfo.IsValid() ? CachedTargetInfo.Actor.Get() : nullptr;
+	MotionWarpingComponent->SetWarpTargetFollowActor(UAPMotionWarpingComponent::WarpTargetName_AttackTarget, TargetActor);
+
+	UpdateAttackApproachTarget(MotionWarpingComponent, TargetActor);
+}
+
+void UEnemyAttackAbility::UpdateAttackApproachTarget(UAPMotionWarpingComponent* MotionWarpingComponent, const AActor* TargetActor)
+{
+	//이전 콤보의 감시 타이머·타깃 정리 후 재설정
+	ClearAttackApproachTarget();
+
+	ApproachStopDistance = 0.0f;
+
+	if (EnemyAttackData && EnemyAttackData->ComboSequence.IsValidIndex(ComboCounter))
+	{
+		ApproachStopDistance = EnemyAttackData->ComboSequence[ComboCounter].WarpStopDistance;
+	}
+
+	//이미 정지 거리 안이면 정지 지점이 오너 뒤에 생기므로 미설정 (몽타주 원래 루트 모션 그대로 재생)
+	const AActor* OwnerActor = MotionWarpingComponent->GetOwner();
+	const bool bCanApproach = TargetActor && OwnerActor && FVector::Dist2D(OwnerActor->GetActorLocation(), TargetActor->GetActorLocation()) > ApproachStopDistance;
+
+	if (!bCanApproach)
+	{
+		return;
+	}
+
+	MotionWarpingComponent->SetWarpTargetFollowActor(UAPMotionWarpingComponent::WarpTargetName_AttackApproach, TargetActor, ApproachStopDistance);
+
+	//워프 도중 타깃 접근 감시 (워프 윈도우 길이가 몽타주마다 달라 어빌리티 종료까지 유지)
+	if (const UWorld* World = GetWorld())
+	{
+		constexpr float GuardInterval = 0.05f;
+		World->GetTimerManager().SetTimer(ApproachGuardTimerHandle, this, &UEnemyAttackAbility::CheckApproachStopDistance, GuardInterval, true);
+	}
+}
+
+void UEnemyAttackAbility::CheckApproachStopDistance()
+{
+	const AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	const AActor* TargetActor = CachedTargetInfo.IsValid() ? CachedTargetInfo.Actor.Get() : nullptr;
+
+	if (EnemyCharacter && TargetActor && FVector::Dist2D(EnemyCharacter->GetActorLocation(), TargetActor->GetActorLocation()) > ApproachStopDistance)
+	{
+		return;
+	}
+
+	//정지 거리 도달 또는 타깃 소멸 → 이동 워프 종료 (해당 윈도우는 Disabled, 남은 구간은 원래 루트 모션)
+	DEBUG_LOG(TEXT("CheckApproachStopDistance: Reached stop distance %.1f, removing AttackApproach"), ApproachStopDistance);
+	ClearAttackApproachTarget();
+}
+
+void UEnemyAttackAbility::ClearAttackApproachTarget()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ApproachGuardTimerHandle);
+	}
+
+	const AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
+	UAPMotionWarpingComponent* MotionWarpingComponent = EnemyCharacter ? EnemyCharacter->GetMotionWarpingComponent() : nullptr;
+
+	if (MotionWarpingComponent)
+	{
+		MotionWarpingComponent->RemoveWarpTarget(UAPMotionWarpingComponent::WarpTargetName_AttackApproach);
+	}
 }
 
 #pragma endregion
@@ -188,7 +268,7 @@ void UEnemyAttackAbility::ExecuteAttack()
 void UEnemyAttackAbility::SetHitDetectionConfig()
 {
 	//어빌리티의 Asset Tag로 HitDetection 조회 (기존 FGameplayTagContainer 오버로드 활용)
-	if (!HitDetectionSetter.PrepareHitDetection(AbilityTags, ComboCounter))
+	if (!HitDetectionSetter.PrepareHitDetection(GetAssetTags(), ComboCounter))
 	{
 		DEBUG_LOG(TEXT("Failed to prepare HitDetection"));
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
@@ -257,7 +337,7 @@ UAnimMontage* UEnemyAttackAbility::SetMontageToPlayTask()
 	if (!Montage)
 	{
 		DEBUG_LOG(TEXT("SetMontageToPlayTask: Failed to load montage. Tags=%s, ComboIndex=%d"),
-			*AbilityTags.ToStringSimple(), ComboCounter);
+			*GetAssetTags().ToStringSimple(), ComboCounter);
 		return nullptr;
 	}
 
@@ -336,39 +416,6 @@ void UEnemyAttackAbility::OnTaskMontageInterrupted()
 {
 	DEBUG_LOG(TEXT("Montage Task Interrupted"));
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-}
-
-void UEnemyAttackAbility::OnEventRotateToTarget(FGameplayEventData Payload)
-{
-	AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo();
-	if (!EnemyCharacter)
-	{
-		DEBUG_LOG(TEXT("OnEventRotateToTarget: No EnemyCharacter"));
-		return;
-	}
-
-	//캐싱된 Target Actor 가져오기
-	if (!CachedTargetInfo.IsValid())
-	{
-		DEBUG_LOG(TEXT("OnEventRotateToTarget: No Cached Target"));
-		return;
-	}
-
-	AActor* TargetActor = CachedTargetInfo.Actor.Get();
-	if (!TargetActor)
-	{
-		DEBUG_LOG(TEXT("OnEventRotateToTarget: Target Actor is nullptr"));
-		return;
-	}
-
-	//현재 콤보의 RotateTime 사용
-	float CurrentRotateTime = 0.1f;
-	if (EnemyAttackData && ComboCounter < EnemyAttackData->ComboSequence.Num())
-	{
-		CurrentRotateTime = EnemyAttackData->ComboSequence[ComboCounter].RotateTime;
-	}
-	EnemyCharacter->RotateToTarget(TargetActor, CurrentRotateTime);
-	DEBUG_LOG(TEXT("OnEventRotateToTarget: Rotating to %s"), *TargetActor->GetName());
 }
 
 void UEnemyAttackAbility::OnEventCheckCondition(FGameplayEventData Payload)
@@ -456,11 +503,23 @@ void UEnemyAttackAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 
 	ComboCounter = 0;
 	bPerformNextCombo = false;
-	
+
+	//감시 타이머가 this를 참조하므로 종료 유효성 검사와 무관하게 정리
+	ClearAttackApproachTarget();
+
 	if (IsEndAbilityValid(Handle, ActorInfo))
 	{
 		//HitDetectionSetter 언바인딩
 		HitDetectionSetter.UnBind();
+
+		//추적 워프 타깃 정리 (리셋/타깃 소멸 후 잔존 방지)
+		if (AEnemyCharacter* EnemyCharacter = GetEnemyCharacterFromActorInfo())
+		{
+			if (UAPMotionWarpingComponent* MotionWarpingComponent = EnemyCharacter->GetMotionWarpingComponent())
+			{
+				MotionWarpingComponent->RemoveWarpTarget(UAPMotionWarpingComponent::WarpTargetName_AttackTarget);
+			}
+		}
 
 		if (PlayMontageWithEventsTask)
 		{

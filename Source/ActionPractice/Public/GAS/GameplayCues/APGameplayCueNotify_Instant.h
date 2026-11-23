@@ -64,6 +64,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cue|SFX")
 	TObjectPtr<USoundBase> InstantSound = nullptr;
 
+	//true면 사운드를 AttachSocketName 소켓(없으면 메시)에 붙여 재생
+	//이동 중인 대상의 울음처럼 소리가 따라가야 하거나, 소유자 기준 동시 재생 제한(bLimitToOwner)을 적용할 때 사용
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cue|SFX")
+	bool bAttachSound = false;
+
 #pragma endregion
 
 #pragma region "Protected Functions"

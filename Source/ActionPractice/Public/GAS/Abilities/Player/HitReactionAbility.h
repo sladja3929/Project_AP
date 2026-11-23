@@ -43,6 +43,7 @@ protected:
 	FGameplayTag StateAbilityBlockingTag;
 	FGameplayTag StateGuardBrokenTag;
 	FGameplayTag AbilityBlockTag;
+	FGameplayTag StateStaminaRegenBlockedTag;
 
 	bool bIsBlockReaction = false;
 	bool bIsGuardBreakReaction = false;
@@ -62,6 +63,10 @@ protected:
 
 private:
 #pragma region "Private Variables"
+
+	//BlockReaction 동안 직접 부여한 리젠 차단 태그 보유 여부 (EndAbility 중복 호출 시 중복 제거 방지)
+	bool bAddedStaminaRegenBlockedTag = false;
+
 #pragma endregion
 
 #pragma region "Private Functions"

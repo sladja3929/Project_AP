@@ -20,7 +20,6 @@ void FEnemyComboAttackUnitCustomization::CustomizeHeader(TSharedRef<IPropertyHan
 		MontageHandle = ComboDataHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FComboAttackUnit, AttackMontage));
 	}
 
-	TSharedPtr<IPropertyHandle> RotateHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FEnemyComboAttackUnit, RotateTime));
 	TSharedPtr<IPropertyHandle> DistanceHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FEnemyComboAttackUnit, MaxTargetDistance));
 	TSharedPtr<IPropertyHandle> AngleHandle = StructPropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FEnemyComboAttackUnit, MaxTargetAngle));
 
@@ -71,15 +70,14 @@ void FEnemyComboAttackUnitCustomization::CustomizeHeader(TSharedRef<IPropertyHan
 		[
 			SNew(STextBlock)
 			.ColorAndOpacity(FSlateColor(FLinearColor(0.6f, 0.6f, 0.6f)))
-			.Text_Lambda([RotateHandle, DistanceHandle, AngleHandle]() -> FText
+			.Text_Lambda([DistanceHandle, AngleHandle]() -> FText
 			{
-				float Rot = 0.1f, Dist = 150.0f, Ang = 60.0f;
-				if (RotateHandle.IsValid()) RotateHandle->GetValue(Rot);
+				float Dist = 150.0f, Ang = 60.0f;
 				if (DistanceHandle.IsValid()) DistanceHandle->GetValue(Dist);
 				if (AngleHandle.IsValid()) AngleHandle->GetValue(Ang);
 
 				return FText::FromString(FString::Printf(
-					TEXT("| Rot:%.2f  Dist:%.0f  Ang:%.0f"), Rot, Dist, Ang));
+					TEXT("| Dist:%.0f  Ang:%.0f"), Dist, Ang));
 			})
 		]
 	];

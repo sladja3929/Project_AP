@@ -70,17 +70,34 @@ void UEnemyAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attrib
 
 void UEnemyAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
+	//데미지·회복은 메타 어트리뷰트(IncomingDamage/IncomingHealing)로 들어와 Super 안의 피격 파이프라인이 SetHealth로 직접 바꿈
+	//GE가 바꾼 어트리뷰트만 보면 Health 변화를 놓치므로 Super 전후 값으로 판단
+	const float OldHealth = GetHealth();
+
 	Super::PostGameplayEffectExecute(Data);
 
-	//Health가 변경되었을 때 머리 위 HP바 표시
-	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+	if (!FMath::IsNearlyEqual(OldHealth, GetHealth()))
 	{
-		if (UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent())
+		ShowHealthBarOnHealthChanged();
+	}
+}
+
+void UEnemyAttributeSet::ShowHealthBarOnHealthChanged() const
+{
+	//사망 시 숨김은 사망 어빌리티 담당이라 다시 띄우지 않음
+	if (GetHealth() <= 0.0f)
+	{
+		return;
+	}
+
+	if (const UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent())
+	{
+		//BeginPlay 전 변화는 클라이언트 최초 복제(기본값 → 서버 값)라 표시하지 않음
+		AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(ASC->GetAvatarActor());
+
+		if (Enemy && Enemy->HasActorBegunPlay())
 		{
-			if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(ASC->GetAvatarActor()))
-			{
-				Enemy->ShowEnemyHealthBar();
-			}
+			Enemy->ShowEnemyHealthBar();
 		}
 	}
 }
@@ -91,12 +108,10 @@ void UEnemyAttributeSet::OnRep_Health(const FGameplayAttributeData& OldHealth)
 	Super::OnRep_Health(OldHealth);
 
 	//클라이언트: Health 복제 수신 시 HP바 표시 (서버는 PostGameplayEffectExecute에서 처리)
-	if (UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent())
+	//REPNOTIFY_Always라 값이 같아도 호출되므로 실제 변화가 있을 때만
+	if (!FMath::IsNearlyEqual(OldHealth.GetCurrentValue(), GetHealth()))
 	{
-		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(ASC->GetAvatarActor()))
-		{
-			Enemy->ShowEnemyHealthBar();
-		}
+		ShowHealthBarOnHealthChanged();
 	}
 }
 

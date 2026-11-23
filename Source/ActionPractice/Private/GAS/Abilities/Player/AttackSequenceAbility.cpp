@@ -433,7 +433,7 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 		}
 		
 		CancelAbilitiesOnAttack();
-		StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
+		StartMontageWithFacingWarp();
 		if (CurrentChargeProgress != EChargeProgress::NoCharge) StartWaitInputReleaseTask(true);
 		break;
 
@@ -449,7 +449,7 @@ void UAttackSequenceAbility::ChangeState(const EAttackSequenceState NewState)
 		CancelAbilitiesOnAttack();
 		SetHitDetectionConfig();
 		AddOrRemoveGameplayTag(StateAbilityAttackingAuthTag, StateAbilityAttackingLocalTag, true);
-		StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
+		StartMontageWithFacingWarp();
 		break;
 
 	case EAttackSequenceState::AfterRecovery:

@@ -56,6 +56,7 @@ public:
 	//위젯 접근자 (외부에서 직접 접근이 필요한 경우 대비)
 	FORCEINLINE UDeathScreenWidget* GetDeathScreenWidget() const { return DeathScreenWidget; }
 	FORCEINLINE UInteractionPromptWidget* GetInteractionPromptWidget() const { return InteractionPromptWidget; }
+	FORCEINLINE UPauseMenuWidget* GetPauseMenuWidget() const { return PauseMenuWidget; }
 
 	//ESC 메뉴 토글
 	void TogglePauseMenu();

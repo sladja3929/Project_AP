@@ -17,7 +17,6 @@ UWeaponSwitchAbility::UWeaponSwitchAbility()
 {
 	bRetriggerInstancedAbility = true;
 	StaminaCost = -1.0f;
-	RotateTime = 0.0f;
 
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;

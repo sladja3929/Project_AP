@@ -32,12 +32,6 @@ void UActionPracticeAbilitySystemComponent::BeginPlay()
 		OwnerCharacter = Cast<AActionPracticeCharacter>(Owner);
 	}
 
-	EffectStaminaRegenBlockDurationTag = UGameplayTagsSubsystem::GetEffectStaminaRegenBlockDurationTag();
-	if (!EffectStaminaRegenBlockDurationTag.IsValid())
-	{
-		DEBUG_LOG(TEXT("EffectStaminaRegenBlockDurationTag is Invalid"));
-	}
-
 	StateAbilityBlockingTag = UGameplayTagsSubsystem::GetStateAbilityBlockingTag();
 	if (!StateAbilityBlockingTag.IsValid())
 	{
@@ -262,7 +256,7 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 		{
 			for (const FGameplayAbilitySpec& Spec : GetActivatableAbilities())
 			{
-				if (Spec.IsActive() && Spec.Ability && Spec.Ability->AbilityTags.HasTag(AbilityParryTag))
+				if (Spec.IsActive() && Spec.Ability && Spec.Ability->GetAssetTags().HasTag(AbilityParryTag))
 				{
 					bIsParryActive = true;
 					break;
@@ -313,6 +307,9 @@ void UActionPracticeAbilitySystemComponent::CalculateAndSetAttributes(AActor* So
 
 				DEBUG_LOG(TEXT("Guard Stamina: PoiseDmg=%.1f, GuardStr=%.1f, Cost=%.1f, Stamina=%.1f->%.1f"),
 					FinalAttackData.PoiseDamage, GuardStrength, StaminaCost, OldStamina, NewStamina);
+
+				//직접 SetStamina는 GE_StaminaCost의 리젠 차단을 거치지 않으므로 별도 적용
+				ApplyGuardStaminaRegenBlock();
 
 				if (NewStamina <= 0.0f)
 				{
@@ -486,6 +483,31 @@ void UActionPracticeAbilitySystemComponent::ForceEnemyGroggy(AActor* EnemyActor)
 		EnemyASC->ForceActivateGroggy();
 		DEBUG_LOG(TEXT("ForceEnemyGroggy: Triggered groggy on %s"), *EnemyActor->GetName());
 	}
+}
+
+void UActionPracticeAbilitySystemComponent::ApplyGuardStaminaRegenBlock()
+{
+	if (!GuardStaminaRegenBlockEffect)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("APASC::ApplyGuardStaminaRegenBlock - GuardStaminaRegenBlockEffect is not set"));
+		return;
+	}
+
+	FGameplayEffectSpecHandle SpecHandle = CreateGameplayEffectSpec(GuardStaminaRegenBlockEffect, 1.0f, GetOwner());
+
+	if (!SpecHandle.IsValid())
+	{
+		return;
+	}
+
+	//가드 전용 지속시간으로 덮어씀 (0 이하면 GE 기본 지속시간)
+	if (GuardStaminaRegenBlockDuration > 0.0f)
+	{
+		SpecHandle.Data->SetDuration(GuardStaminaRegenBlockDuration, true);
+	}
+
+	ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+	DEBUG_LOG(TEXT("ApplyGuardStaminaRegenBlock: Duration=%.2f"), SpecHandle.Data->GetDuration());
 }
 
 void UActionPracticeAbilitySystemComponent::CheckBlockSuccess(AActor* SourceActor)

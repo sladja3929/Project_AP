@@ -49,6 +49,12 @@ void UHitReactionAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorIn
 	{
 		DEBUG_LOG(TEXT("AbilityBlockTag is Invalid"));
 	}
+
+	StateStaminaRegenBlockedTag = UGameplayTagsSubsystem::GetStateStaminaRegenBlockedTag();
+	if (!StateStaminaRegenBlockedTag.IsValid())
+	{
+		DEBUG_LOG(TEXT("StateStaminaRegenBlockedTag is Invalid"));
+	}
 }
 
 void UHitReactionAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -83,6 +89,14 @@ void UHitReactionAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 			{
 				ActorInfo->AbilitySystemComponent->AddLooseGameplayTag(StateAbilityBlockingTag);
 				DEBUG_LOG(TEXT("State.Blocking tag added for BlockReaction"));
+			}
+
+			//BlockAbility 캔슬로 빠진 리젠 차단 태그를 BlockReaction 동안 유지
+			if (StateStaminaRegenBlockedTag.IsValid() && !bAddedStaminaRegenBlockedTag)
+			{
+				ActorInfo->AbilitySystemComponent->AddLooseGameplayTag(StateStaminaRegenBlockedTag);
+				bAddedStaminaRegenBlockedTag = true;
+				DEBUG_LOG(TEXT("State.StaminaRegenBlocked tag added for BlockReaction"));
 			}
 		}
 
@@ -213,6 +227,14 @@ void UHitReactionAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 	//BlockReaction 후처리에 필요한 값을 Super 호출 전에 미리 캡처
 	bool bShouldReactivateBlock = false;
 	FGameplayAbilitySpecHandle BlockAbilityHandle;
+
+	//BlockReaction 동안 부여한 리젠 차단 태그 제거 (BlockAbility 재활성화 전에 정리)
+	if (bAddedStaminaRegenBlockedTag)
+	{
+		ActorInfo->AbilitySystemComponent->RemoveLooseGameplayTag(StateStaminaRegenBlockedTag);
+		bAddedStaminaRegenBlockedTag = false;
+		DEBUG_LOG(TEXT("State.StaminaRegenBlocked tag removed after BlockReaction"));
+	}
 
 	//가드 + 가드 브레이크 시 방어 유지
 	if (bIsBlockReaction || bIsGuardBreakReaction)

@@ -79,4 +79,12 @@ protected:
 	virtual void OnRep_PhysicalAttackPower(const FGameplayAttributeData& OldPhysicalAttackPower);
 
 #pragma endregion
+
+private:
+#pragma region "Private Functions"
+
+	//HP 변동 시 머리 위 HP바 표시 (사망 상태면 생략)
+	void ShowHealthBarOnHealthChanged() const;
+
+#pragma endregion
 };

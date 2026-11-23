@@ -20,7 +20,6 @@ URollAbility::URollAbility()
 {
 	bRetriggerInstancedAbility = true;
 	StaminaCost = 20.0f;
-	RotateTime = 0.05f;
 	bIgnoreLockOn = true;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 }
@@ -58,7 +57,7 @@ void URollAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, cons
 		return;
 	}
 
-	StartWaitDelayTask_WaitRotateCharacterAndPlayMontageTask();
+	StartMontageWithFacingWarp();
 	START_WAIT_EVENT_TASK(WaitInvincibleStartEventTask, EventNotifyInvincibleStartTag, OnEventInvincibleStart, nullptr, true, true);
 }
 

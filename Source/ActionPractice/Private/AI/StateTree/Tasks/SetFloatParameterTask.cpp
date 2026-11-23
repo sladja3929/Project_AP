@@ -18,7 +18,7 @@ EStateTreeRunStatus FSetFloatParameterTask::EnterState(FStateTreeExecutionContex
 
 	DEBUG_LOG(TEXT("EnterState: OutputValue set to %.2f"), InstanceData.OutputValue);
 
-	return EStateTreeRunStatus::Succeeded;
+	return InstanceData.bKeepRunning ? EStateTreeRunStatus::Running : EStateTreeRunStatus::Succeeded;
 }
 
 #if WITH_EDITOR
@@ -28,7 +28,7 @@ FText FSetFloatParameterTask::GetDescription(const FGuid& ID, FStateTreeDataView
 
 	if (InstanceData)
 	{
-		return FText::FromString(FString::Printf(TEXT("<b>Set Float:</b> %.2f"), InstanceData->NewValue));
+		return FText::FromString(FString::Printf(TEXT("<b>Set Float:</b> %.2f%s"), InstanceData->NewValue, InstanceData->bKeepRunning ? TEXT(" (Keep Running)") : TEXT("")));
 	}
 
 	return FText::FromString(TEXT("<b>Set Float Parameter</b>"));

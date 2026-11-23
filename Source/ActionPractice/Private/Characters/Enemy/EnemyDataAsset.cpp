@@ -44,6 +44,27 @@ void UEnemyDataAsset::PreloadAllMontages()
 		FStreamableManager::DefaultAsyncLoadPriority);
 }
 
+bool UEnemyDataAsset::BuildFinalAttackData(const FGameplayTagContainer& AttackTags, int32 ComboIndex, FFinalAttackData& OutAttackData) const
+{
+	const FEnemyTaggedAttackData* AttackData = GetAttackDataByTags(AttackTags);
+
+	if (!AttackData || AttackData->ComboSequence.Num() == 0)
+	{
+		DEBUG_LOG(TEXT("BuildFinalAttackData: No attack data for tags %s"), *AttackTags.ToStringSimple());
+		return false;
+	}
+
+	ComboIndex = FMath::Clamp(ComboIndex, 0, AttackData->ComboSequence.Num() - 1);
+	const FAttackStats& AttackStats = AttackData->ComboSequence[ComboIndex].ComboData.AttackData;
+
+	OutAttackData.FinalDamage = BaseDamage * AttackStats.DamageMultiplier;
+	OutAttackData.PoiseDamage = AttackStats.PoiseDamage;
+	OutAttackData.DamageType = AttackStats.DamageType;
+	OutAttackData.bUnparriable = AttackStats.bUnparriable;
+
+	return true;
+}
+
 void UEnemyDataAsset::BeginDestroy()
 {
 	//Combat 번들 핸들 정리 (핸들이 잡고 있던 몽타주 레퍼런스 해제)

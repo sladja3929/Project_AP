@@ -144,6 +144,9 @@ protected:
 	/** Input mapping context + action binding setup */
 	virtual void SetupInputComponent() override;
 
+	//휴식 중 아날로그 축을 제외한 아무 키 입력 시 일어서기 이벤트 전송 (일시정지 키 제외), 이후 기본 입력 처리
+	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
+
 	// ===== Input Handlers =====
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
@@ -189,6 +192,20 @@ protected:
 	// ===== Pause Menu =====
 	void OnPauseInput();
 
+	//일시정지 메뉴의 계속하기 버튼 — ESC 토글과 같은 경로로 닫고 입력 모드 복원
+	void HandlePauseMenuResumeRequested();
+
+	//메뉴 표시 상태에 맞춰 커서·입력 모드 적용
+	void ApplyPauseMenuInputMode();
+
+	// ===== Debug =====
+	//"6" 키: 보스룸(ABossArena)에 가장 가까운 Bonfire로 이동 (Shipping 빌드에서는 바인딩·동작 안 함)
+	void OnDebugTeleportToBossBonfire();
+
+	//이동은 서버 권한으로 처리 (CMC 위치 보정 방지)
+	UFUNCTION(Server, Reliable)
+	void Server_DebugTeleportToBossBonfire();
+
 #pragma endregion
 
 private:
@@ -203,6 +220,13 @@ private:
 #pragma endregion
 
 #pragma region "Private Functions"
+
+	// ===== Rest =====
+	bool IsResting() const;
+	bool IsPauseKey(const FKey& Key) const;
+
+	//RestAbility의 종료 대기(Ability.Rest 이벤트) 트리거
+	void SendExitRestEvent();
 
 	// ===== GAS Input Binding Wrappers =====
 	void OnJumpPressed()          { HandleGASInputPressed(IA_Jump); }

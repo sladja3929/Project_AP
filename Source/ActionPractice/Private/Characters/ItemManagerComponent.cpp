@@ -97,46 +97,57 @@ void UItemManagerComponent::Server_CycleQuickSlot_Implementation()
 	CycleQuickSlot();
 }
 
-bool UItemManagerComponent::ConsumeEquippedItem()
+bool UItemManagerComponent::ConsumeItem(const UUsableItemDataAsset* InItemDA)
 {
 	//서버에서만 수량 차감
 	if (!GetOwner()->HasAuthority())
 	{
-		DEBUG_LOG(TEXT("ConsumeEquippedItem called on client - ignored"));
+		DEBUG_LOG(TEXT("ConsumeItem called on client - ignored"));
 		return false;
 	}
 
-	if (!Slots.IsValidIndex(EquippedIndex))
+	const int32 SlotIndex = FindSlotIndexByItemDA(InItemDA);
+
+	if (SlotIndex == INDEX_NONE)
 	{
-		DEBUG_LOG(TEXT("ConsumeEquippedItem: Invalid EquippedIndex %d"), EquippedIndex);
+		DEBUG_LOG(TEXT("ConsumeItem: No slot for %s"), *GetNameSafe(InItemDA));
 		return false;
 	}
 
-	FUsableItemSlot& Slot = Slots[EquippedIndex];
+	FUsableItemSlot& Slot = Slots[SlotIndex];
+
 	if (!Slot.ConsumeOne())
 	{
-		DEBUG_LOG(TEXT("ConsumeEquippedItem: Cannot consume - Count=%d"), Slot.CurrentCount);
+		DEBUG_LOG(TEXT("ConsumeItem: Cannot consume - Count=%d"), Slot.CurrentCount);
 		return false;
 	}
 
-	DEBUG_LOG(TEXT("ConsumeEquippedItem: Consumed. Remaining=%d"), Slot.CurrentCount);
+	DEBUG_LOG(TEXT("ConsumeItem: Consumed %s at index %d. Remaining=%d"), *GetNameSafe(InItemDA), SlotIndex, Slot.CurrentCount);
 
 	//Consumable이고 수량 0이면 슬롯 제거
 	if (Slot.ItemDA && Slot.ItemDA->IsConsumable() && Slot.CurrentCount <= 0)
 	{
-		DEBUG_LOG(TEXT("ConsumeEquippedItem: Consumable depleted — removing slot at index %d"), EquippedIndex);
-		Slots.RemoveAt(EquippedIndex);
+		DEBUG_LOG(TEXT("ConsumeItem: Consumable depleted — removing slot at index %d"), SlotIndex);
+		Slots.RemoveAt(SlotIndex);
 
 		//EquippedIndex 보정
 		if (Slots.Num() == 0)
 		{
 			EquippedIndex = 0;
 		}
+		else if (SlotIndex < EquippedIndex)
+		{
+			//앞쪽 슬롯 제거 — 장착 중인 아이템 유지
+			--EquippedIndex;
+		}
 		else if (EquippedIndex >= Slots.Num())
 		{
 			EquippedIndex = 0;
 		}
-		//같은 인덱스면 다음 아이템이 자동으로 장착됨 — 추가 보정 불필요
+		//장착 슬롯 자체가 제거되면 같은 인덱스의 다음 아이템이 장착됨
+
+		//장착 아이템이 바뀌었을 수 있으므로 프리로드 (클라이언트는 OnRep 시점에 수행)
+		PreloadEquippedItemAssets();
 	}
 
 	OnEquippedItemChanged.Broadcast();
@@ -258,4 +269,31 @@ void UItemManagerComponent::PreloadEquippedItemAssets()
 
 	//PreloadAssets는 non-const지만 DA 상태(캐시)만 채우므로 const_cast 사용
 	const_cast<UUsableItemDataAsset*>(ItemDA)->PreloadAssets();
+}
+
+int32 UItemManagerComponent::FindSlotIndexByItemDA(const UUsableItemDataAsset* InItemDA) const
+{
+	if (!InItemDA) return INDEX_NONE;
+
+	//같은 DA 슬롯이 여러 개면 장착 슬롯 우선
+	if (Slots.IsValidIndex(EquippedIndex) && Slots[EquippedIndex].ItemDA == InItemDA)
+	{
+		return EquippedIndex;
+	}
+
+	//그 외에는 사용 가능한(수량이 남은) 슬롯 우선, 없으면 첫 일치 슬롯
+	const int32 UsableIndex = Slots.IndexOfByPredicate([InItemDA](const FUsableItemSlot& Slot)
+	{
+		return Slot.ItemDA == InItemDA && Slot.CanUse();
+	});
+
+	if (UsableIndex != INDEX_NONE)
+	{
+		return UsableIndex;
+	}
+
+	return Slots.IndexOfByPredicate([InItemDA](const FUsableItemSlot& Slot)
+	{
+		return Slot.ItemDA == InItemDA;
+	});
 }

@@ -1,4 +1,5 @@
 #include "Characters/BaseCharacter.h"
+#include "Characters/APMotionWarpingComponent.h"
 #include "AbilitySystemComponent.h"
 #include "GAS/AbilitySet/AbilitySetDataAsset.h"
 #include "GAS/CharacterStats/CharacterStatsDataAsset.h"
@@ -25,14 +26,17 @@ ABaseCharacter::ABaseCharacter()
 
 	//데디케이티드 서버에서도 애니메이션 틱 활성화 (몽타주 콜백을 위해 필수)
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+
+	//몽타주 회전 보정용 모션 워핑 (워프 타깃은 서버 → 시뮬 프록시 자동 복제)
+	MotionWarpingComponent = CreateDefaultSubobject<UAPMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 }
 
 void ABaseCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	//GAS 초기화는 possess 타이밍으로 이동 (ActionPracticeCharacter::PossessedBy / OnRep_Owner)
-	//단, possess가 없는 케이스(적 캐릭터 등)를 위해 자식에서 필요 시 직접 호출
+	//GAS 초기화는 possess 타이밍 (플레이어: ActionPracticeCharacter::PossessedBy / OnRep_Owner, 적: EnemyCharacter::PossessedBy)
+	//적 클라이언트·빙의되지 않은 적은 EnemyCharacter::BeginPlay에서 안전망으로 호출
 }
 
 void ABaseCharacter::Tick(float DeltaTime)
