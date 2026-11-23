@@ -98,6 +98,6 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -회전 워프는 남은 구간 시간에 비례해 각도를 나누므로 구간이 짧을수록 빠르게 돎. 발이 땅에 붙은 정지 구간에서 돌면 몸이 긴 4족(Wolf)은 엉덩이가 옆으로 끌려 미끄러져 보이므로, 회전 ANS는 몸이 크게 움직이는 예비동작·공중 구간에 길게 두고 WarpMaxRotationRate로 구간 끝 스냅(타깃 이동으로 남은 각도를 마지막 프레임에 몰아서 회전)을 제한함
 -애니메이션 이동량이 0인 구간(제자리 공격)도 SkewWarp가 AddTranslationEasingFunc 곡선으로 이동량을 생성. 타깃이 움직이면 매 틱 시작점이 재설정되므로 Linear가 아닌 곡선은 속도가 일정하지 않음
 -복제: 엔진이 WarpTargets를 서버 → 시뮬레이티드 프록시로만 복제(COND_SimulatedOnly). 오너 클라이언트 → 서버 방향은 복제되지 않음
--플레이어(ActionRecoveryAbility 계열): 로컬 컨트롤 측이 락온/입력 방향으로 Facing 타깃 계산 → 로컬 적용 + Server RPC 전달(SetWarpTargetYawPredicted). 방향이 없으면 타깃 제거해 이전 액션 타깃 잔존 방지
+-플레이어(ActionRecoveryAbility 계열): 로컬 컨트롤 측이 락온/입력 방향으로 Facing 타깃 계산 → 로컬 적용 + Server RPC 전달(SetWarpTargetYawPredicted). 방향이 없으면 타깃 제거해 이전 액션 타깃 잔존 방지. 일반 공격·구르기 공격은 시작 0.1초에 즉시 돌고, 대시 공격(Sprint/ChargeSprint)은 조금 길게(약 0~0.25초, 강 0~0.2초) 잡아 부드럽게 돌되, 돌진 본격 구간 전에 끝냄. Facing은 시작 순간 방향의 고정 Yaw라 회전 구간이 돌진과 많이 겹치면 도는 동안 원래 방향으로 전진해 궤적이 휘고 도착 시 타깃과 어긋남
 -적(EnemyAttackAbility 계열): 서버가 매 콤보 시작 시 캐싱된 타깃을 bFollowComponent로 AttackTarget·AttackApproach에 설정 → 시뮬 프록시 자동 복제. 단 런지(SuperJump)는 비루트모션 몽타주라 워핑 불가 → TrackingTarget ANS의 틱 회전(RotateToTarget) + 목적지 이벤트 발행 유지
 -워핑은 루트 모션을 수정하는 방식이므로 몽타주 애니메이션의 Root Motion이 켜져 있어야 하고, MOVE_None 상태에선 동작하지 않음 (Rest는 이 이유로 틱 회전 유지)
