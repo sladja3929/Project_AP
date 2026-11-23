@@ -103,6 +103,7 @@ void AEnemyCharacter::PostInitializeComponents()
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
 		DefaultCapsulePawnResponse = Capsule->GetCollisionResponseToChannel(ECC_Pawn);
+		DefaultCapsuleCameraResponse = Capsule->GetCollisionResponseToChannel(ECC_Camera);
 	}
 }
 
@@ -278,8 +279,10 @@ void AEnemyCharacter::ApplyCorpseCollision()
 	UCapsuleComponent* Capsule = GetCapsuleComponent();
 	if (!Capsule) return;
 
-	//Pawn 채널만 해제 — WorldStatic 등 지형 응답은 유지
+	//Pawn·Camera 채널만 해제 — WorldStatic 등 지형 응답은 유지
+	//Camera는 플레이어가 시체 캡슐 안에 들어가면 스프링암 프로브가 캡슐 안에서 시작해 카메라가 캐릭터로 당겨지므로 함께 해제
 	Capsule->SetCollisionResponseToChannel(ECC_Pawn, bIsCorpse ? ECR_Ignore : DefaultCapsulePawnResponse.GetValue());
+	Capsule->SetCollisionResponseToChannel(ECC_Camera, bIsCorpse ? ECR_Ignore : DefaultCapsuleCameraResponse.GetValue());
 	DEBUG_LOG(TEXT("ApplyCorpseCollision: %s, bIsCorpse=%d"), *GetName(), bIsCorpse);
 }
 

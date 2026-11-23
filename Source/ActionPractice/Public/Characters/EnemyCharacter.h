@@ -94,8 +94,11 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_FreezeAnimPose();
 
-	//시체 충돌 전환 (서버 전용) — 사망 시 true로 캡슐의 Pawn 충돌을 해제해 이동을 막지 않게 하고, 리셋 시 false로 복구
+	//시체 충돌 전환 (서버 전용) — 사망 시 true로 캡슐의 Pawn·Camera 충돌을 해제해 이동·카메라를 막지 않게 하고, 리셋 시 false로 복구
 	void SetCorpseCollision(bool bCorpse);
+
+	//시체 상태 — 사망 어빌리티 시작 시점부터 true (StateDead 태그는 사망 몽타주가 끝난 뒤에 붙으므로 사망 직후 판정에 사용)
+	FORCEINLINE bool IsCorpse() const { return bIsCorpse; }
 
 	// ===== Replication =====
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -156,8 +159,11 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_IsCorpse, Transient)
 	bool bIsCorpse = false;
 
-	//복구용 캡슐 Pawn 채널 원래 응답 (BeginPlay 캐시, BP 오버라이드 반영)
+	//복구용 캡슐 Pawn 채널 원래 응답 (PostInitializeComponents 캐시, BP 오버라이드 반영)
 	TEnumAsByte<ECollisionResponse> DefaultCapsulePawnResponse = ECR_Block;
+
+	//복구용 캡슐 Camera 채널 원래 응답 (PostInitializeComponents 캐시, BP 오버라이드 반영)
+	TEnumAsByte<ECollisionResponse> DefaultCapsuleCameraResponse = ECR_Block;
 
 #pragma endregion
 
@@ -169,7 +175,7 @@ private:
 	UFUNCTION()
 	void OnRep_IsCorpse();
 
-	//bIsCorpse에 맞춰 캡슐 Pawn 채널 응답 적용
+	//bIsCorpse에 맞춰 캡슐 Pawn·Camera 채널 응답 적용
 	void ApplyCorpseCollision();
 
 #pragma endregion

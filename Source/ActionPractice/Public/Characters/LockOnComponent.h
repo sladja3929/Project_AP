@@ -215,5 +215,8 @@ private:
 	//서버에서 클라이언트 락온 요청을 최소 검증
 	bool ValidateLockOnRequest(const AActor* NewTarget) const;
 
+	//사망 판정 — StateDead 태그 또는 적 시체 상태 (태그는 사망 몽타주가 끝난 뒤에 붙으므로 시체 상태로 사망 직후부터 판정)
+	bool IsTargetDead(const AActor* Target) const;
+
 #pragma endregion
 };
