@@ -13,8 +13,10 @@
 
 FExecuteGameplayCueTask::FExecuteGameplayCueTask()
 {
-	//항상 Running인 연출 태스크라 상태 완료 판정에서 제외
+	//항상 Running인 연출 태스크라 상태 완료 판정에서 제외 (에디터 전용 데이터, ST 컴파일 시 런타임 데이터로 반영)
+#if WITH_EDITORONLY_DATA
 	bConsideredForCompletion = false;
+#endif
 }
 
 EStateTreeRunStatus FExecuteGameplayCueTask::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
