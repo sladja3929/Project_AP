@@ -1,17 +1,18 @@
 # Project AP
 
-1인 개발 포트폴리오 프로젝트로, 게임 ‘엘든 링’을 레퍼런스로 하여 언리얼 기반 3D 액션 게임을 모작하였습니다.
+1인 개발 언리얼 프로젝트로, 3D 액션 게임의 핵심 시스템과 기능들을 설계하여 역량을 키우고, 게임 개발에 AI를 활용하여 AI 활용 숙달을 목표로 합니다.
 
 ## 개발 목적
-+ 엘든 링, 몬스터 헌터 같은 하드코어 3D 액션 게임의 시스템과 기능들을 모방하여 설계 역량을 키우고  장르의 특성을 이해
++ 3D RPG 액션 게임을 직접 구현하며 설계 역량을 키우고  장르의 특성을 이해
 + 언리얼의 다양한 기술들을 사용해보며 엔진에 숙달
++ AI 환경을 구축하여 게임 개발에서의 AI 활용을 숙달
 
 ## 시연 영상
-[![Video Label](http://img.youtube.com/vi/ItxRoDKDwbM/0.jpg)](https://www.youtube.com/watch?v=ItxRoDKDwbM)
+[![Video Label](http://img.youtube.com/vi/5DyYNm1-bnw/0.jpg)](https://www.youtube.com/watch?v=5DyYNm1-bnw)
 
 ## 환경
 + 플랫폼: Windows PC
-+ 엔진: Unreal 5.7
++ 엔진: Unreal 5.8
 + 언어: C++
 
 ## 구현 기능
@@ -21,3 +22,4 @@
 + Data Driven Design
 + State Tree, GAS 기반 Enemy AI
 + Dedicated Server 환경 Co-op 전투 동기화
++ Unreal Mcp와 툴 확장을 통한 작업 환경 구축
