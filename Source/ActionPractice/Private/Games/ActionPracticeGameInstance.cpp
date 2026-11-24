@@ -1,5 +1,6 @@
 #include "Games/ActionPracticeGameInstance.h"
 #include "GameFramework/GameUserSettings.h"
+#include "HAL/IConsoleManager.h"
 
 #define ENABLE_DEBUG_LOG 1
 
@@ -30,6 +31,32 @@ void UActionPracticeGameInstance::ApplyDesktopResolution()
 	Settings->ApplyResolutionSettings(false);
 
 	DEBUG_LOG(TEXT("Desktop resolution applied: %d x %d (WindowedFullscreen)"), DesktopRes.X, DesktopRes.Y);
+
+	//에디터 PIE는 에디터 뷰포트 기준이라 제외
+	if (!GIsEditor)
+	{
+		ApplyScreenPercentageForResolution(DesktopRes);
+	}
+}
+
+void UActionPracticeGameInstance::ApplyScreenPercentageForResolution(const FIntPoint& Resolution)
+{
+	if (Resolution.Y <= 0)
+	{
+		return;
+	}
+
+	//예: 1080p·1440p → 75%, 4K → 50%
+	const float ScreenPercentage = FMath::Clamp(TargetRenderHeight / static_cast<float>(Resolution.Y) * 100.0f, MinScreenPercentage, MaxScreenPercentage);
+
+	//ini([SystemSettings])보다 높은 우선순위로 설정
+	if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.ScreenPercentage")))
+	{
+		CVar->Set(ScreenPercentage, ECVF_SetByCode);
+	}
+
+	DEBUG_LOG(TEXT("Screen percentage %.1f%% for %d x %d (render %d x %d)"), ScreenPercentage, Resolution.X, Resolution.Y,
+		FMath::RoundToInt(Resolution.X * ScreenPercentage / 100.0f), FMath::RoundToInt(Resolution.Y * ScreenPercentage / 100.0f));
 }
 
 void UActionPracticeGameInstance::ApplyScalabilitySettings()
@@ -50,7 +77,14 @@ void UActionPracticeGameInstance::ApplyScalabilitySettings()
 	Settings->SetFoliageQuality(1);
 	Settings->SetShadingQuality(2);
 
+	//시연·녹화용 60fps 고정 (엔진이 GameInstance 생성 직전에 사용자 설정 프레임 제한을 적용하므로 이후 시점에서 덮어씀)
+	//에디터 PIE에서는 에디터 프레임까지 묶이지 않도록 제외
+	if (!GIsEditor)
+	{
+		Settings->SetFrameRateLimit(DemoFrameRateLimit);
+	}
+
 	Settings->ApplySettings(false);
 
-	DEBUG_LOG(TEXT("Scalability settings locked for demo build"));
+	DEBUG_LOG(TEXT("Scalability settings locked for demo build (FrameRateLimit %.0f)"), Settings->GetFrameRateLimit());
 }

@@ -4,6 +4,7 @@
 #include "MontageCurvePoller.generated.h"
 
 class UAnimInstance;
+class UAnimMontage;
 
 //몽타주 커브 폴링을 위한 구조체
 //히스테리시스 상태머신으로 블렌딩 중에도 안정적인 에지 감지
@@ -47,8 +48,10 @@ public:
 	//커브 추가
 	void AddCurve(const FName InCurveName);
 	
-	//폴링 실행 - TickTask에서 호출
-	void Poll(UAnimInstance* AnimInstance);
+	//폴링 실행 - TickTask와 몽타주 시작 직후에 호출
+	//Montage를 넘기면 그 몽타주가 활성인 동안 몽타주 에셋 커브 값(블렌드 가중치 없음)도 함께 봄
+	//AnimInstance 커브 값은 블렌드 인 가중치가 곱해져 커브를 0초부터 그려도 에지가 늦게 잡히기 때문
+	void Poll(UAnimInstance* AnimInstance, const UAnimMontage* Montage = nullptr);
 
 	//커브가 현재 활성 상태인지 확인
 	bool IsCurveActive(FName CurveName) const;

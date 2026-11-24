@@ -51,6 +51,8 @@ description: 환경 에셋 팩(KiteDemo 등)으로 플레이용 맵을 unreal-mc
 5. create_foliage_type(나무·바위 collision=True, 덤불·고사리 False) → scatter_foliage 종류별
 6. 조명(Lighting 폴더): DirectionalLight(pitch -50, yaw 200, Intensity 32, Temperature 5000, VolumetricScatteringIntensity 2), SkyAtmosphere, SkyLight(실시간 캡처, 1.5), ExponentialHeightFog(Density 0.02, Falloff 0.12, 녹청 Inscattering, 볼류메트릭 ScatteringDistribution 0.75), PostProcessVolume(Unbound, AEM_Manual, Bias 8.5, Vignette 0.35)
    -길이 어두우면 태양 고도를 올리고(그림자 짧게) 스카이라이트를 올린다. 프로젝트 기본 노출은 고정(Bias 1)이라 맵 PPV가 필수
+   -보스룸 너머 랜드마크 거목(높이 약 50m)이 태양 쪽에 있으면 공터 절반 이상이 그림자에 덮인다. 태양을 진입 방향 뒤쪽(보스 정면 조명)으로 돌리고 고도를 올린다 (DeepForest: pitch -50/yaw -160에서 그림자 62% → pitch -65/yaw 15에서 0%)
+   -각도는 높이맵(height.r16)과 폴리지 JSON·랜드마크로 공터 샘플점에서 태양 방향 레이를 쏴 그림자 비율을 계산해 고른 뒤 캡처로 확인한다
 7. 게임플레이: PlayerStart(+100), BP_Bonfire, BP_Beer(+30), BP_StaminaOrb(+80), BP_Wolf/BP_StickMan(+120), BP_WoodGiant(+300, scale 2, yaw 180), NavMeshBoundsVolume(scale = 크기m/2)
 8. 투명 벽: /Engine/BasicShapes/Cube, scale (길이/100, 0.5, 40), 컴포넌트에 {"BodyInstance":{"CollisionProfileName":"InvisibleWall"},"bHiddenInGame":true,"CastShadow":false,"bVisible":false}. InvisibleWall은 Visibility를 무시해 AI 시야는 통과
 9. rebuild_navigation → 범위가 0이면 빌드 진행 중이니 잠시 뒤 RecastNavMesh 바운드를 다시 확인 → AssetTools.save_assets

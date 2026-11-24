@@ -32,6 +32,7 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -무기별 공격 데이터는 WeaponDataAsset의 FTaggedAttackData 배열에서 태그로 식별됨
 -적 공격 데이터는 EnemyDataAsset의 FEnemyTaggedAttackData에서 관리됨
 -히트 판정은 IHitDetectionInterface 전략(AttackTrace 소켓 스윕 / CapsuleOverlap / 투사체 스윕)과 IHitDetectionUser(판정 결과로 GE 적용)로 나뉨. 근접 공격은 어빌리티가 User지만, 투사체는 투사체 자신(ABaseProjectile)이 User라서 발사 후 어빌리티가 끝나거나 취소돼도 판정·데미지가 유지됨
+-근접 소켓 판정의 반경은 HitDetection 구간 내내 고정이라, 착지·충격 순간에만 넓어지는 범위는 원형 판정(Burst)으로 따로 처리: 소켓 설정(FAttackSocketConfig::BurstRadius)이 반경, HitDetectionBurst 노티파이(Event.Notify.HitDetectionBurst)가 시점을 정하고, UAttackTraceComponent가 그 소켓 위치에서 1회 판정함. 같은 공격 데이터·중복 피격 체크를 공유해 소켓 경로에 이미 맞은 대상은 다시 맞지 않음 (예: WoodGiant FootStomp 발 착지)
 -투사체 공격은 EComboAttackType::Projectile + FEnemyProjectileConfig + UEnemyProjectileAbility(EnemyAttackAbility 상속)로 구성. 몽타주의 Projectile Event 노티파이(Spawn → Grab → Launch)로 생성·부착·발사하며, 진행 단계(EProjectilePhase)는 복제되어 투사체 BP의 OnProjectilePhaseChanged에서 소유자별 등장 연출을 붙임 (공용 코드에 적 전용 연출을 넣지 않음)
 -ABaseProjectile(플레이어/적 공용)은 공격 데이터 출처(ResolveAttackData)와 아군 판정(IsFriendlyActor)만 자식(AEnemyProjectile 등)에 맡김. 서버가 판정·착탄을 처리하고 착탄 연출은 EffectManagerSubsystem 멀티캐스트 (ImpactEffect 1개 + 같은 위치·법선으로 겹쳐 띄우는 AdditionalImpactEffects 레이어). 회피 무적(State.Invincible) 대상은 통과. 메시는 MeshPivot(메시 기하 중심) 아래에 붙어 있어 BP에서 회전·스케일은 MeshPivot으로 조정
 
@@ -89,6 +90,7 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -Block: 홀드 방식, 입력 해제 대기와 피격 후 재활성화 흐름까지 고려할 것
 -Parry: IA_SpecialAction 입력, ParryAbility는 ActionRecoveryAbility 상속, ParryWindow 커브로 State.Parrying 태그 제어
 -ActionRecoveryAbility는 버퍼 입력 허용, 리커버리 상태 태그 관리, 버퍼 실행까지 담당함
+-ActionRecovery·EnableBufferInput 커브는 FMontageCurvePoller가 에지로 감지하며, 판정 값은 AnimInstance 커브(블렌드 가중치 적용)와 재생 중인 몽타주 에셋 커브(가중치 없음) 중 큰 값. 몽타주 시작 직후에도 한 번 폴링함. 가중치 값만 쓰면 0초부터 그린 커브도 블렌드 인 동안(약 0.1초) 에지가 늦어, 그 사이 들어온 구르기가 State.Recovering 없이 활성화되어 피격 리액션을 끊은 사례가 있음
 -ChargeAttackAbility는 입력 유지/해제와 차지 시작 커브, 최대 차지, 노차지 분기를 포함함
 
 ##액션 회전 (Motion Warping) 설계

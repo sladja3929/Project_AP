@@ -1,5 +1,6 @@
 #include "GAS/Abilities/Tasks/MontageCurvePoller.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 
 #define ENABLE_DEBUG_LOG 0
 
@@ -40,7 +41,7 @@ void FMontageCurvePoller::AddCurve(const FName InCurveName)
 	DEBUG_LOG(TEXT("MontageCurvePoller Add Curve to Polling: %s"), *InCurveName.ToString());
 }
 
-void FMontageCurvePoller::Poll(UAnimInstance* AnimInstance)
+void FMontageCurvePoller::Poll(UAnimInstance* AnimInstance, const UAnimMontage* Montage)
 {
 	if (!AnimInstance)
 	{
@@ -51,11 +52,22 @@ void FMontageCurvePoller::Poll(UAnimInstance* AnimInstance)
 	RisingEdgeCurves.Empty();
 	FallingEdgeCurves.Empty();
 
+	//몽타주가 활성(블렌드 아웃 중이 아님)일 때만 에셋 커브를 함께 봄
+	const FAnimMontageInstance* MontageInstance = Montage ? AnimInstance->GetActiveInstanceForMontage(Montage) : nullptr;
+	const bool bUseMontageCurve = MontageInstance && MontageInstance->IsActive();
+	const FAnimExtractContext MontageContext(bUseMontageCurve ? static_cast<double>(MontageInstance->GetPosition()) : 0.0);
+
 	//GetActiveCurveNames 최적화 제거 - 항상 직접 GetCurveValue 호출
 	//추적 커브가 2개뿐이므로 직접 호출이 더 안전하고 에지 누락/오탐 위험 없음
 	for (const FName& CurveName : CurveNames)
 	{
 		float NewValue = AnimInstance->GetCurveValue(CurveName);
+
+		//블렌드 인 가중치가 곱해진 값 대신 몽타주에 그린 값 기준으로 판정 (몽타주에 해당 커브가 없으면 0이라 AnimInstance 값 사용)
+		if (bUseMontageCurve)
+		{
+			NewValue = FMath::Max(NewValue, Montage->EvaluateCurveData(CurveName, MontageContext));
+		}
 		CurrentValues.Add(CurveName, NewValue);
 		//DEBUG_LOG(TEXT("Curve Value: %s (Value: %.3f)"), *CurveName.ToString(), NewValue);
 		
