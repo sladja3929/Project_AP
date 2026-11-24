@@ -36,6 +36,11 @@ struct FAttackSocketConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Socket")
 	float TraceRadius = 10.0f;
+
+	//HitDetectionBurst 노티파이 시점에 이 소켓 그룹 위치에서 한 번 판정할 반경 (0이면 사용 안 함)
+	//예: 발이 땅에 닿는 순간 주변 충격 범위. 소켓 경로 판정과 같은 공격으로 취급되어 이미 맞은 대상은 다시 맞지 않음
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Socket", meta = (ClampMin = "0.0"))
+	float BurstRadius = 0.0f;
 };
 
 //개별 공격 데이터

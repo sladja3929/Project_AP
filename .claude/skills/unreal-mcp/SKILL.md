@@ -51,6 +51,9 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 -블렌드스페이스: SampleData(샘플 추가·이동·삭제)를 바꾸면 AnimMontageTools.resample_blend_space를 호출한다. 리플렉션 편집은 블렌드 데이터를 재계산하지 않아 새 샘플이 무시된다
 -BP·ABP 그래프: 편집 후 BlueprintTools.compile_blueprint(warnings_as_errors=True)로 경고까지 확인한다
 -사운드: AudioTools(import_sound_waves → create_sound_cue → create_sound_asset)로 만든다. 웨이브 여러 개를 넘기면 Random 노드 Cue가 된다. SoundCue 기본 VolumeMultiplier가 0.75이므로 음량을 맞춘 파일이면 1.0으로 바꾼다. 감쇠·동시 재생 제한·볼륨은 ObjectTools.set_properties로 설정한다 (Concurrency는 maxCount와 platformMaxCount.default를 함께 설정)
+-같은 시점에 겹치는 노티파이를 추가하면 엔진(RefreshCacheData)이 다른 트랙으로 옮기거나 새 트랙을 만들고, 새 트랙 이름이 기존 트랙과 같아질 수 있다. 이름 기반 트랙 조회는 첫 트랙만 보므로 노티파이가 사라진 것처럼 보인다
+  -list_notifies는 전체 Notifies 배열 기준이며 track이 null이면 이름이 겹친 트랙에 있는 것이다. 사라진 것처럼 보여도 다시 추가하지 말고 list_notifies 결과로 판단한다 (중복 이펙트를 만든 사례)
+  -remove_notifies_by_name은 같은 표시 이름(예: "Environment Impact")을 모두 지운다. 하나만 지울 때는 지운 뒤 남길 것을 다시 추가하고 프로퍼티를 복사한다
 -AnimNotify를 몽타주 0초에 두면 시작 프레임에서 건너뛸 수 있어 0.01초에 둔다. 몽타주의 Notifies 배열(TriggerChance 등 이벤트 필드)은 ObjectTools로 읽거나 쓸 수 없다. 사운드 빈도 조절은 SoundConcurrency의 retriggerTime으로 한다
 
 ##나이아가라 (NiagaraToolset_System)
@@ -61,6 +64,9 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 -AddModule은 moduleLocationRef로 지정한 모듈 **뒤에** 넣는다. Drag 등 힘 모듈은 SolveForcesAndVelocity보다 앞이어야 하므로, Solve를 지우고 힘 모듈 뒤에 다시 추가해 순서를 맞춘다
 -다이내믹 입력 안쪽 값은 inputNameStack에 체인을 넣어 설정한다 (예: ['Scale Alpha', 'Scale Curve'], ['Scale RGB', 'Color']). 커브 DI는 DataInterface propertyValues JSON의 Curve.keys로 쓴다
 -다른 시스템과 공유하는 머티리얼(MI)은 바꾸지 말고 색·알파는 이미터의 ScaleColor·InitializeParticle Color로 조절한다
+-원샷 시스템은 add_to_scene_from_asset 직후 CaptureViewport로 찍어도 보이지 않는다(재생 시점을 못 맞춤, 컴포넌트 툴세트에 리셋 툴 없음). 가시성 확인은 사용자 PIE로 요청한다
+-지면에서 퍼지는 링은 위치 오프셋을 올리지 않는다. AddVelocityFromPoint 원점이 지면에 남아 위쪽 속도 성분이 생겨 아래에서 위로 퍼진다. 가시성은 알파·수명·크기로 올린다
+-알파 배율이 0.1대면 녹색 풀 위에서 거의 안 보인다(DeepForest 기준 링 0.6, 먼지 구름 0.75~0.8). 먼지 색은 어두운 갈색(0.24, 0.17, 0.10)이 너무 진하다는 피드백이 있었고 밝은 흙먼지 톤(0.42, 0.34, 0.24)으로 조정했다
 
 ##애님 그래프 (BlueprintTools)
 -노드 타입 ID가 에디터 언어로 현지화돼 있다. find_node_types는 한국어로 검색한다

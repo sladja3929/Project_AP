@@ -587,25 +587,36 @@ class AnimMontageTools(unreal.ToolsetDefinition):
             A JSON string: {"length": float, "tracks": [str], "notifies": [{"name",
             "track", "trigger_time", "duration", "is_state", "class", "object"}]},
             sorted by trigger time. "object" is the notify instance path usable with ObjectTools.
+            Every notify of the asset is listed. "track" is null when the notify sits on a
+            track whose name is shared with an earlier track (the engine auto-creates such
+            tracks when notifies overlap, and track-name lookups only reach the first one).
         """
         track_names = [str(name) for name in _anim_lib().get_animation_notify_track_names(animation)]
-        notifies = []
 
-        #FAnimNotifyEvent::TrackIndex는 스크립트에 노출되지 않으므로 트랙 단위로 조회
+        #FAnimNotifyEvent::TrackIndex는 스크립트에 노출되지 않으므로 트랙 이름별 조회로 소속 트랙을 구함
+        #엔진의 트랙 이름 조회는 중복 이름을 한 번만 돌려주므로, 목록 자체는 전체 Notifies 배열에서 만듦
+        track_of_instance = {}
         for track_name in track_names:
             for event in _anim_lib().get_animation_notify_events_for_track(animation, track_name):
-                notify = event.get_editor_property('notify')
-                notify_state = event.get_editor_property('notify_state_class')
-                instance = notify_state if notify_state else notify
-                notifies.append({
-                    'name': str(event.get_editor_property('notify_name')),
-                    'track': track_name,
-                    'trigger_time': _anim_lib().get_anim_notify_event_trigger_time(event),
-                    'duration': _anim_lib().get_anim_notify_event_duration(event),
-                    'is_state': notify_state is not None,
-                    'class': instance.get_class().get_path_name() if instance else None,
-                    'object': instance.get_path_name() if instance else None,
-                })
+                instance = event.get_editor_property('notify_state_class') or event.get_editor_property('notify')
+                if instance:
+                    track_of_instance.setdefault(instance.get_path_name(), track_name)
+
+        notifies = []
+        for event in _anim_lib().get_animation_notify_events(animation):
+            notify = event.get_editor_property('notify')
+            notify_state = event.get_editor_property('notify_state_class')
+            instance = notify_state if notify_state else notify
+            path = instance.get_path_name() if instance else None
+            notifies.append({
+                'name': str(event.get_editor_property('notify_name')),
+                'track': track_of_instance.get(path),
+                'trigger_time': _anim_lib().get_anim_notify_event_trigger_time(event),
+                'duration': _anim_lib().get_anim_notify_event_duration(event),
+                'is_state': notify_state is not None,
+                'class': instance.get_class().get_path_name() if instance else None,
+                'object': path,
+            })
 
         notifies.sort(key=lambda entry: entry['trigger_time'])
 

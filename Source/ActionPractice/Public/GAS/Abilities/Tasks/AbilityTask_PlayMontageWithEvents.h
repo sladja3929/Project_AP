@@ -143,7 +143,10 @@ protected:
     
     UFUNCTION()
     void PlayMontage();
-    
+
+    //커브 폴링 후 에지 브로드캐스트 (TickTask와 몽타주 시작 직후에 호출)
+    void PollCurvesAndBroadcast(UAnimInstance* AnimInstance);
+
     //이벤트 핸들러
     UFUNCTION()
     void OnMontageBlendingOut(UAnimMontage* Montage, bool bInterrupted);

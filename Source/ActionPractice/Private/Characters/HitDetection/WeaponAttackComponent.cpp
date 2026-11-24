@@ -94,10 +94,11 @@ bool UWeaponAttackComponent::LoadTraceConfig(const FGameplayTagContainer& Attack
 	{
 		if (FHitSocketGroupConfig* PrebuiltSocketGroup = PrebuiltSocketGroups.Find(SocketConfig.SocketName))
 		{
-			//미리 빌드된 설정을 복사하고 DamageType과 TraceRadius 설정
+			//미리 빌드된 설정을 복사하고 DamageType, TraceRadius, BurstRadius 설정
 			FHitSocketGroupConfig SocketGroupConfig = *PrebuiltSocketGroup;
 			SocketGroupConfig.AttackMotionType = AttackInfo.DamageType;
 			SocketGroupConfig.TraceRadius = SocketConfig.TraceRadius;
+			SocketGroupConfig.BurstRadius = SocketConfig.BurstRadius;
 
 			UsingHitSocketGroups.Add(SocketConfig.SocketName, SocketGroupConfig);
 			DEBUG_LOG(TEXT("LoadTraceConfig - Added socket group: %s, SocketCount: %d, Radius: %.2f"),

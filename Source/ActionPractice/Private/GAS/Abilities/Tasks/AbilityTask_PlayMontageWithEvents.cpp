@@ -58,9 +58,16 @@ void UAbilityTask_PlayMontageWithEvents::Activate()
         UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
 
         if (AnimInstance != nullptr)
-        {         
+        {
             PlayMontage();
             bPlayedMontage = true;
+
+            //시작 프레임에 바로 한 번 폴링: 0초부터 켜진 커브(ActionRecovery 등)의 에지를 다음 틱까지 미루지 않음
+            //미루면 그 사이 들어온 입력이 Recovering 태그 없이 활성화되어 이 몽타주를 끊을 수 있음 (피격 리액션 직후 구르기 등)
+            if (bUseCurvePolling && IsActive())
+            {
+                PollCurvesAndBroadcast(AnimInstance);
+            }
         }
     }
 
@@ -69,7 +76,11 @@ void UAbilityTask_PlayMontageWithEvents::Activate()
         EndTask();
     }
 
-    SetWaitingOnAvatar();
+    //시작 직후 에지 처리에서 태스크가 끝났을 수 있음
+    if (IsActive())
+    {
+        SetWaitingOnAvatar();
+    }
 }
 
 void UAbilityTask_PlayMontageWithEvents::TickTask(float DeltaTime)
@@ -86,23 +97,28 @@ void UAbilityTask_PlayMontageWithEvents::TickTask(float DeltaTime)
 
     if (AnimInstance)
     {
-        //커브 폴링 실행
-        CurvePoller.Poll(AnimInstance);
+        PollCurvesAndBroadcast(AnimInstance);
+    }
+}
 
-        //엣지 브로드캐스트
-        if (ShouldBroadcastAbilityTaskDelegates())
+void UAbilityTask_PlayMontageWithEvents::PollCurvesAndBroadcast(UAnimInstance* AnimInstance)
+{
+    //커브 폴링 실행 (이 태스크의 몽타주 에셋 커브도 함께 판정)
+    CurvePoller.Poll(AnimInstance, MontageToPlay);
+
+    //엣지 브로드캐스트
+    if (ShouldBroadcastAbilityTaskDelegates())
+    {
+        for (const FName& CurveName : CurvePoller.RisingEdgeCurves)
         {
-            for (const FName& CurveName : CurvePoller.RisingEdgeCurves)
-            {
-                DEBUG_LOG(TEXT("Curve Rising Edge: %s"), *CurveName.ToString());
-                OnCurveRisingEdge.Broadcast(CurveName);
-            }
+            DEBUG_LOG(TEXT("Curve Rising Edge: %s"), *CurveName.ToString());
+            OnCurveRisingEdge.Broadcast(CurveName);
+        }
 
-            for (const FName& CurveName : CurvePoller.FallingEdgeCurves)
-            {
-                DEBUG_LOG(TEXT("Curve Falling Edge: %s"), *CurveName.ToString());
-                OnCurveFallingEdge.Broadcast(CurveName);
-            }
+        for (const FName& CurveName : CurvePoller.FallingEdgeCurves)
+        {
+            DEBUG_LOG(TEXT("Curve Falling Edge: %s"), *CurveName.ToString());
+            OnCurveFallingEdge.Broadcast(CurveName);
         }
     }
 }

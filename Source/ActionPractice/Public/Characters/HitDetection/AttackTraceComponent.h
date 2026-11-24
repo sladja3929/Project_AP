@@ -36,6 +36,9 @@ struct FHitSocketGroupConfig
 	int32 SocketCount = 2;
 	float TraceRadius = 10.0f;
 
+	//HitDetectionBurst 시점의 원형 판정 반경 (0이면 사용 안 함)
+	float BurstRadius = 0.0f;
+
 	UPROPERTY()
 	TArray<FName> TraceSocketNames;
 
@@ -108,6 +111,9 @@ public:
 	virtual FOnHitDetected& GetOnHitDetected() override { return OnHit; }
 	//=====================================
 
+	//HitDetectionBurst 노티파이: HitDetection 구간 안에서 BurstRadius가 설정된 소켓 그룹 위치에 원형 판정 1회
+	void HandleHitDetectionBurst(const FGameplayEventData& Payload);
+
 	UFUNCTION(BlueprintCallable, Category = "Attack Trace")
 	void ResetHitActors();
 
@@ -155,6 +161,7 @@ protected:
 	// ===== Event Delegate =====
 	FDelegateHandle HitDetectionStartHandle;
 	FDelegateHandle HitDetectionEndHandle;
+	FDelegateHandle HitDetectionBurstHandle;
 
 #pragma endregion
 
@@ -180,7 +187,10 @@ protected:
 	void PerformSlashTrace(FHitSocketGroupConfig& SocketGroup);
 	void PerformPierceTrace(FHitSocketGroupConfig& SocketGroup);
 	void PerformStrikeTrace(FHitSocketGroupConfig& SocketGroup);
-	
+
+	//소켓 그룹의 각 소켓 위치에서 BurstRadius 구체 오버랩 판정 (길이 0 스윕)
+	void PerformBurstTrace(const FHitSocketGroupConfig& SocketGroup);
+
 	// ===== Adaptive Trace Sweep Functions =====
 	FVector GetTipSocketLocation(const FHitSocketGroupConfig& SocketGroup) const;
 	float CalculateSwingSpeed(const FHitSocketGroupConfig& SocketGroup) const;

@@ -1,5 +1,6 @@
 #include "Projectiles/BaseProjectile.h"
 #include "Characters/HitDetection/ProjectileHitDetectionComponent.h"
+#include "Characters/HitDetection/EnemyAttackComponent.h"
 #include "GAS/AbilitySystemComponent/BaseAbilitySystemComponent.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "AbilitySystemBlueprintLibrary.h"
@@ -112,6 +113,15 @@ void ABaseProjectile::InitProjectile(UBaseAbilitySystemComponent* InSourceASC, T
 	EffectLevel = InEffectLevel;
 	AttackTags = InAttackTags;
 	ComboIndex = InComboIndex;
+
+	//던진 적의 공격 판정 디버그 표시 상태 상속 (2키 토글)
+	const AActor* SourceAvatar = InSourceASC ? InSourceASC->GetAvatarActor() : nullptr;
+	const UEnemyAttackComponent* SourceAttackComponent = SourceAvatar ? SourceAvatar->FindComponentByClass<UEnemyAttackComponent>() : nullptr;
+
+	if (SourceAttackComponent && HitDetectionComponent)
+	{
+		HitDetectionComponent->bDrawDebugTrace = SourceAttackComponent->bDrawDebugTrace;
+	}
 
 	//히트 판정 전략 연결 후 공격 데이터 주입
 	HitDetectionSetter.Init(HitDetectionComponent.Get());

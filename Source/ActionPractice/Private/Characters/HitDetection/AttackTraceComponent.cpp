@@ -3,6 +3,7 @@
 #include "Characters/HitDetection/AttackTraceComponent.h"
 #include "Items/AttackData.h"
 #include "Components/MeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "GAS/GameplayTagsSubsystem.h"
 #include "AbilitySystemComponent.h"
@@ -69,7 +70,7 @@ void UAttackTraceComponent::BindEventCallbacks()
 		return;
 	}
 
-	if (HitDetectionStartHandle.IsValid() || HitDetectionEndHandle.IsValid())
+	if (HitDetectionStartHandle.IsValid() || HitDetectionEndHandle.IsValid() || HitDetectionBurstHandle.IsValid())
 	{
 		DEBUG_LOG(TEXT("BindEventCallbacks: Clearing previous handles before binding new"));
 		UnbindEventCallbacks();
@@ -98,6 +99,17 @@ void UAttackTraceComponent::BindEventCallbacks()
 			HandleHitDetectionEnd(*EventData);
 		}
 	});
+
+	//HitDetectionBurst 노티파이 (착지 순간 원형 판정)
+	HitDetectionBurstHandle = CachedASC->GenericGameplayEventCallbacks
+	.FindOrAdd(UGameplayTagsSubsystem::GetEventNotifyHitDetectionBurstTag())
+	.AddLambda([this](const FGameplayEventData* EventData)
+	{
+		if (IsValid(this) && EventData)
+		{
+			HandleHitDetectionBurst(*EventData);
+		}
+	});
 }
 
 void UAttackTraceComponent::UnbindEventCallbacks()
@@ -119,10 +131,19 @@ void UAttackTraceComponent::UnbindEventCallbacks()
 				Delegate->Remove(HitDetectionEndHandle);
 			}
 		}
+
+		if (HitDetectionBurstHandle.IsValid())
+		{
+			if (FGameplayEventMulticastDelegate* Delegate = CachedASC->GenericGameplayEventCallbacks.Find(UGameplayTagsSubsystem::GetEventNotifyHitDetectionBurstTag()))
+			{
+				Delegate->Remove(HitDetectionBurstHandle);
+			}
+		}
 	}
 
 	HitDetectionStartHandle.Reset();
 	HitDetectionEndHandle.Reset();
+	HitDetectionBurstHandle.Reset();
 }
 
 void UAttackTraceComponent::HandleHitDetectionStart(const FGameplayEventData& Payload)
@@ -149,6 +170,34 @@ void UAttackTraceComponent::HandleHitDetectionEnd(const FGameplayEventData& Payl
 	StopTrace();
 	//프레임 드랍으로 HitDetectionEnd가 HitDetectionStart보다 먼저 도착할 수 있기 때문에
 	//bIsPrepared를 다음 PrepareHitDetection에서 초기화되도록 여기서 false로 설정하지 않음
+}
+
+void UAttackTraceComponent::HandleHitDetectionBurst(const FGameplayEventData& Payload)
+{
+	DEBUG_LOG(TEXT("HitDetectionBurst: Received. bIsTracing=%s"),
+		bIsTracing ? TEXT("true") : TEXT("false"));
+
+	//HitDetection 구간 안에서만 판정 (bIsPrepared는 구간 종료 후에도 남아 있어, 공격이 끝나거나 취소된 뒤 이전 공격 데이터로 판정되는 것 방지)
+	if (!bIsTracing)
+	{
+		return;
+	}
+
+	//히트 판정은 서버에서만 (PerformTrace와 같은 규칙)
+	AActor* OwnerActor = GetOwner();
+
+	if (!OwnerActor || !OwnerActor->HasAuthority())
+	{
+		return;
+	}
+
+	for (const TPair<FName, FHitSocketGroupConfig>& Pair : UsingHitSocketGroups)
+	{
+		if (Pair.Value.BurstRadius > 0.0f)
+		{
+			PerformBurstTrace(Pair.Value);
+		}
+	}
 }
 #pragma endregion
 
@@ -410,6 +459,63 @@ void UAttackTraceComponent::PerformStrikeTrace(FHitSocketGroupConfig& SocketGrou
 {
 	//타격: 둔기 전용 판정 형태(범위 확장 등)가 정해지기 전까지 찌르기와 같은 소켓 경로 판정 사용
 	PerformPierceTrace(SocketGroup);
+}
+
+void UAttackTraceComponent::PerformBurstTrace(const FHitSocketGroupConfig& SocketGroup)
+{
+	if (!OwnerMesh || !GetWorld())
+	{
+		return;
+	}
+
+	const FCollisionQueryParams Params = GetCollisionQueryParams();
+	const FCollisionShape BurstShape = FCollisionShape::MakeSphere(SocketGroup.BurstRadius);
+
+	//각 소켓 위치에서 길이 0 스윕 = 반경 오버랩 판정 (투사체 착탄 반경 판정과 같은 방식)
+	//소켓끼리 겹친 대상은 ValidateHit의 중복 체크로 한 번만 맞음
+	for (const FName& SocketName : SocketGroup.TraceSocketNames)
+	{
+		if (!OwnerMesh->DoesSocketExist(SocketName))
+		{
+			DEBUG_LOG(TEXT("PerformBurstTrace - Socket %s not found on mesh"), *SocketName.ToString());
+			continue;
+		}
+
+		const FVector Center = OwnerMesh->GetSocketLocation(SocketName);
+
+		TArray<FHitResult> Hits;
+		GetWorld()->SweepMultiByChannel(Hits, Center, Center, FQuat::Identity, GetTraceChannel(), BurstShape, Params);
+
+		++DebugSweepTraceCounter;
+
+		if (bDrawDebugTrace)
+		{
+			DrawDebugSphere(GetWorld(), Center, SocketGroup.BurstRadius, 16, DebugTraceColor, false, DebugTraceDuration);
+		}
+
+		for (FHitResult& Hit : Hits)
+		{
+			//길이 0 스윕 히트는 ImpactPoint가 반경 중심이라 맞은 바디(본) 위치로 보정 (피격 이펙트가 대상 몸에서 재생되도록)
+			const USkeletalMeshComponent* SkeletalMesh = Cast<USkeletalMeshComponent>(Hit.GetComponent());
+
+			if (SkeletalMesh && Hit.BoneName != NAME_None)
+			{
+				Hit.ImpactPoint = SkeletalMesh->GetBoneLocation(Hit.BoneName);
+			}
+			else if (Hit.GetActor())
+			{
+				Hit.ImpactPoint = Hit.GetActor()->GetActorLocation();
+			}
+
+			Hit.ImpactNormal = (Hit.ImpactPoint - Center).GetSafeNormal();
+
+			//소켓 경로 판정과 같은 공격 데이터로 처리 (발에 이미 맞은 대상은 다시 맞지 않음)
+			if (ValidateHit(Hit.GetActor(), Hit, false))
+			{
+				ProcessHit(Hit.GetActor(), Hit);
+			}
+		}
+	}
 }
 
 void UAttackTraceComponent::PerformSlashTrace(FHitSocketGroupConfig& SocketGroup)

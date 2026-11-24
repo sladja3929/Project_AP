@@ -81,6 +81,7 @@ public:
 	static const FGameplayTag& GetEventNotifyInvincibleStartTag();
 	static const FGameplayTag& GetEventNotifyHitDetectionStartTag();
 	static const FGameplayTag& GetEventNotifyHitDetectionEndTag();
+	static const FGameplayTag& GetEventNotifyHitDetectionBurstTag();
 	static const FGameplayTag& GetEventNotifyCheckConditionTag();
 	static const FGameplayTag& GetEventNotifyTrackingTargetTag();
 	static const FGameplayTag& GetEventNotifyLungeStartTag();
@@ -183,6 +184,7 @@ private:
 	const FGameplayTag& GetEventNotifyInvincibleStartTagInternal() const;
 	const FGameplayTag& GetEventNotifyHitDetectionStartTagInternal() const;
 	const FGameplayTag& GetEventNotifyHitDetectionEndTagInternal() const;
+	const FGameplayTag& GetEventNotifyHitDetectionBurstTagInternal() const;
 	const FGameplayTag& GetEventNotifyCheckConditionTagInternal() const;
 	const FGameplayTag& GetEventNotifyTrackingTargetTagInternal() const;
 	const FGameplayTag& GetEventNotifyLungeStartTagInternal() const;
