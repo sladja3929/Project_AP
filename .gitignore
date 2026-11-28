@@ -76,7 +76,7 @@ Plugins/**/Intermediate/*
 DerivedDataCache/*
 
 # AI Configuration files
-.claude/settings.local.json
+# .claude/settings.local.json은 환경 이전용으로 추적 (개인정보·토큰·사용자 경로 금지)
 .env
 .env.*
 !.env.example

@@ -6,7 +6,7 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 #unreal-mcp 공통 규칙과 함정
 
 모두 실제로 겪은 문제에서 나온 규칙이다. 작업별 절차는 add-enemy(적 추가), edit-statetree(StateTree 편집), create-map(맵 제작) 스킬을 따른다.
-반드시 지킬 BP 기본값 규칙은 CLAUDE.md "#MCP 에셋 편집 주의사항"에 있다.
+BP 기본값 규칙의 핵심은 CLAUDE.md "#MCP 에셋 편집 주의사항", 이유·확인·복구 절차는 아래 "프로퍼티 편집"의 BP 기본값 항목에 있다.
 
 ##에디터 실행·종료와 빌드
 -실행 전 `tasklist`로 UnrealEditor.exe가 이미 떠 있는지 확인한다. 사용자가 연 에디터가 있으면 새로 띄우지 않고 MCP 연결만 쓴다
@@ -20,8 +20,13 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
   -임시 타입을 참조한 채 저장되어 재시작 후 노드가 None이 된 사례가 있다. 재시작 후 describe_state_tree에서 `<None>` 노드가 없는지 확인한다
 
 ##툴 호출
--`call_tool`은 toolset_name(예: `ap_toolset.toolsets.anim_montage.AnimMontageTools`)과 tool_name(접두사 없는 툴 이름)을 따로 넘긴다. 툴세트 이름은 list_toolsets, 인자 스키마는 describe_toolset으로 확인한다
--describe_toolset 결과가 큰 툴세트(BlueprintTools 등)는 파일로 저장된다. python으로 툴 이름과 인자 목록만 뽑아 본다
+-`call_tool`은 toolset_name(예: `ap_toolset.toolsets.anim_montage.AnimMontageTools`)과 tool_name(접두사 없는 툴 이름)을 따로 넘긴다
+-툴세트·인자 확인은 list_toolsets·describe_toolset 대신 `ProjectToolsetAdminTools.describe_tools_compact`로 한다 (describe_toolset 1회 평균 1.2만 자, 최대 5만 자로 세션 토큰의 가장 큰 단일 원인이었음)
+  -toolset_name='' → 툴세트 이름·툴 개수 목록 / toolset_name만 → 툴별 한 줄 시그니처(`*` 필수 인자) / tool_names="a,b" 추가 → 해당 툴의 전체 설명·스키마만
+  -엔진 툴세트(editor_toolset.*, EditorAppToolset 등)도 조회된다. 시그니처로 부족한 툴만 tool_names로 상세 조회한다
+  -같은 세션에서 이미 조회한 툴세트·툴은 다시 조회하지 않고 앞선 결과를 쓴다 (컨텍스트 압축 뒤 내용이 사라졌을 때만 다시 조회)
+  -없는 툴세트·툴 이름은 오류(ValueError)로 후보 목록을 돌려준다
+  -describe_tools_compact가 등록되지 않은 상태면 먼저 reload_project_toolsets를 호출한다. 그래도 쓸 수 없어 describe_toolset을 써야 하면 python으로 필요한 툴 이름과 인자만 뽑아 본다
 -스키마상 필수인 인자는 기본값이 있어 보여도 넘긴다
   -ap_toolset 툴에서 기본값이 빈 문자열('')인 인자
   -BlueprintTools.find_node_types의 context_pins (빈 배열)
@@ -33,7 +38,11 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
   -진행 상황은 `Saved/Logs/ActionPractice.log`의 `Built static mesh [N s]` 줄로 확인한다
 
 ##프로퍼티 편집
--BP 기본값(CDO·컴포넌트 템플릿)은 BlueprintDefaultsTools.set_blueprint_defaults로만 바꾼다 (CLAUDE.md). 결과를 검증할 때는 배치 인스턴스 값까지 확인한 뒤 결론을 낸다
+-BP 기본값(CDO·컴포넌트 템플릿)은 BlueprintDefaultsTools.set_blueprint_defaults로만 바꾼다 (레벨 배치 인스턴스 전파 + BP·액터 패키지 저장). 결과를 검증할 때는 배치 인스턴스 값까지 확인한 뒤 결론을 낸다
+  -ObjectTools.set_properties로 BP CDO·컴포넌트 템플릿을 직접 바꾸지 않는다. 열린 레벨의 배치 인스턴스에 전파되지 않아 PIE에 반영 안 되고, 이 상태로 레벨을 저장하면 이전 값이 인스턴스 오버라이드로 굳는다
+  -ObjectTools.reset_properties를 BP 인스턴스·컴포넌트에 쓰지 않는다. BP 값이 아닌 네이티브 클래스 기본값으로 되돌린다 (인스턴스를 BP 값으로 맞출 때는 sync_blueprint_instances)
+  -BP 값을 바꿨는데 PIE 동작이 그대로면 check_blueprint_instances로 배치 인스턴스 값부터 확인한다. 결과의 unloaded_map_references(로드 안 된 맵)는 해당 맵을 열었을 때 다시 확인한다
+  -결과의 failed_instances·kept_overrides가 비어 있지 않거나 호출이 중간에 실패하면 check_blueprint_instances → sync_blueprint_instances(force=True)로 복구한다 (재호출은 이전 값이 이미 바뀌어 전파 안 됨)
 -배열: 크기 변경과 기존 원소 변경을 한 호출에 넣으면 "ArrayAdd/ArrayRemove: elements changed alongside the size change"로 거부된다
   -늘릴 때: get_properties로 읽은 기존 원소를 그대로 둔 채 새 원소만 붙인다. 기존 원소도 바꿔야 하면 같은 크기로 먼저 바꾼 뒤, 다시 읽은 값에 새 원소를 붙인다
   -줄이거나 통째로 바꿀 때: 빈 배열로 한 번 설정한 뒤 새 배열을 설정한다
@@ -108,6 +117,7 @@ description: unreal-mcp(언리얼 에디터 MCP)를 쓰는 모든 작업의 공�
 -사용자가 플레이 중일 수 있으므로 임의로 PIE를 종료하지 않는다
 -내가 띄우는 PIE는 플레이어를 조작할 수 없다. 행동 선택 순서, 몽타주 재생 길이, 판정 결과 같은 로그 확인까지만 하고, 조작이 필요한 재현과 체감 품질(움직임, 미끄러짐)은 사용자에게 요청한다
 -로그는 LogsToolset.GetLogEntries(카테고리·정규식 필터) 또는 `Saved/Logs/ActionPractice.log`에서 본다. 사용자가 "마지막 PIE 로그"라고 하면 마지막 PIE 시작 이후 구간을 찾는다
+  -로그 원문을 수백 줄씩 출력하지 않는다. grep -c로 건수부터 보고, 측정 로그(`[ChaseMeasure]` 등)는 python으로 시각·값을 집계해 요약 표로 보며, 원문은 이상 구간 앞뒤 몇 줄만 본다 (로그 원문 출력이 1회 1~2만 자까지 커진 사례)
 -원인이 불분명하거나 사용자와 내 추측이 엇갈리면, 추가 수정 대신 임시 측정 로그(구분 접두사 예: `[ChaseMeasure]`)를 넣고 재현을 요청한다. 원인을 확정한 뒤 로그를 지운다
 
 ##캡처

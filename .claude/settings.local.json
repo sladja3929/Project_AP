@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(where claude)",
+      "Bash(claude:*)",
+      "Bash(\"D:/Epic Games/UE_5.8/Engine/Build/BatchFiles/Build.bat\" ActionPracticeEditor Win64 Development \"D:/unreal/ActionPractice/ActionPractice.uproject\" -waitmutex)",
+      "Bash(\"D:/Epic Games/UE_5.8/Engine/Build/BatchFiles/Build.bat\" ActionPracticeServer Win64 Development \"D:/unreal/ActionPractice/ActionPractice.uproject\" -waitmutex)",
+      "Read(//c//**)",
+      "Read(//d//**)",
+      "Read(//e//**)",
+      "mcp__ide__getDiagnostics",
+      "PowerShell(Test-Path *)",
+      "Bash(powershell *)",
+      "Bash(git *)",
+      "Skill(fewer-permission-prompts)",
+      "Bash(tasklist)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "unreal-mcp"
+  ],
+  "enableAllProjectMcpServers": true,
+  "autoCompactWindow": 300000,
+  "env": {
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "300000"
+  }
+}
