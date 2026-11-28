@@ -26,14 +26,18 @@
 -사용자가 이미지·로그를 언급하면 collab/에서 먼저 찾고, 사용자용 정리 문서를 새로 만들 때도 collab/에 생성할 것
 -developer 서브에이전트는 설계가 확정된 기계적 대량 변경(리네이밍, 레거시 삭제, 다수 파일 일괄 수정)이나 메인 컨텍스트 보호가 필요한 작업에만 위임
 -커밋은 사용자가 요청할 때만 하고, 커밋 시 push까지 함께 수행. 커밋 메시지에 Co-Authored-By 줄은 넣지 않음
+-출력 크기를 모르는 조회는 건수·파일 목록부터 보고 필요한 부분만 읽을 것 (컨텍스트 절약): 소스 검색은 Bash grep 대신 Grep 툴(files_with_matches → head_limit 지정 content), 로그는 grep -c로 건수 확인 후 필요한 구간만 읽거나 python으로 집계해 요약
+
+#Compact Instructions (압축 요약에 남길 것)
+-사용자 결정·피드백·금지 지시는 원래 표현 그대로, 현재 작업 목표·플랜 범위(제외 항목 포함)·남은 단계
+-변경한 파일·에셋 경로와 변경 요지, 빌드·검증·reviewer 결과
+-이후 작업에 쓰는 확인 값(MCP로 읽은 프로퍼티 값, 노티파이 시점, StateTree 상태·노드 이름 등)과 측정·로그 분석의 결론 수치
+-열려 있는 상태: 실행 중인 에디터·PIE·백그라운드 작업, TEMP_ 백업 에셋, 커밋하지 않은 변경
+-버릴 것: 도구 원문 출력(describe 결과, 로그·grep 원문), 이미 해결된 시행착오의 세부 과정
 
 #MCP 에셋 편집 주의사항
--unreal-mcp 툴로 에셋·BP·레벨을 편집하거나 에디터·PIE를 다루기 전에 unreal-mcp 스킬(공통 규칙과 함정 원본)을 읽을 것. 아래는 그중 반드시 지킬 BP 기본값 규칙
--BP 기본값(CDO·컴포넌트 템플릿)은 반드시 ap_toolset BlueprintDefaultsTools.set_blueprint_defaults로 수정 (레벨 배치 인스턴스 전파 + BP·액터 패키지 저장)
--ObjectTools.set_properties로 BP CDO·컴포넌트 템플릿을 직접 바꾸지 말 것. 열린 레벨의 배치 인스턴스에 전파되지 않아 PIE에 반영 안 되고, 이 상태로 레벨을 저장하면 이전 값이 인스턴스 오버라이드로 굳음
--ObjectTools.reset_properties를 BP 인스턴스·컴포넌트에 쓰지 말 것. BP 값이 아닌 네이티브 클래스 기본값으로 되돌림 (인스턴스를 BP 값으로 맞출 때는 sync_blueprint_instances)
--BP 값을 바꿨는데 PIE 동작이 그대로면 check_blueprint_instances로 배치 인스턴스 값부터 확인. 결과의 unloaded_map_references(로드 안 된 맵)는 해당 맵을 열었을 때 다시 확인
--set_blueprint_defaults 결과의 failed_instances·kept_overrides가 비어 있지 않거나 호출이 중간에 실패하면 check_blueprint_instances → sync_blueprint_instances(force=True)로 복구 (재호출은 이전 값이 이미 바뀌어 전파 안 됨)
+-unreal-mcp 툴로 에셋·BP·레벨을 편집하거나 에디터·PIE를 다루기 전에 unreal-mcp 스킬(공통 규칙과 함정 원본)을 읽을 것
+-BP 기본값(CDO·컴포넌트 템플릿)은 반드시 ap_toolset BlueprintDefaultsTools.set_blueprint_defaults로만 수정. ObjectTools.set_properties·reset_properties를 BP CDO·컴포넌트·배치 인스턴스에 쓰지 말 것 (이유·인스턴스 확인·복구 절차는 스킬 "BP 기본값" 항목)
 
 #코드 컨벤션
 -중괄호는 Allman 스타일
@@ -162,24 +166,14 @@ private:
 -SkeletalMesh 콜리전이 Physics Asset 바디 위의 최상위 게이트 역할
 -WeaponTrace 채널 기본 응답은 Ignore로 설정하고, 명시적으로 Block 설정된 메시 바디만 판정
 
-#루트 모션 주의사항
--ApplyRootMotionMoveToForce는 CMC에 사본을 등록함. 태스크 멤버만 변경해도 CMC 사본에는 반영 안 됨
--CMC에 등록된 MoveToForce 소스의 TargetLocation을 직접 수정하지 말 것 — Matches()가 TargetLocation을 비교하므로 dedi 시뮬프록시에서 ConvertRootMotionServerIDsToLocalIDs ensure 발생 (갱신 빈도와 무관)
--이동 중 목적지 재조정이 필요한 루트 모션은 MoveToDynamicForce 사용 (Matches가 목적지 비교 안 함, SetTargetLocation으로 기존 소스 유지한 채 갱신)
--MoveToDynamicForce는 GAS 태스크가 아닌 Engine 모듈 struct(RootMotionSource.h) — CMC->ApplyRootMotionSource로 직접 등록. 대응하는 Vector 기반 태스크는 없음
--목적지를 계속 갱신하는 GAS 태스크는 ApplyRootMotionMoveToActorForce뿐이며 TargetActor 필수 (Actor 없으면 목적지 고정, SetRootMotionTargetLocation은 protected)
--MoveToDynamicForce도 StartLocation이 고정이라 TargetLocation만 바꾸면 lerp 목표점이 진행률 × 변화량만큼 즉시 튐(움찔거림). 변화율 클램프는 점프를 줄이는 대신 추적 지연을 만듦
--점프 없는 재타게팅은 같은 소스에서 StartLocation을 역산값으로 직접 대입 + SetTargetLocation을 함께 호출 (Matches가 Start/Target 비교 안 함, UpdateStateFrom이 둘 다 시뮬프록시로 복사 → ensure 없음). 예: EnemyLungeAbility
--CMC 소스 필드 직접 대입은 해당 struct의 Matches() 비교 대상이 아닌 필드만 허용. 소스 교체(Remove → Apply)로 재타게팅하지 말 것
-
-#애니메이션 주의사항
--Two-stage chained Layered Blend Per Bone (UpperBody 적용 → 캐시 → arm 레이어 base로 사용)로 구성하면 GetSlotLocalWeight 동적 가중치 없이 레이어 분리 가능
--양손 무기 레이어 스위칭은 DA에 프로퍼티만 유지 중이며, 구현은 명시적으로 보류 상태
+#루트 모션 / 애니메이션 주의사항
+-CMC에 등록된 루트 모션 소스의 Matches() 비교 필드(MoveToForce의 TargetLocation 등)를 직접 수정하거나 소스 교체(Remove → Apply)로 재타게팅하지 말 것 (dedi 시뮬프록시 ensure)
+-루트 모션 소스(MoveToForce·MoveToDynamicForce)를 다루거나 재타게팅하기 전 docs/ARCHITECTURE.md "루트 모션 소스" 섹션을 읽을 것
+-애니메이션 레이어 구성(Layered Blend Per Bone, 양손 무기 레이어 보류)은 ARCHITECTURE.md "애니메이션 레이어" 섹션 참조
 
 #StateTree 주의사항
 -Property Binding은 Context Actor의 서브오브젝트(컴포넌트) 프로퍼티만 노출함. 액터 직속 UPROPERTY 멤버는 노출 안 됨
--태그 기반 Condition은 노드 선택 시점에만 평가됨. 글로벌 전환이 필요하면 Root 레벨 On Event Transition 사용
--공격(ActivateAbilityTask) 상태에는 쿨다운이 0이어도 항상 쿨다운 조건(HasGameplayTagsCondition, 어빌리티 AbilityTags, bInvert)을 두고, Combat 맨 끝에는 Wait 상태를 둠 (docs/STATETREE_COMBAT_LAYOUT.md)
+-편집은 edit-statetree 스킬, 전투 상태 배치(공격 상태 쿨다운 조건, Combat 끝 Wait 상태)는 docs/STATETREE_COMBAT_LAYOUT.md, 태그 Condition 평가 시점은 ARCHITECTURE.md를 따를 것
 
 #응답 원칙
 -질문에서 AP 접두사를 사용하면 보통 ActionPractice를 줄여서 부르는 것으로 해석할 것

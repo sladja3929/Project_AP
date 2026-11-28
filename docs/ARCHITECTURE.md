@@ -103,3 +103,17 @@ CLAUDE.md에는 핵심 불변식만 한 줄로 두고, 해당 시스템을 수�
 -플레이어(ActionRecoveryAbility 계열): 로컬 컨트롤 측이 락온/입력 방향으로 Facing 타깃 계산 → 로컬 적용 + Server RPC 전달(SetWarpTargetYawPredicted). 방향이 없으면 타깃 제거해 이전 액션 타깃 잔존 방지. 일반 공격·구르기 공격은 시작 0.1초에 즉시 돌고, 대시 공격(Sprint/ChargeSprint)은 조금 길게(약 0~0.25초, 강 0~0.2초) 잡아 부드럽게 돌되, 돌진 본격 구간 전에 끝냄. Facing은 시작 순간 방향의 고정 Yaw라 회전 구간이 돌진과 많이 겹치면 도는 동안 원래 방향으로 전진해 궤적이 휘고 도착 시 타깃과 어긋남
 -적(EnemyAttackAbility 계열): 서버가 매 콤보 시작 시 캐싱된 타깃을 bFollowComponent로 AttackTarget·AttackApproach에 설정 → 시뮬 프록시 자동 복제. 단 런지(SuperJump)는 비루트모션 몽타주라 워핑 불가 → TrackingTarget ANS의 틱 회전(RotateToTarget) + 목적지 이벤트 발행 유지
 -워핑은 루트 모션을 수정하는 방식이므로 몽타주 애니메이션의 Root Motion이 켜져 있어야 하고, MOVE_None 상태에선 동작하지 않음 (Rest는 이 이유로 틱 회전 유지)
+
+##루트 모션 소스 (RootMotionSource) 주의사항
+-ApplyRootMotionMoveToForce는 CMC에 사본을 등록함. 태스크 멤버만 변경해도 CMC 사본에는 반영 안 됨
+-CMC에 등록된 MoveToForce 소스의 TargetLocation을 직접 수정하지 말 것 — Matches()가 TargetLocation을 비교하므로 dedi 시뮬프록시에서 ConvertRootMotionServerIDsToLocalIDs ensure 발생 (갱신 빈도와 무관)
+-이동 중 목적지 재조정이 필요한 루트 모션은 MoveToDynamicForce 사용 (Matches가 목적지 비교 안 함, SetTargetLocation으로 기존 소스 유지한 채 갱신)
+-MoveToDynamicForce는 GAS 태스크가 아닌 Engine 모듈 struct(RootMotionSource.h) — CMC->ApplyRootMotionSource로 직접 등록. 대응하는 Vector 기반 태스크는 없음
+-목적지를 계속 갱신하는 GAS 태스크는 ApplyRootMotionMoveToActorForce뿐이며 TargetActor 필수 (Actor 없으면 목적지 고정, SetRootMotionTargetLocation은 protected)
+-MoveToDynamicForce도 StartLocation이 고정이라 TargetLocation만 바꾸면 lerp 목표점이 진행률 × 변화량만큼 즉시 튐(움찔거림). 변화율 클램프는 점프를 줄이는 대신 추적 지연을 만듦
+-점프 없는 재타게팅은 같은 소스에서 StartLocation을 역산값으로 직접 대입 + SetTargetLocation을 함께 호출 (Matches가 Start/Target 비교 안 함, UpdateStateFrom이 둘 다 시뮬프록시로 복사 → ensure 없음). 예: EnemyLungeAbility
+-CMC 소스 필드 직접 대입은 해당 struct의 Matches() 비교 대상이 아닌 필드만 허용. 소스 교체(Remove → Apply)로 재타게팅하지 말 것
+
+##애니메이션 레이어 주의사항
+-Two-stage chained Layered Blend Per Bone (UpperBody 적용 → 캐시 → arm 레이어 base로 사용)로 구성하면 GetSlotLocalWeight 동적 가중치 없이 레이어 분리 가능
+-양손 무기 레이어 스위칭은 DA에 프로퍼티만 유지 중이며, 구현은 명시적으로 보류 상태
